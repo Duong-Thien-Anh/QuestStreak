@@ -1,0 +1,81 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 240 14% 4%;
+    --foreground: 0 0% 100%;
+    --card: 240 14% 8%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 14% 6%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 336 100% 58%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 14% 14%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 240 14% 14%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 14% 14%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 4 90% 58%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 10% 18%;
+    --input: 240 10% 18%;
+    --ring: 336 100% 58%;
+    --radius: 0.75rem;
+  }
+
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-[#0D0D11] text-white antialiased;
+    font-family: 'Inter', system-ui, -apple-system, sans-serif;
+    overflow-x: hidden;
+    -webkit-tap-highlight-color: transparent;
+  }
+
+  /* Scrollbar styling */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: #52525B;
+    border-radius: 2px;
+  }
+}
+
+@layer utilities {
+  .text-gradient-pink {
+    background: linear-gradient(135deg, #FF2A85, #FF6B9D);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .text-gradient-purple {
+    background: linear-gradient(135deg, #A155FF, #D4A5FF);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+  }
+  .bg-glass {
+    background: rgba(26, 26, 34, 0.85);
+    backdrop-filter: blur(12px);
+  }
+  .shadow-neon-pink {
+    box-shadow: 0 0 20px rgba(255, 42, 133, 0.3), 0 0 40px rgba(255, 42, 133, 0.1);
+  }
+  .shadow-neon-purple {
+    box-shadow: 0 0 20px rgba(161, 85, 255, 0.3), 0 0 40px rgba(161, 85, 255, 0.1);
+  }
+  .shadow-neon-red {
+    box-shadow: 0 0 20px rgba(255, 59, 48, 0.3), 0 0 40px rgba(255, 59, 48, 0.1);
+  }
+  .shadow-neon-cyan {
+    box-shadow: 0 0 20px rgba(0, 242, 254, 0.3), 0 0 40px rgba(0, 242, 254, 0.1);
+  }
+}

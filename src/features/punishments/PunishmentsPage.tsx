@@ -1,0 +1,413 @@
+import { useState } from "react";
+import { useAppStore } from "@/shared/store/useAppStore";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Link2,
+  AlertOctagon,
+  Heart,
+  Plus,
+  Check,
+  Crown,
+} from "lucide-react";
+import { FAB } from "@/shared/components/FAB";
+import { BottomSheet } from "@/shared/components/BottomSheet";
+import { mockPunishments, mockMembers } from "@/shared/mockData/mockData";
+
+interface ChecklistItem {
+  label: string;
+  completed: boolean;
+}
+
+interface Assignment {
+  id: number;
+  punishmentId: number;
+  memberId: number;
+  assignedBy: number;
+  status: string;
+  assignedAt: Date;
+  checklist: ChecklistItem[];
+  punishment: (typeof mockPunishments)[0];
+}
+
+export function PunishmentsPage() {
+  const { mockSystemRole, showToast } = useAppStore();
+  const isAdmin = mockSystemRole === "admin";
+  const [wallet, setWallet] = useState(mockMembers[1].wallet);
+  const [assignments, setAssignments] = useState<Assignment[]>([
+    {
+      id: 1,
+      punishmentId: 1,
+      memberId: 2,
+      assignedBy: 1,
+      status: "active",
+      assignedAt: new Date(),
+      checklist: [
+        { label: "Viết 100 dòng đầu tiên", completed: false },
+        { label: "Viết 100 dòng tiếp theo", completed: false },
+        { label: "Viết 100 dòng tiếp theo", completed: false },
+        { label: "Viết 100 dòng tiếp theo", completed: false },
+        { label: "Viết 100 dòng cuối cùng", completed: false },
+      ],
+      punishment: mockPunishments[0],
+    },
+  ]);
+  const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [actionSheet, setActionSheet] = useState<string | null>(null);
+  const [pointsInput, setPointsInput] = useState("5");
+  const [reasonInput, setReasonInput] = useState("");
+  const [punishments] = useState(mockPunishments);
+
+  const toggleChecklistItem = (assignmentId: number, index: number) => {
+    setAssignments((prev) =>
+      prev.map((a) => {
+        if (a.id !== assignmentId) return a;
+        const newChecklist = a.checklist.map((item, i) =>
+          i === index ? { ...item, completed: !item.completed } : item
+        );
+        return { ...a, checklist: newChecklist };
+      })
+    );
+  };
+
+  const handleRedeem = (assignment: Assignment) => {
+    const allCompleted = assignment.checklist.every((item) => item.completed);
+    if (!allCompleted) {
+      showToast("Vui long hoan thanh tat ca cac muc!", "error");
+      return;
+    }
+    if (wallet.chayBalance < assignment.punishment.chayCost) {
+      showToast("Khong du Chay de chuoc loi!", "error");
+      return;
+    }
+    setWallet((prev) => ({
+      ...prev,
+      chayBalance: Math.max(0, prev.chayBalance - assignment.punishment.chayCost),
+    }));
+    setAssignments((prev) =>
+      prev.map((a) => (a.id === assignment.id ? { ...a, status: "redeemed" } : a))
+    );
+    setExpandedId(null);
+    showToast("Da chuoc loi thanh cong!", "success");
+  };
+
+  const handleForgive = (assignmentId: number) => {
+    setAssignments((prev) =>
+      prev.map((a) => (a.id === assignmentId ? { ...a, status: "forgiven" } : a))
+    );
+    setActionSheet(null);
+    showToast("Da tha thu!", "success");
+  };
+
+  const handleAddDemerits = () => {
+    const amount = parseInt(pointsInput) || 0;
+    if (amount <= 0) return;
+    setWallet((prev) => ({ ...prev, chayBalance: prev.chayBalance + amount }));
+    setActionSheet(null);
+    showToast("Da them " + amount + " Chay!", "success");
+  };
+
+  const handleForgiveDemerits = () => {
+    const amount = parseInt(pointsInput) || 0;
+    if (amount <= 0) return;
+    setWallet((prev) => ({
+      ...prev,
+      chayBalance: Math.max(0, prev.chayBalance - amount),
+    }));
+    setActionSheet(null);
+    showToast("Da xoa " + amount + " Chay!", "success");
+  };
+
+  const activeAssignments = assignments.filter((a) => a.status === "active");
+
+  return (
+    <div className="px-4 pt-4 space-y-4">
+      {/* Profile Card */}
+      <motion.div
+        initial={{ opacity: 0, y: 15 }}
+        animate={{ opacity: 1, y: 0 }}
+        className="flex gap-4"
+      >
+        <div className="relative flex-shrink-0">
+          <img
+            src="/avatars/sub.jpg"
+            alt="Avatar"
+            className="w-20 h-20 rounded-xl object-cover border-2 border-[#FF3B30]/30"
+          />
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF3B30] flex items-center justify-center">
+            <AlertOctagon className="w-3 h-3 text-white" />
+          </div>
+        </div>
+        <div className="flex-1 grid grid-rows-2 gap-2">
+          <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
+            <div>
+              <p className="text-2xl font-bold text-white">{wallet.chayBalance}</p>
+              <p className="text-xs text-white/50">Chay</p>
+            </div>
+            <Link2 className="w-6 h-6 text-[#FF3B30]" />
+          </div>
+          <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
+            <div>
+              <p className="text-2xl font-bold text-white">
+                {assignments.filter((a) => a.status === "redeemed").length}
+              </p>
+              <p className="text-xs text-white/50">Redeemed</p>
+            </div>
+            <Crown className="w-6 h-6 text-[#FFD700]" />
+          </div>
+        </div>
+      </motion.div>
+
+      {/* Active Punishments */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+          Active Punishments
+        </h2>
+
+        {activeAssignments.length === 0 ? (
+          <div className="text-center py-8 text-white/30 text-sm">
+            No active punishments
+          </div>
+        ) : (
+          activeAssignments.map((assignment) => (
+            <motion.div
+              key={assignment.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              className={
+                "bg-[#1A1A22] rounded-xl border transition-colors " +
+                (expandedId === assignment.id
+                  ? "border-[#FF3B30]/30 bg-[#252532]"
+                  : "border-white/5")
+              }
+            >
+              <div className="p-4">
+                <div className="flex items-start justify-between">
+                  <div className="flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-white text-sm">
+                        {assignment.punishment.title}
+                      </h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
+                        <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chay
+                      </span>
+                    </div>
+                    <p className="text-xs text-white/50 mt-1">
+                      {assignment.punishment.description}
+                    </p>
+                  </div>
+                  {isAdmin ? (
+                    <button
+                      onClick={() => handleForgive(assignment.id)}
+                      className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
+                    >
+                      Forgive
+                    </button>
+                  ) : (
+                    <button
+                      onClick={() =>
+                        setExpandedId(
+                          expandedId === assignment.id ? null : assignment.id
+                        )
+                      }
+                      className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
+                    >
+                      {expandedId === assignment.id ? "Close" : "Redeem"}
+                    </button>
+                  )}
+                </div>
+              </div>
+
+              {/* Expandable checklist */}
+              <AnimatePresence>
+                {expandedId === assignment.id && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: "auto" }}
+                    exit={{ opacity: 0, height: 0 }}
+                    transition={{ duration: 0.2 }}
+                    className="overflow-hidden"
+                  >
+                    <div className="px-4 pb-4 space-y-2">
+                      {assignment.checklist.map((item, i) => (
+                        <motion.button
+                          key={i}
+                          initial={{ opacity: 0, x: -10 }}
+                          animate={{ opacity: 1, x: 0 }}
+                          transition={{ delay: i * 0.05 }}
+                          onClick={() => toggleChecklistItem(assignment.id, i)}
+                          className="w-full flex items-center gap-3 p-3 rounded-lg bg-[#1A1A22] border border-white/5 hover:border-[#00F2FE]/20 transition-colors"
+                        >
+                          <div
+                            className={
+                              "w-5 h-5 rounded border-2 flex items-center justify-center transition-all " +
+                              (item.completed
+                                ? "bg-[#00F2FE] border-[#00F2FE]"
+                                : "border-white/20")
+                            }
+                          >
+                            {item.completed && (
+                              <motion.div
+                                initial={{ scale: 0 }}
+                                animate={{ scale: 1 }}
+                                transition={{ type: "spring", stiffness: 400 }}
+                              >
+                                <Check className="w-3 h-3 text-[#0D0D11]" />
+                              </motion.div>
+                            )}
+                          </div>
+                          <span
+                            className={
+                              "text-sm " +
+                              (item.completed
+                                ? "text-white/40 line-through"
+                                : "text-white/70")
+                            }
+                          >
+                            {item.label}
+                          </span>
+                        </motion.button>
+                      ))}
+                      <button
+                        onClick={() => handleRedeem(assignment)}
+                        className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors mt-2"
+                      >
+                        Submit Redemption ({assignment.punishment.chayCost} Chay)
+                      </button>
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </motion.div>
+          ))
+        )}
+      </div>
+
+      {/* All Punishments Catalog */}
+      <div className="space-y-3">
+        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+          Punishment Catalog
+        </h2>
+        {punishments.map((p, i) => (
+          <motion.div
+            key={p.id}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.05 }}
+            className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
+          >
+            <div className="flex items-start justify-between">
+              <div className="flex-1">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <h3 className="font-semibold text-white text-sm">{p.title}</h3>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
+                    <Link2 className="w-3 h-3" /> {p.chayCost} Chay
+                  </span>
+                </div>
+                <p className="text-xs text-white/50 mt-1">{p.description}</p>
+              </div>
+              {isAdmin && (
+                <button className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0">
+                  Assign
+                </button>
+              )}
+            </div>
+          </motion.div>
+        ))}
+      </div>
+
+      {/* FAB */}
+      <FAB
+        actions={[
+          {
+            label: "New Punishment",
+            icon: <Plus className="w-5 h-5 text-white" />,
+            onClick: () => showToast("Tao hinh phat moi!", "info"),
+            color: "#FF3B30",
+          },
+          {
+            label: "Forgive Demerit",
+            icon: <Heart className="w-5 h-5 text-white" />,
+            onClick: () => setActionSheet("forgive"),
+            color: "#00F2FE",
+          },
+          {
+            label: "Add Demerit",
+            icon: <AlertOctagon className="w-5 h-5 text-white" />,
+            onClick: () => setActionSheet("add"),
+            color: "#FF3B30",
+          },
+        ]}
+      />
+
+      {/* Action Sheets */}
+      <BottomSheet
+        isOpen={actionSheet === "add"}
+        onClose={() => setActionSheet(null)}
+        title="Add Demerits"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Amount</label>
+            <input
+              type="number"
+              value={pointsInput}
+              onChange={(e) => setPointsInput(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Reason</label>
+            <input
+              type="text"
+              value={reasonInput}
+              onChange={(e) => setReasonInput(e.target.value)}
+              placeholder="Enter reason..."
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleAddDemerits}
+            className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 transition-colors"
+          >
+            Add Chay
+          </button>
+        </div>
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={actionSheet === "forgive"}
+        onClose={() => setActionSheet(null)}
+        title="Forgive Demerits"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Amount to Forgive</label>
+            <input
+              type="number"
+              value={pointsInput}
+              onChange={(e) => setPointsInput(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Mercy Note</label>
+            <input
+              type="text"
+              value={reasonInput}
+              onChange={(e) => setReasonInput(e.target.value)}
+              placeholder="Write a kind note..."
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleForgiveDemerits}
+            className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
+          >
+            <Heart className="w-4 h-4 inline mr-2" />
+            Forgive
+          </button>
+        </div>
+      </BottomSheet>
+    </div>
+  );
+}

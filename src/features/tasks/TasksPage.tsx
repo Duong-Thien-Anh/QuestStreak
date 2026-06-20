@@ -214,7 +214,7 @@ export function TasksPage() {
           <img
             src={subMember?.telegramAvatar || "/avatars/sub.jpg"}
             alt="Avatar"
-            className="w-20 h-20 rounded-xl object-cover border-2 border-[#FF2A85]/30"
+            className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF2A85] flex items-center justify-center">
             <Heart className="w-3 h-3 text-white" />
@@ -222,7 +222,7 @@ export function TasksPage() {
         </div>
 
         {/* Wallets */}
-        <div className="flex-1 grid grid-rows-2 gap-2">
+        <div className="w-44 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{subMember?.wallet.chymBalance}</p>

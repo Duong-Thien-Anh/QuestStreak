@@ -49,7 +49,7 @@ export const habitRouter = createRouter({
           icon: input.icon || "heart",
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: habits.id });
 
       return { id: habit.id, ...input };
     }),

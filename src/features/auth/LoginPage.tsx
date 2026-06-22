@@ -18,6 +18,8 @@ function getOAuthUrl() {
 }
 
 export default function Login() {
+  const showDemoLogin = import.meta.env.DEV;
+
   return (
     <div className="min-h-screen flex items-center justify-center">
       <Card className="w-full max-w-sm">
@@ -25,6 +27,18 @@ export default function Login() {
           <CardTitle>Welcome</CardTitle>
         </CardHeader>
         <CardContent>
+          {showDemoLogin && (
+            <Button
+              className="mb-3 w-full"
+              size="lg"
+              variant="secondary"
+              onClick={() => {
+                window.location.href = "/api/dev/login";
+              }}
+            >
+              Continue as Demo
+            </Button>
+          )}
           <Button
             className="w-full"
             size="lg"

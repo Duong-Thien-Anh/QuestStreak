@@ -1,4 +1,5 @@
 import { motion } from "framer-motion";
+import { useState } from "react";
 import { useAppStore } from "@/shared/store/useAppStore";
 import {
   ChevronLeft,
@@ -10,10 +11,119 @@ import {
   HelpCircle,
 } from "lucide-react";
 import { mockMembers } from "@/shared/mockData/mockData";
+import { trpc } from "@/providers/trpc";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
+
+type LocalMember = {
+  id: number;
+  houseId: number;
+  userId: number;
+  nickname: string;
+  lifestyleRole: "dominant" | "submissive" | "switch";
+  gender: "male" | "female" | "other";
+  telegramAvatar: string;
+  wallet: {
+    chymBalance: number;
+    chayBalance: number;
+  };
+};
 
 export function HouseManagementPage() {
-  const { setShowHouseManagement, mockSystemRole, showToast } = useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { setShowHouseManagement, showToast } = useAppStore();
+  const { isAdmin } = useCurrentUser();
+  const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
+  const house = houseQuery.data;
+  const [localMembers, setLocalMembers] = useState<LocalMember[]>(
+    mockMembers as LocalMember[]
+  );
+  const members = house?.members ?? localMembers;
+  const utils = trpc.useUtils();
+  const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
+  const [memberForm, setMemberForm] = useState({
+    nickname: "",
+    lifestyleRole: "submissive" as "dominant" | "submissive" | "switch",
+    gender: "other" as "male" | "female" | "other",
+  });
+  const addMemberMutation = trpc.house["member.add"].useMutation({
+    onSuccess: async () => {
+      await utils.house.get.invalidate();
+    },
+  });
+  const updateMemberMutation = trpc.house["member.update"].useMutation({
+    onSuccess: async () => {
+      await utils.house.get.invalidate();
+    },
+  });
+
+  const resetMemberForm = () => {
+    setEditingMemberId(null);
+    setMemberForm({
+      nickname: "",
+      lifestyleRole: "submissive",
+      gender: "other",
+    });
+  };
+
+  const submitMemberForm = () => {
+    if (!memberForm.nickname.trim()) return;
+    if (!house?.id) {
+      if (editingMemberId) {
+        setLocalMembers((prev) =>
+          prev.map((member) =>
+            member.id === editingMemberId
+              ? {
+                  ...member,
+                  nickname: memberForm.nickname,
+                  lifestyleRole: memberForm.lifestyleRole,
+                  gender: memberForm.gender,
+                }
+              : member
+          )
+        );
+        showToast("Đã cập nhật thành viên tạm thời", "success");
+      } else {
+        setLocalMembers((prev) => [
+          ...prev,
+          {
+            id: Date.now(),
+            houseId: 1,
+            userId: Date.now(),
+            nickname: memberForm.nickname,
+            lifestyleRole: memberForm.lifestyleRole,
+            gender: memberForm.gender,
+            telegramAvatar: "",
+            wallet: {
+              chymBalance: 0,
+              chayBalance: 0,
+            },
+          },
+        ]);
+        showToast("Đã thêm thành viên tạm thời", "success");
+      }
+      resetMemberForm();
+      return;
+    }
+
+    if (editingMemberId) {
+      updateMemberMutation.mutate({
+        memberId: editingMemberId,
+        nickname: memberForm.nickname,
+        lifestyleRole: memberForm.lifestyleRole,
+        gender: memberForm.gender,
+      });
+      showToast("Đã cập nhật thành viên", "success");
+    } else {
+      addMemberMutation.mutate({
+        houseId: house.id,
+        nickname: memberForm.nickname,
+        lifestyleRole: memberForm.lifestyleRole,
+        gender: memberForm.gender,
+      });
+      showToast("Đã thêm thành viên", "success");
+    }
+
+    resetMemberForm();
+  };
 
   const getRoleIcon = (role: string) => {
     switch (role) {
@@ -66,12 +176,12 @@ export function HouseManagementPage() {
         >
           <ChevronLeft className="w-5 h-5 text-white" />
         </button>
-        <h1 className="text-xl font-bold text-white">Lunis House</h1>
+        <h1 className="text-xl font-bold text-white">{house?.name ?? "Lunis House"}</h1>
       </motion.div>
 
       {/* Members List */}
       <div className="space-y-3">
-        {mockMembers.map((member, i) => {
+        {members.map((member, i) => {
           const isOwner = i === 0;
           return (
             <motion.div
@@ -126,7 +236,14 @@ export function HouseManagementPage() {
               {/* Actions */}
               {isAdmin && (
                 <button
-                  onClick={() => showToast("Chỉnh sửa thành viên", "info")}
+                  onClick={() => {
+                    setEditingMemberId(member.id);
+                    setMemberForm({
+                      nickname: member.nickname ?? "",
+                      lifestyleRole: member.lifestyleRole,
+                      gender: member.gender,
+                    });
+                  }}
                   className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors"
                 >
                   <Settings className="w-4 h-4 text-white/40" />
@@ -137,32 +254,77 @@ export function HouseManagementPage() {
         })}
       </div>
 
-      {/* Role Toggle (Demo Only) */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.2 }}
-        className="mt-6 p-4 bg-[#1A1A22] rounded-xl border border-white/5"
-      >
-        <h3 className="text-sm font-semibold text-white mb-2">Demo Controls</h3>
-        <p className="text-xs text-white/40 mb-3">
-          Toggle between Admin (Dom) and User (Sub) views to see different UI states.
-        </p>
-        <button
-          onClick={() => {
-            useAppStore.getState().toggleMockRole();
-            showToast(
-              `Switched to ${
-                useAppStore.getState().mockSystemRole === "admin" ? "Admin" : "User"
-              } mode`,
-              "info"
-            );
-          }}
-          className="w-full py-2.5 rounded-xl bg-[#252532] border border-white/10 text-white text-sm font-medium hover:bg-white/5 transition-colors"
+      {isAdmin && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+          className="mt-6 p-4 bg-[#1A1A22] rounded-xl border border-white/5 space-y-3"
         >
-          Toggle Role (Current: {isAdmin ? "Admin/Dom" : "User/Sub"})
-        </button>
-      </motion.div>
+          <h3 className="text-sm font-semibold text-white">
+            {editingMemberId ? "Edit Member" : "Add Member"}
+          </h3>
+          <input
+            type="text"
+            value={memberForm.nickname}
+            onChange={(event) =>
+              setMemberForm((current) => ({
+                ...current,
+                nickname: event.target.value,
+              }))
+            }
+            placeholder="Nickname"
+            className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={memberForm.lifestyleRole}
+              onChange={(event) =>
+                setMemberForm((current) => ({
+                  ...current,
+                  lifestyleRole: event.target.value as typeof memberForm.lifestyleRole,
+                }))
+              }
+              className="px-3 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
+            >
+              <option value="dominant">Dominant</option>
+              <option value="submissive">Submissive</option>
+              <option value="switch">Switch</option>
+            </select>
+            <select
+              value={memberForm.gender}
+              onChange={(event) =>
+                setMemberForm((current) => ({
+                  ...current,
+                  gender: event.target.value as typeof memberForm.gender,
+                }))
+              }
+              className="px-3 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
+            >
+              <option value="other">Other</option>
+              <option value="female">Female</option>
+              <option value="male">Male</option>
+            </select>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={submitMemberForm}
+              disabled={!memberForm.nickname.trim()}
+              className="flex-1 py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 transition-colors"
+            >
+              {editingMemberId ? "Save Member" : "Add Member"}
+            </button>
+            {editingMemberId && (
+              <button
+                onClick={resetMemberForm}
+                className="px-4 py-3 rounded-xl border border-white/10 text-white/70 text-sm hover:bg-white/5 transition-colors"
+              >
+                Cancel
+              </button>
+            )}
+          </div>
+        </motion.div>
+      )}
 
       {/* House Info */}
       <motion.div
@@ -175,11 +337,11 @@ export function HouseManagementPage() {
         <div className="space-y-2 text-xs text-white/50">
           <div className="flex justify-between">
             <span>House Name</span>
-            <span className="text-white/80">Lunis House</span>
+            <span className="text-white/80">{house?.name ?? "Lunis House"}</span>
           </div>
           <div className="flex justify-between">
             <span>Members</span>
-            <span className="text-white/80">{mockMembers.length}</span>
+            <span className="text-white/80">{members.length}</span>
           </div>
           <div className="flex justify-between">
             <span>Created</span>

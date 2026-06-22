@@ -1,6 +1,7 @@
 import { motion, AnimatePresence } from "framer-motion";
 import { Plus } from "lucide-react";
 import { useAppStore } from "@/shared/store/useAppStore";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 interface FABAction {
   label: string;
@@ -14,8 +15,8 @@ interface FABProps {
 }
 
 export function FAB({ actions }: FABProps) {
-  const { fabOpen, setFabOpen, mockSystemRole } = useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { fabOpen, setFabOpen } = useAppStore();
+  const { isAdmin } = useCurrentUser();
 
   if (!isAdmin) return null;
 

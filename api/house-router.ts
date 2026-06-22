@@ -64,7 +64,7 @@ export const houseRouter = createRouter({
           name: input.name || "Lunis House",
           ownerId: userId,
         })
-        .$returningId();
+        .returning({ id: houses.id });
 
       // Create member record for owner
       const [member] = await db
@@ -75,7 +75,7 @@ export const houseRouter = createRouter({
           nickname: ctx.user.name || "Chủ nhà",
           lifestyleRole: "dominant",
         })
-        .$returningId();
+        .returning({ id: houseMembers.id });
 
       // Create wallet
       await db.insert(wallets).values({ memberId: member.id });
@@ -129,7 +129,7 @@ export const houseRouter = createRouter({
           lifestyleRole: input.lifestyleRole,
           gender: input.gender || "other",
         })
-        .$returningId();
+        .returning({ id: houseMembers.id });
 
       await db.insert(wallets).values({ memberId: member.id });
 

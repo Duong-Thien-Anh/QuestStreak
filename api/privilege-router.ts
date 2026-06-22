@@ -40,7 +40,7 @@ export const privilegeRouter = createRouter({
           rarity: input.rarity,
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: privileges.id });
 
       return { id: priv.id, ...input };
     }),

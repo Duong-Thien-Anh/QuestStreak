@@ -69,7 +69,7 @@ export const taskRouter = createRouter({
           linkedRewardId: input.linkedRewardId || null,
           linkedPunishmentId: input.linkedPunishmentId || null,
         })
-        .$returningId();
+        .returning({ id: tasks.id });
 
       return { id: task.id, ...input };
     }),
@@ -96,6 +96,23 @@ export const taskRouter = createRouter({
       if (input.dueDate !== undefined) updateData.dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
       await db.update(tasks).set(updateData).where(eq(tasks.id, input.taskId));
+      return { success: true };
+    }),
+
+  assign: adminQuery
+    .input(
+      z.object({
+        taskId: z.number(),
+        memberId: z.number(),
+      })
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .update(tasks)
+        .set({ assignedTo: input.memberId, status: "active" })
+        .where(eq(tasks.id, input.taskId));
+
       return { success: true };
     }),
 

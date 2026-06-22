@@ -1,8 +1,6 @@
 import { create } from "zustand";
 
 export type Tab = "tasks" | "shop" | "punishments" | "notebook";
-export type LifestyleRole = "dominant" | "submissive" | "switch";
-export type SystemRole = "admin" | "user";
 
 export interface AppState {
   // Navigation
@@ -36,12 +34,6 @@ export interface AppState {
   notebookSubTab: string;
   setNotebookSubTab: (tab: string) => void;
 
-  // Mock data (for demo mode)
-  mockHouseId: number;
-  mockMemberId: number;
-  mockSystemRole: SystemRole;
-  mockLifestyleRole: LifestyleRole;
-  toggleMockRole: () => void;
 }
 
 export const useAppStore = create<AppState>((set) => ({
@@ -75,15 +67,4 @@ export const useAppStore = create<AppState>((set) => ({
   // Notebook sub-tab
   notebookSubTab: "overview",
   setNotebookSubTab: (tab) => set({ notebookSubTab: tab }),
-
-  // Mock data
-  mockHouseId: 1,
-  mockMemberId: 2,
-  mockSystemRole: "admin",
-  mockLifestyleRole: "dominant",
-  toggleMockRole: () =>
-    set((state) => ({
-      mockSystemRole: state.mockSystemRole === "admin" ? "user" : "admin",
-      mockLifestyleRole: state.mockLifestyleRole === "dominant" ? "submissive" : "dominant",
-    })),
 }));

@@ -29,8 +29,12 @@ export async function upsertUser(data: InsertUser) {
     updateSet.role = "admin";
   }
 
+  // PostgreSQL upsert: onConflictDoUpdate replaces MySQL's onDuplicateKeyUpdate
   await getDb()
     .insert(schema.users)
     .values(values)
-    .onDuplicateKeyUpdate({ set: updateSet });
+    .onConflictDoUpdate({
+      target: schema.users.unionId,
+      set: updateSet,
+    });
 }

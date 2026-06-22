@@ -44,7 +44,7 @@ async function seed() {
       name: "Lunis House",
       ownerId: adminId,
     })
-    .$returningId();
+    .returning({ id: houses.id });
 
   console.log(`Created house: ${house.id}`);
 
@@ -58,7 +58,7 @@ async function seed() {
       lifestyleRole: "dominant",
       gender: "male",
     })
-    .$returningId();
+    .returning({ id: houseMembers.id });
 
   // Create sub member (placeholder user)
   const [subMember] = await db
@@ -70,7 +70,7 @@ async function seed() {
       lifestyleRole: "submissive",
       gender: "female",
     })
-    .$returningId();
+    .returning({ id: houseMembers.id });
 
   // Create wallets
   await db.insert(wallets).values({
@@ -368,7 +368,7 @@ async function seed() {
       name: "Nhật ký cảm xúc",
       prompt: "Hôm nay bạn cảm thấy thế nào?",
     })
-    .$returningId();
+    .returning({ id: journals.id });
 
   await db.insert(journalEntries).values([
     {

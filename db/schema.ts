@@ -1,24 +1,43 @@
 import {
-  mysqlTable,
-  mysqlEnum,
+  pgTable,
+  pgEnum,
   serial,
   varchar,
   text,
   timestamp,
-  int,
+  integer,
   bigint,
   boolean,
-} from "drizzle-orm/mysql-core";
+} from "drizzle-orm/pg-core";
+
+// ─── Enums ──────────────────────────────────────────────────────────
+
+export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const lifestyleRoleEnum = pgEnum("lifestyleRole", ["dominant", "submissive", "switch"]);
+export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
+export const habitTypeEnum = pgEnum("habitType", ["wanted", "unwanted"]);
+export const frequencyEnum = pgEnum("frequency", ["daily", "weekly", "monthly"]);
+export const checkinStatusEnum = pgEnum("checkinStatus", ["done", "missed"]);
+export const taskCategoryEnum = pgEnum("taskCategory", ["daily", "weekly", "monthly", "special", "superSpecial"]);
+export const taskStatusEnum = pgEnum("taskStatus", ["pending", "active", "submitted", "completed", "failed"]);
+export const rarityEnum = pgEnum("rarity", ["common", "rare", "epic", "legendary"]);
+export const purchaseStatusEnum = pgEnum("purchaseStatus", ["active", "used", "expired"]);
+export const assignmentStatusEnum = pgEnum("assignmentStatus", ["active", "redeemed", "forgiven"]);
+export const privilegeStatusEnum = pgEnum("privilegeStatus", ["active", "used", "expired"]);
+export const limitTypeEnum = pgEnum("limitType", ["limit", "desire"]);
+export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active", "void"]);
+export const moodEnum = pgEnum("mood", ["sad", "neutral", "happy", "excited", "loved"]);
+export const visibilityEnum = pgEnum("visibility", ["public", "private"]);
 
 // ─── Users (managed by auth system) ────────────────────────────────
 
-export const users = mysqlTable("users", {
+export const users = pgTable("users", {
   id: serial("id").primaryKey(),
   unionId: varchar("unionId", { length: 255 }).notNull().unique(),
   name: varchar("name", { length: 255 }),
   email: varchar("email", { length: 320 }),
   avatar: text("avatar"),
-  role: mysqlEnum("role", ["user", "admin"]).default("user").notNull(),
+  role: roleEnum("role").default("user").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -32,10 +51,10 @@ export type InsertUser = typeof users.$inferInsert;
 
 // ─── Houses ────────────────────────────────────────────────────────
 
-export const houses = mysqlTable("houses", {
+export const houses = pgTable("houses", {
   id: serial("id").primaryKey(),
   name: varchar("name", { length: 255 }).default("Lunis House").notNull(),
-  ownerId: bigint("ownerId", { mode: "number", unsigned: true }).notNull(),
+  ownerId: bigint("ownerId", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -47,17 +66,13 @@ export type House = typeof houses.$inferSelect;
 
 // ─── House Members ─────────────────────────────────────────────────
 
-export const houseMembers = mysqlTable("houseMembers", {
+export const houseMembers = pgTable("houseMembers", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
-  userId: bigint("userId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
+  userId: bigint("userId", { mode: "number" }).notNull(),
   nickname: varchar("nickname", { length: 255 }),
-  lifestyleRole: mysqlEnum("lifestyleRole", ["dominant", "submissive", "switch"])
-    .default("submissive")
-    .notNull(),
-  gender: mysqlEnum("gender", ["male", "female", "other"])
-    .default("other")
-    .notNull(),
+  lifestyleRole: lifestyleRoleEnum("lifestyleRole").default("submissive").notNull(),
+  gender: genderEnum("gender").default("other").notNull(),
   telegramAvatar: text("telegramAvatar"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
@@ -70,13 +85,11 @@ export type HouseMember = typeof houseMembers.$inferSelect;
 
 // ─── Wallets ───────────────────────────────────────────────────────
 
-export const wallets = mysqlTable("wallets", {
+export const wallets = pgTable("wallets", {
   id: serial("id").primaryKey(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true })
-    .notNull()
-    .unique(),
-  chymBalance: int("chymBalance").default(0).notNull(),
-  chayBalance: int("chayBalance").default(0).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull().unique(),
+  chymBalance: integer("chymBalance").default(0).notNull(),
+  chayBalance: integer("chayBalance").default(0).notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
     .notNull()
@@ -87,20 +100,18 @@ export type Wallet = typeof wallets.$inferSelect;
 
 // ─── Habits ────────────────────────────────────────────────────────
 
-export const habits = mysqlTable("habits", {
+export const habits = pgTable("habits", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  type: mysqlEnum("type", ["wanted", "unwanted"]).default("wanted").notNull(),
-  frequency: mysqlEnum("frequency", ["daily", "weekly", "monthly"])
-    .default("daily")
-    .notNull(),
+  type: habitTypeEnum("type").default("wanted").notNull(),
+  frequency: frequencyEnum("frequency").default("daily").notNull(),
   daysOfWeek: text("daysOfWeek"),
-  chymReward: int("chymReward").default(0).notNull(),
-  chayPenalty: int("chayPenalty").default(0).notNull(),
+  chymReward: integer("chymReward").default(0).notNull(),
+  chayPenalty: integer("chayPenalty").default(0).notNull(),
   icon: varchar("icon", { length: 50 }).default("heart"),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -112,55 +123,33 @@ export type Habit = typeof habits.$inferSelect;
 
 // ─── Habit Checkins ────────────────────────────────────────────────
 
-export const habitCheckins = mysqlTable("habitCheckins", {
+export const habitCheckins = pgTable("habitCheckins", {
   id: serial("id").primaryKey(),
-  habitId: bigint("habitId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
+  habitId: bigint("habitId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
   checkedAt: timestamp("checkedAt").defaultNow().notNull(),
-  status: mysqlEnum("status", ["done", "missed"]).default("done").notNull(),
+  status: checkinStatusEnum("status").default("done").notNull(),
 });
 
 export type HabitCheckin = typeof habitCheckins.$inferSelect;
 
 // ─── Tasks ─────────────────────────────────────────────────────────
 
-export const tasks = mysqlTable("tasks", {
+export const tasks = pgTable("tasks", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  category: mysqlEnum("category", [
-    "daily",
-    "weekly",
-    "monthly",
-    "special",
-    "superSpecial",
-  ])
-    .default("daily")
-    .notNull(),
-  chymReward: int("chymReward").default(0).notNull(),
-  chayPenalty: int("chayPenalty").default(0).notNull(),
-  assignedTo: bigint("assignedTo", { mode: "number", unsigned: true }),
-  status: mysqlEnum("status", [
-    "pending",
-    "active",
-    "submitted",
-    "completed",
-    "failed",
-  ])
-    .default("pending")
-    .notNull(),
+  category: taskCategoryEnum("category").default("daily").notNull(),
+  chymReward: integer("chymReward").default(0).notNull(),
+  chayPenalty: integer("chayPenalty").default(0).notNull(),
+  assignedTo: bigint("assignedTo", { mode: "number" }),
+  status: taskStatusEnum("status").default("pending").notNull(),
   dueDate: timestamp("dueDate"),
   completedAt: timestamp("completedAt"),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
-  linkedRewardId: bigint("linkedRewardId", {
-    mode: "number",
-    unsigned: true,
-  }),
-  linkedPunishmentId: bigint("linkedPunishmentId", {
-    mode: "number",
-    unsigned: true,
-  }),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
+  linkedRewardId: bigint("linkedRewardId", { mode: "number" }),
+  linkedPunishmentId: bigint("linkedPunishmentId", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -172,18 +161,16 @@ export type Task = typeof tasks.$inferSelect;
 
 // ─── Rewards ───────────────────────────────────────────────────────
 
-export const rewards = mysqlTable("rewards", {
+export const rewards = pgTable("rewards", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  cost: int("cost").default(0).notNull(),
+  cost: integer("cost").default(0).notNull(),
   image: text("image"),
-  rarity: mysqlEnum("rarity", ["common", "rare", "epic", "legendary"])
-    .default("common")
-    .notNull(),
+  rarity: rarityEnum("rarity").default("common").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -191,32 +178,28 @@ export type Reward = typeof rewards.$inferSelect;
 
 // ─── Reward Purchases ──────────────────────────────────────────────
 
-export const rewardPurchases = mysqlTable("rewardPurchases", {
+export const rewardPurchases = pgTable("rewardPurchases", {
   id: serial("id").primaryKey(),
-  rewardId: bigint("rewardId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
+  rewardId: bigint("rewardId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
   purchasedAt: timestamp("purchasedAt").defaultNow().notNull(),
-  giftedBy: bigint("giftedBy", { mode: "number", unsigned: true }),
-  status: mysqlEnum("status", ["active", "used", "expired"])
-    .default("active")
-    .notNull(),
+  giftedBy: bigint("giftedBy", { mode: "number" }),
+  status: purchaseStatusEnum("status").default("active").notNull(),
 });
 
 export type RewardPurchase = typeof rewardPurchases.$inferSelect;
 
 // ─── Privileges ────────────────────────────────────────────────────
 
-export const privileges = mysqlTable("privileges", {
+export const privileges = pgTable("privileges", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   image: text("image"),
-  rarity: mysqlEnum("rarity", ["common", "rare", "epic", "legendary"])
-    .default("common")
-    .notNull(),
+  rarity: rarityEnum("rarity").default("common").notNull(),
   isActive: boolean("isActive").default(true).notNull(),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -224,30 +207,28 @@ export type Privilege = typeof privileges.$inferSelect;
 
 // ─── Privilege Assignments ─────────────────────────────────────────
 
-export const privilegeAssignments = mysqlTable("privilegeAssignments", {
+export const privilegeAssignments = pgTable("privilegeAssignments", {
   id: serial("id").primaryKey(),
-  privilegeId: bigint("privilegeId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
-  assignedBy: bigint("assignedBy", { mode: "number", unsigned: true }).notNull(),
+  privilegeId: bigint("privilegeId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
+  assignedBy: bigint("assignedBy", { mode: "number" }).notNull(),
   assignedAt: timestamp("assignedAt").defaultNow().notNull(),
-  status: mysqlEnum("status", ["active", "used", "expired"])
-    .default("active")
-    .notNull(),
+  status: privilegeStatusEnum("status").default("active").notNull(),
 });
 
 export type PrivilegeAssignment = typeof privilegeAssignments.$inferSelect;
 
 // ─── Punishments ───────────────────────────────────────────────────
 
-export const punishments = mysqlTable("punishments", {
+export const punishments = pgTable("punishments", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
-  chayCost: int("chayCost").default(0).notNull(),
+  chayCost: integer("chayCost").default(0).notNull(),
   image: text("image"),
   isActive: boolean("isActive").default(true).notNull(),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -255,14 +236,12 @@ export type Punishment = typeof punishments.$inferSelect;
 
 // ─── Punishment Assignments ────────────────────────────────────────
 
-export const punishmentAssignments = mysqlTable("punishmentAssignments", {
+export const punishmentAssignments = pgTable("punishmentAssignments", {
   id: serial("id").primaryKey(),
-  punishmentId: bigint("punishmentId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
-  assignedBy: bigint("assignedBy", { mode: "number", unsigned: true }).notNull(),
-  status: mysqlEnum("status", ["active", "redeemed", "forgiven"])
-    .default("active")
-    .notNull(),
+  punishmentId: bigint("punishmentId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
+  assignedBy: bigint("assignedBy", { mode: "number" }).notNull(),
+  status: assignmentStatusEnum("status").default("active").notNull(),
   assignedAt: timestamp("assignedAt").defaultNow().notNull(),
   redeemedAt: timestamp("redeemedAt"),
   checklist: text("checklist"),
@@ -272,12 +251,12 @@ export type PunishmentAssignment = typeof punishmentAssignments.$inferSelect;
 
 // ─── Limits ────────────────────────────────────────────────────────
 
-export const limits = mysqlTable("limits", {
+export const limits = pgTable("limits", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   content: text("content").notNull(),
-  type: mysqlEnum("type", ["limit", "desire"]).default("limit").notNull(),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  type: limitTypeEnum("type").default("limit").notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -285,9 +264,9 @@ export type Limit = typeof limits.$inferSelect;
 
 // ─── Agreements ────────────────────────────────────────────────────
 
-export const agreements = mysqlTable("agreements", {
+export const agreements = pgTable("agreements", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   purpose: text("purpose"),
   rules: text("rules"),
@@ -296,10 +275,8 @@ export const agreements = mysqlTable("agreements", {
   subSignature: boolean("subSignature").default(false).notNull(),
   domSignedAt: timestamp("domSignedAt"),
   subSignedAt: timestamp("subSignedAt"),
-  status: mysqlEnum("status", ["pending", "active", "void"])
-    .default("pending")
-    .notNull(),
-  createdBy: bigint("createdBy", { mode: "number", unsigned: true }).notNull(),
+  status: agreementStatusEnum("status").default("pending").notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
@@ -307,10 +284,10 @@ export type Agreement = typeof agreements.$inferSelect;
 
 // ─── Journals ──────────────────────────────────────────────────────
 
-export const journals = mysqlTable("journals", {
+export const journals = pgTable("journals", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
   name: varchar("name", { length: 255 }).notNull(),
   prompt: text("prompt"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
@@ -320,13 +297,11 @@ export type Journal = typeof journals.$inferSelect;
 
 // ─── Journal Entries ───────────────────────────────────────────────
 
-export const journalEntries = mysqlTable("journalEntries", {
+export const journalEntries = pgTable("journalEntries", {
   id: serial("id").primaryKey(),
-  journalId: bigint("journalId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
-  mood: mysqlEnum("mood", ["sad", "neutral", "happy", "excited", "loved"])
-    .default("neutral")
-    .notNull(),
+  journalId: bigint("journalId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
+  mood: moodEnum("mood").default("neutral").notNull(),
   content: text("content").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
@@ -335,15 +310,13 @@ export type JournalEntry = typeof journalEntries.$inferSelect;
 
 // ─── Notes ─────────────────────────────────────────────────────────
 
-export const notes = mysqlTable("notes", {
+export const notes = pgTable("notes", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
-  memberId: bigint("memberId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
   title: varchar("title", { length: 255 }).notNull(),
   content: text("content"),
-  visibility: mysqlEnum("visibility", ["public", "private"])
-    .default("private")
-    .notNull(),
+  visibility: visibilityEnum("visibility").default("private").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")
     .defaultNow()
@@ -355,14 +328,42 @@ export type Note = typeof notes.$inferSelect;
 
 // ─── Logs ──────────────────────────────────────────────────────────
 
-export const logs = mysqlTable("logs", {
+export const logs = pgTable("logs", {
   id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number", unsigned: true }).notNull(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
   action: varchar("action", { length: 255 }).notNull(),
-  actorId: bigint("actorId", { mode: "number", unsigned: true }).notNull(),
-  targetId: bigint("targetId", { mode: "number", unsigned: true }),
+  actorId: bigint("actorId", { mode: "number" }).notNull(),
+  targetId: bigint("targetId", { mode: "number" }),
   details: text("details"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
 });
 
 export type Log = typeof logs.$inferSelect;
+
+// ─── Wheels ────────────────────────────────────────────────────────
+
+export const wheels = pgTable("wheels", {
+  id: serial("id").primaryKey(),
+  houseId: bigint("houseId", { mode: "number" }).notNull(),
+  title: varchar("title", { length: 255 }).notNull(),
+  description: text("description"),
+  options: text("options").notNull(),            // JSON array of { label, weight }
+  assignedTo: bigint("assignedTo", { mode: "number" }),
+  isActive: boolean("isActive").default(true).notNull(),
+  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
+  createdAt: timestamp("createdAt").defaultNow().notNull(),
+});
+
+export type Wheel = typeof wheels.$inferSelect;
+
+// ─── Wheel Spins ───────────────────────────────────────────────────
+
+export const wheelSpins = pgTable("wheelSpins", {
+  id: serial("id").primaryKey(),
+  wheelId: bigint("wheelId", { mode: "number" }).notNull(),
+  memberId: bigint("memberId", { mode: "number" }).notNull(),
+  result: varchar("result", { length: 255 }).notNull(),
+  spunAt: timestamp("spunAt").defaultNow().notNull(),
+});
+
+export type WheelSpin = typeof wheelSpins.$inferSelect;

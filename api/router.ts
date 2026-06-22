@@ -8,6 +8,7 @@ import { privilegeRouter } from "./privilege-router";
 import { punishmentRouter } from "./punishment-router";
 import { notebookRouter } from "./notebook-router";
 import { logRouter } from "./log-router";
+import { wheelRouter } from "./wheel-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -20,6 +21,7 @@ export const appRouter = createRouter({
   reward: rewardRouter,
   privilege: privilegeRouter,
   punishment: punishmentRouter,
+  wheel: wheelRouter,
   notebook: notebookRouter,
   log: logRouter,
 });

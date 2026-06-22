@@ -1,19 +1,27 @@
 import { useAppStore } from "@/shared/store/useAppStore";
-import { Menu, MessageSquare, Crown } from "lucide-react";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
+import { useAuth } from "@/features/auth/hooks/useAuth";
+import { Menu, MessageSquare, Crown, LogOut } from "lucide-react";
 
 export function TopBar() {
-  const { setShowHouseManagement, mockSystemRole } = useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { setShowHouseManagement, showToast } = useAppStore();
+  const { isAdmin } = useCurrentUser();
+  const { logout, isLoading: isLoggingOut } = useAuth();
 
   return (
     <header className="fixed top-0 left-0 right-0 h-14 bg-[#0D0D11]/95 backdrop-blur-sm z-50 border-b border-white/5 flex items-center justify-between px-4">
-      {isAdmin ? (
-        <button className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors">
-          <Menu className="w-5 h-5 text-white/70" />
-        </button>
-      ) : (
-        <div className="w-10" />
-      )}
+      <div className="w-20 flex justify-start">
+        {isAdmin ? (
+          <button
+            onClick={() => setShowHouseManagement(true)}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors"
+            aria-label="Mở menu quản trị"
+            title="Menu quản trị"
+          >
+            <Menu className="w-5 h-5 text-white/70" />
+          </button>
+        ) : null}
+      </div>
 
       <button
         onClick={() => setShowHouseManagement(true)}
@@ -27,14 +35,29 @@ export function TopBar() {
         </span>
       </button>
 
-      {isAdmin ? (
-        <button className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors relative">
-          <MessageSquare className="w-5 h-5 text-white/70" />
-          <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF2A85] rounded-full" />
+      <div className="w-20 flex items-center justify-end gap-1">
+        {isAdmin ? (
+          <button
+            onClick={() => showToast("Tin nhắn sẽ được bổ sung sau khi backend ổn định", "info")}
+            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors relative"
+            aria-label="Tin nhắn"
+            title="Tin nhắn"
+          >
+            <MessageSquare className="w-5 h-5 text-white/70" />
+            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF2A85] rounded-full" />
+          </button>
+        ) : null}
+
+        <button
+          onClick={logout}
+          disabled={isLoggingOut}
+          className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+          aria-label="Đăng xuất"
+          title="Đăng xuất"
+        >
+          <LogOut className="w-5 h-5 text-white/70" />
         </button>
-      ) : (
-        <div className="w-10" />
-      )}
+      </div>
     </header>
   );
 }

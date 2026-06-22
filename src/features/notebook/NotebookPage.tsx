@@ -18,6 +18,8 @@ import {
   mockNotes,
   moodEmojis,
 } from "@/shared/mockData/mockData";
+import { trpc } from "@/providers/trpc";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 interface Agreement {
   id: number;
@@ -34,8 +36,8 @@ interface Agreement {
 }
 
 export function NotebookPage() {
-  const { mockSystemRole, showToast } = useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { showToast } = useAppStore();
+  const { isAdmin } = useCurrentUser();
   const [activeSection, setActiveSection] = useState<string | null>(null);
   const [limits, setLimits] = useState(mockLimits);
   const [desires, setDesires] = useState(mockDesires);
@@ -67,9 +69,123 @@ export function NotebookPage() {
   const [newJournalEntry, setNewJournalEntry] = useState({ mood: "happy" as const, content: "" });
   const [selectedJournal, setSelectedJournal] = useState<number | null>(null);
   const [newAgreement, setNewAgreement] = useState({ title: "", purpose: "", rules: "", consequences: "" });
+  const utils = trpc.useUtils();
+  const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
+  const houseId = houseQuery.data?.id ?? 1;
+  const limitsQuery = trpc.notebook["limits.list"].useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const agreementsQuery = trpc.notebook["agreements.list"].useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const journalsQuery = trpc.notebook["journals.list"].useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const notesQuery = trpc.notebook["notes.list"].useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const journalEntriesQuery = trpc.notebook["journals.entries.list"].useQuery(
+    { journalId: selectedJournal ?? 0 },
+    { enabled: !!houseQuery.data?.id && !!selectedJournal, retry: false }
+  );
+  const createLimitMutation = trpc.notebook["limits.create"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["limits.list"].invalidate();
+    },
+  });
+  const deleteLimitMutation = trpc.notebook["limits.delete"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["limits.list"].invalidate();
+    },
+  });
+  const createAgreementMutation = trpc.notebook["agreements.create"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["agreements.list"].invalidate();
+    },
+  });
+  const signAgreementMutation = trpc.notebook["agreements.sign"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["agreements.list"].invalidate();
+    },
+  });
+  const createJournalMutation = trpc.notebook["journals.create"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["journals.list"].invalidate();
+    },
+  });
+  const createJournalEntryMutation = trpc.notebook["journals.entries.create"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["journals.entries.list"].invalidate();
+    },
+  });
+  const createNoteMutation = trpc.notebook["notes.create"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["notes.list"].invalidate();
+    },
+  });
+  const deleteNoteMutation = trpc.notebook["notes.delete"].useMutation({
+    onSuccess: async () => {
+      await utils.notebook["notes.list"].invalidate();
+    },
+  });
+  const visibleLimits = (limitsQuery.data?.filter((item) => item.type === "limit") ?? limits);
+  const visibleDesires = (limitsQuery.data?.filter((item) => item.type === "desire") ?? desires);
+  const visibleAgreements = agreementsQuery.data ?? agreements;
+  const visibleJournals = journalsQuery.data ?? journals;
+  const visibleNotes = notesQuery.data ?? notes;
+  const selectedJournalEntries = journalEntriesQuery.data ?? journals.find((journal) => journal.id === selectedJournal)?.entries ?? [];
+
+  const renderMultilineText = (value: string | null | undefined) => {
+    if (!value) return null;
+
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return (
+          <ul className="space-y-1">
+            {parsed.map((item, index) => (
+              <li key={index} className="text-xs text-white/60">
+                {typeof item === "string"
+                  ? item
+                  : Object.values(item as Record<string, unknown>)
+                      .filter(Boolean)
+                      .join(" - ")}
+              </li>
+            ))}
+          </ul>
+        );
+      }
+    } catch {
+      // Plain textarea content is rendered line by line below.
+    }
+
+    return (
+      <ul className="space-y-1">
+        {value
+          .split("\n")
+          .map((line) => line.trim())
+          .filter(Boolean)
+          .map((line, index) => (
+            <li key={index} className="text-xs text-white/60">
+              {line}
+            </li>
+          ))}
+      </ul>
+    );
+  };
 
   const handleAddLimit = () => {
     if (!newLimit.trim()) return;
+    if (houseQuery.data) {
+      createLimitMutation.mutate({ houseId, content: newLimit, type: "limit" });
+      setNewLimit("");
+      showToast("Đã thêm giới hạn!", "success");
+      return;
+    }
     setLimits([...limits, { id: Date.now(), houseId: 1, content: newLimit, type: "limit" as const }]);
     setNewLimit("");
     showToast("Đã thêm giới hạn!", "success");
@@ -77,20 +193,68 @@ export function NotebookPage() {
 
   const handleAddDesire = () => {
     if (!newDesire.trim()) return;
+    if (houseQuery.data) {
+      createLimitMutation.mutate({ houseId, content: newDesire, type: "desire" });
+      setNewDesire("");
+      showToast("Đã thêm mong muốn!", "success");
+      return;
+    }
     setDesires([...desires, { id: Date.now(), houseId: 1, content: newDesire, type: "desire" as const }]);
     setNewDesire("");
     showToast("Đã thêm mong muốn!", "success");
   };
 
+  const handleDeleteLimit = (limitId: number) => {
+    if (!houseQuery.data) {
+      setLimits((prev) => prev.filter((limit) => limit.id !== limitId));
+      setDesires((prev) => prev.filter((desire) => desire.id !== limitId));
+      showToast("Đã xóa mục tạm thời", "success");
+      return;
+    }
+    deleteLimitMutation.mutate({ limitId });
+    showToast("Đã xóa mục", "success");
+  };
+
   const handleAddNote = () => {
     if (!newNote.title.trim()) return;
+    if (houseQuery.data) {
+      createNoteMutation.mutate({
+        houseId,
+        title: newNote.title,
+        content: newNote.content || undefined,
+        visibility: newNote.visibility,
+      });
+      setNewNote({ title: "", content: "", visibility: "private" });
+      showToast("Da them ghi chu!", "success");
+      return;
+    }
     setNotes([...notes, { id: Date.now(), houseId: 1, memberId: 1, title: newNote.title, content: newNote.content, visibility: newNote.visibility as "public" | "private" }]);
     setNewNote({ title: "", content: "", visibility: "private" });
     showToast("Da them ghi chu!", "success");
   };
 
+  const handleDeleteNote = (noteId: number) => {
+    if (!houseQuery.data) {
+      setNotes((prev) => prev.filter((note) => note.id !== noteId));
+      showToast("Da xoa ghi chu tam thoi!", "success");
+      return;
+    }
+    deleteNoteMutation.mutate({ noteId });
+    showToast("Da xoa ghi chu!", "success");
+  };
+
   const handleAddJournal = () => {
     if (!newJournal.name.trim()) return;
+    if (houseQuery.data) {
+      createJournalMutation.mutate({
+        houseId,
+        name: newJournal.name,
+        prompt: newJournal.prompt || undefined,
+      });
+      setNewJournal({ name: "", prompt: "" });
+      showToast("Đã tạo nhật ký!", "success");
+      return;
+    }
     setJournals([...journals, { id: Date.now(), houseId: 1, memberId: 2, ...newJournal, entries: [] }]);
     setNewJournal({ name: "", prompt: "" });
     showToast("Đã tạo nhật ký!", "success");
@@ -98,6 +262,16 @@ export function NotebookPage() {
 
   const handleAddJournalEntry = () => {
     if (!newJournalEntry.content.trim() || !selectedJournal) return;
+    if (houseQuery.data) {
+      createJournalEntryMutation.mutate({
+        journalId: selectedJournal,
+        mood: newJournalEntry.mood,
+        content: newJournalEntry.content,
+      });
+      setNewJournalEntry({ mood: "happy", content: "" });
+      showToast("Đã thêm bài viết!", "success");
+      return;
+    }
     setJournals((prev) =>
       prev.map((j) => {
         if (j.id !== selectedJournal) return j;
@@ -123,6 +297,18 @@ export function NotebookPage() {
 
   const handleCreateAgreement = () => {
     if (!newAgreement.title.trim()) return;
+    if (houseQuery.data) {
+      createAgreementMutation.mutate({
+        houseId,
+        title: newAgreement.title,
+        purpose: newAgreement.purpose || undefined,
+        rules: newAgreement.rules || undefined,
+        consequences: newAgreement.consequences || undefined,
+      });
+      setNewAgreement({ title: "", purpose: "", rules: "", consequences: "" });
+      showToast("Da tao thoa thuan!", "success");
+      return;
+    }
     const newAg: Agreement = {
       id: Date.now(),
       houseId: 1,
@@ -142,6 +328,11 @@ export function NotebookPage() {
   };
 
   const handleSignAgreement = (id: number, as: "dom" | "sub") => {
+    if (houseQuery.data) {
+      signAgreementMutation.mutate({ agreementId: id, signAs: as });
+      showToast("Da ky thoa thuan!", "success");
+      return;
+    }
     setAgreements((prev) =>
       prev.map((a) => {
         if (a.id !== id) return a;
@@ -219,10 +410,10 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Agreements ({agreements.length})
+                Agreements ({visibleAgreements.length})
               </h3>
               <p className="text-xs text-white/50">
-                {agreements.filter((a) => a.status === "active").length} active
+                {visibleAgreements.filter((a) => a.status === "active").length} active
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-white/30" />
@@ -246,7 +437,7 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Journals ({journals.length})
+                Journals ({visibleJournals.length})
               </h3>
               <p className="text-xs text-white/50">Track your feelings</p>
             </div>
@@ -271,9 +462,9 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Notes ({notes.length})
+                Notes ({visibleNotes.length})
               </h3>
-              <p className="text-xs text-white/50">List · {notes.length} items</p>
+              <p className="text-xs text-white/50">List · {visibleNotes.length} items</p>
             </div>
             <ChevronRight className="w-4 h-4 text-white/30" />
           </button>
@@ -321,13 +512,21 @@ export function NotebookPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-lg font-semibold text-white mb-4">Limits</h2>
           <div className="space-y-2">
-            {limits.map((limit) => (
+            {visibleLimits.map((limit) => (
               <div
                 key={limit.id}
                 className="flex items-center gap-3 p-3 bg-[#1A1A22] rounded-xl border border-[#FF3B30]/20"
               >
                 <Lock className="w-4 h-4 text-[#FF3B30] flex-shrink-0" />
-                <span className="text-sm text-white/80">{limit.content}</span>
+                <span className="flex-1 text-sm text-white/80">{limit.content}</span>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteLimit(limit.id)}
+                    className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -359,13 +558,21 @@ export function NotebookPage() {
             Tell them what you&apos;re into, without having to say it out loud.
           </p>
           <div className="space-y-2">
-            {desires.map((desire) => (
+            {visibleDesires.map((desire) => (
               <div
                 key={desire.id}
                 className="flex items-center gap-3 p-3 bg-[#1A1A22] rounded-xl border border-[#FF2A85]/20"
               >
                 <Heart className="w-4 h-4 text-[#FF2A85] flex-shrink-0" />
-                <span className="text-sm text-white/80">{desire.content}</span>
+                <span className="flex-1 text-sm text-white/80">{desire.content}</span>
+                {isAdmin && (
+                  <button
+                    onClick={() => handleDeleteLimit(desire.id)}
+                    className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
+                  >
+                    Delete
+                  </button>
+                )}
               </div>
             ))}
           </div>
@@ -394,7 +601,7 @@ export function NotebookPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-lg font-semibold text-white mb-4">Agreements</h2>
           <div className="space-y-3">
-            {agreements.map((agreement) => (
+            {visibleAgreements.map((agreement) => (
               <div
                 key={agreement.id}
                 className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
@@ -417,6 +624,26 @@ export function NotebookPage() {
                 </div>
                 {agreement.purpose && (
                   <p className="text-xs text-white/50 mb-3">{agreement.purpose}</p>
+                )}
+                {(agreement.rules || agreement.consequences) && (
+                  <div className="space-y-3 rounded-lg bg-[#252532] border border-white/5 p-3">
+                    {agreement.rules && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase text-white/30">
+                          Rules
+                        </p>
+                        {renderMultilineText(agreement.rules)}
+                      </div>
+                    )}
+                    {agreement.consequences && (
+                      <div>
+                        <p className="mb-1 text-[10px] font-semibold uppercase text-white/30">
+                          Consequences
+                        </p>
+                        {renderMultilineText(agreement.consequences)}
+                      </div>
+                    )}
+                  </div>
                 )}
                 {/* Signatures */}
                 <div className="flex gap-4 mt-3">
@@ -483,7 +710,7 @@ export function NotebookPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-lg font-semibold text-white mb-4">Journals</h2>
           <div className="space-y-3">
-            {journals.map((journal) => (
+            {visibleJournals.map((journal) => (
               <button
                 key={journal.id}
                 onClick={() => setSelectedJournal(selectedJournal === journal.id ? null : journal.id)}
@@ -494,12 +721,12 @@ export function NotebookPage() {
                   <p className="text-xs text-white/50 mt-1">{journal.prompt}</p>
                 )}
                 <p className="text-xs text-white/30 mt-1">
-                  {journal.entries.length} entries
+                  {selectedJournal === journal.id ? selectedJournalEntries.length : "View"} entries
                 </p>
                 {/* Show entries if expanded */}
                 {selectedJournal === journal.id && (
                   <div className="mt-3 space-y-2 border-t border-white/5 pt-3">
-                    {journal.entries.map((entry) => (
+                    {selectedJournalEntries.map((entry) => (
                       <div
                         key={entry.id}
                         className="p-3 rounded-lg bg-[#252532] border border-white/5"
@@ -568,22 +795,32 @@ export function NotebookPage() {
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
           <h2 className="text-lg font-semibold text-white mb-4">Notes</h2>
           <div className="space-y-3">
-            {notes.map((note) => (
+            {visibleNotes.map((note) => (
               <div
                 key={note.id}
                 className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
               >
                 <div className="flex items-center justify-between mb-1">
                   <h3 className="font-semibold text-white text-sm">{note.title}</h3>
-                  <span
-                    className={`text-[10px] px-2 py-0.5 rounded-full ${
-                      note.visibility === "public"
-                        ? "bg-[#00F2FE]/10 text-[#00F2FE]"
-                        : "bg-white/5 text-white/40"
-                    }`}
-                  >
-                    {note.visibility}
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span
+                      className={`text-[10px] px-2 py-0.5 rounded-full ${
+                        note.visibility === "public"
+                          ? "bg-[#00F2FE]/10 text-[#00F2FE]"
+                          : "bg-white/5 text-white/40"
+                      }`}
+                    >
+                      {note.visibility}
+                    </span>
+                    {isAdmin && (
+                      <button
+                        onClick={() => handleDeleteNote(note.id)}
+                        className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
+                      >
+                        Delete
+                      </button>
+                    )}
+                  </div>
                 </div>
                 <p className="text-xs text-white/50">{note.content}</p>
               </div>

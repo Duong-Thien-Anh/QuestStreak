@@ -45,7 +45,7 @@ export const notebookRouter = createRouter({
           type: input.type,
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: limits.id });
 
       return { id: item.id, ...input };
     }),
@@ -95,7 +95,7 @@ export const notebookRouter = createRouter({
           consequences: input.consequences,
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: agreements.id });
 
       return { id: agreement.id, ...input };
     }),
@@ -172,7 +172,7 @@ export const notebookRouter = createRouter({
           name: input.name,
           prompt: input.prompt,
         })
-        .$returningId();
+        .returning({ id: journals.id });
 
       return { id: journal.id, ...input };
     }),
@@ -208,7 +208,7 @@ export const notebookRouter = createRouter({
           mood: input.mood,
           content: input.content,
         })
-        .$returningId();
+        .returning({ id: journalEntries.id });
 
       return { id: entry.id, ...input };
     }),
@@ -263,7 +263,7 @@ export const notebookRouter = createRouter({
           content: input.content,
           visibility: input.visibility,
         })
-        .$returningId();
+        .returning({ id: notes.id });
 
       return { id: note.id, ...input };
     }),

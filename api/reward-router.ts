@@ -42,7 +42,7 @@ export const rewardRouter = createRouter({
           rarity: input.rarity,
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: rewards.id });
 
       return { id: reward.id, ...input };
     }),

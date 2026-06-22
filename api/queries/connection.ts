@@ -1,18 +1,11 @@
-import { drizzle } from "drizzle-orm/mysql2";
-import { env } from "../lib/env";
-import * as schema from "@db/schema";
-import * as relations from "@db/relations";
-
-const fullSchema = { ...schema, ...relations };
-
-let instance: ReturnType<typeof drizzle<typeof fullSchema>>;
+/**
+ * Database connection — returns the shared `db` instance from db/index.ts.
+ * Driver is selected automatically based on NODE_ENV:
+ *   - development: postgres-js -> local PostgreSQL
+ *   - production:  @neondatabase/serverless -> Neon
+ */
+import { db } from "@db/index";
 
 export function getDb() {
-  if (!instance) {
-    instance = drizzle(env.databaseUrl, {
-      mode: "planetscale",
-      schema: fullSchema,
-    });
-  }
-  return instance;
+  return db;
 }

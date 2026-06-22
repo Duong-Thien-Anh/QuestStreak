@@ -12,6 +12,8 @@ import {
 import { FAB } from "@/shared/components/FAB";
 import { BottomSheet } from "@/shared/components/BottomSheet";
 import { mockPunishments, mockMembers } from "@/shared/mockData/mockData";
+import { trpc } from "@/providers/trpc";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 interface ChecklistItem {
   label: string;
@@ -26,12 +28,20 @@ interface Assignment {
   status: string;
   assignedAt: Date;
   checklist: ChecklistItem[];
-  punishment: (typeof mockPunishments)[0];
+  punishment: {
+    id: number;
+    houseId: number;
+    title: string;
+    description: string | null;
+    chayCost: number;
+    image: string | null;
+    isActive: boolean;
+  };
 }
 
 export function PunishmentsPage() {
-  const { mockSystemRole, showToast } = useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { showToast } = useAppStore();
+  const { isAdmin } = useCurrentUser();
   const [wallet, setWallet] = useState(mockMembers[1].wallet);
   const [assignments, setAssignments] = useState<Assignment[]>([
     {
@@ -52,12 +62,106 @@ export function PunishmentsPage() {
     },
   ]);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  const [checklistOverrides, setChecklistOverrides] = useState<Record<number, ChecklistItem[]>>({});
   const [actionSheet, setActionSheet] = useState<string | null>(null);
   const [pointsInput, setPointsInput] = useState("5");
   const [reasonInput, setReasonInput] = useState("");
-  const [punishments] = useState(mockPunishments);
+  const [newPunishment, setNewPunishment] = useState({
+    title: "",
+    description: "",
+    chayCost: 1,
+  });
+  const [punishments, setPunishments] = useState(mockPunishments);
+  const utils = trpc.useUtils();
+  const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
+  const houseId = houseQuery.data?.id ?? 1;
+  const members = houseQuery.data?.members ?? mockMembers;
+  const subMember = members.find((member) => member.lifestyleRole === "submissive") ?? members[0];
+  const punishmentsQuery = trpc.punishment.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const walletQuery = trpc.wallet.get.useQuery(
+    { memberId: subMember?.id ?? 0 },
+    { enabled: !!houseQuery.data?.id && !!subMember?.id, retry: false }
+  );
+  const adminAssignmentsQuery = trpc.punishment.allAssignments.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id && isAdmin, retry: false }
+  );
+  const myAssignmentsQuery = trpc.punishment.myAssignments.useQuery(undefined, {
+    enabled: !!houseQuery.data?.id && !isAdmin,
+    retry: false,
+  });
+  const addChayMutation = trpc.wallet.addChay.useMutation({
+    onSuccess: async () => {
+      await utils.wallet.get.invalidate();
+    },
+  });
+  const forgiveChayMutation = trpc.wallet.forgiveChay.useMutation({
+    onSuccess: async () => {
+      await utils.wallet.get.invalidate();
+    },
+  });
+  const assignPunishmentMutation = trpc.punishment.assign.useMutation({
+    onSuccess: async () => {
+      await utils.punishment.allAssignments.invalidate();
+    },
+  });
+  const createPunishmentMutation = trpc.punishment.create.useMutation({
+    onSuccess: async () => {
+      await utils.punishment.list.invalidate();
+    },
+  });
+  const forgivePunishmentMutation = trpc.punishment.forgive.useMutation({
+    onSuccess: async () => {
+      await utils.punishment.allAssignments.invalidate();
+    },
+  });
+  const redeemPunishmentMutation = trpc.punishment.redeem.useMutation({
+    onSuccess: async () => {
+      await utils.punishment.myAssignments.invalidate();
+      await utils.punishment.allAssignments.invalidate();
+      await utils.wallet.get.invalidate();
+    },
+  });
+  const visibleWallet = walletQuery.data ?? wallet;
+  const visiblePunishments = punishmentsQuery.data ?? punishments;
+
+  const parseChecklist = (value: unknown): ChecklistItem[] => {
+    if (Array.isArray(value)) return value as ChecklistItem[];
+    if (typeof value !== "string" || !value) return [];
+    try {
+      const parsed = JSON.parse(value);
+      return Array.isArray(parsed) ? parsed : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const apiAssignments = (isAdmin
+    ? adminAssignmentsQuery.data
+    : myAssignmentsQuery.data)?.map((assignment) => ({
+      ...assignment,
+      status: assignment.status,
+      assignedAt: assignment.assignedAt ?? new Date(),
+      checklist: checklistOverrides[assignment.id] ?? parseChecklist(assignment.checklist),
+      punishment: assignment.punishment ?? visiblePunishments.find((item) => item.id === assignment.punishmentId) ?? visiblePunishments[0],
+    })) as Assignment[] | undefined;
+  const visibleAssignments = apiAssignments ?? assignments;
 
   const toggleChecklistItem = (assignmentId: number, index: number) => {
+    if (houseQuery.data) {
+      const current =
+        visibleAssignments.find((assignment) => assignment.id === assignmentId)?.checklist ?? [];
+      setChecklistOverrides((prev) => ({
+        ...prev,
+        [assignmentId]: current.map((item, i) =>
+          i === index ? { ...item, completed: !item.completed } : item
+        ),
+      }));
+      return;
+    }
     setAssignments((prev) =>
       prev.map((a) => {
         if (a.id !== assignmentId) return a;
@@ -75,8 +179,17 @@ export function PunishmentsPage() {
       showToast("Vui long hoan thanh tat ca cac muc!", "error");
       return;
     }
-    if (wallet.chayBalance < assignment.punishment.chayCost) {
+    if (visibleWallet.chayBalance < assignment.punishment.chayCost) {
       showToast("Khong du Chay de chuoc loi!", "error");
+      return;
+    }
+    if (houseQuery.data) {
+      redeemPunishmentMutation.mutate({
+        assignmentId: assignment.id,
+        checklist: assignment.checklist,
+      });
+      setExpandedId(null);
+      showToast("Da chuoc loi thanh cong!", "success");
       return;
     }
     setWallet((prev) => ({
@@ -91,6 +204,12 @@ export function PunishmentsPage() {
   };
 
   const handleForgive = (assignmentId: number) => {
+    if (houseQuery.data) {
+      forgivePunishmentMutation.mutate({ assignmentId });
+      setActionSheet(null);
+      showToast("Da tha thu!", "success");
+      return;
+    }
     setAssignments((prev) =>
       prev.map((a) => (a.id === assignmentId ? { ...a, status: "forgiven" } : a))
     );
@@ -101,6 +220,16 @@ export function PunishmentsPage() {
   const handleAddDemerits = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
+    if (houseQuery.data && subMember?.id) {
+      addChayMutation.mutate({
+        memberId: subMember.id,
+        amount,
+        reason: reasonInput || undefined,
+      });
+      setActionSheet(null);
+      showToast("Da them " + amount + " Chay!", "success");
+      return;
+    }
     setWallet((prev) => ({ ...prev, chayBalance: prev.chayBalance + amount }));
     setActionSheet(null);
     showToast("Da them " + amount + " Chay!", "success");
@@ -109,6 +238,16 @@ export function PunishmentsPage() {
   const handleForgiveDemerits = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
+    if (houseQuery.data && subMember?.id) {
+      forgiveChayMutation.mutate({
+        memberId: subMember.id,
+        amount,
+        reason: reasonInput || undefined,
+      });
+      setActionSheet(null);
+      showToast("Da xoa " + amount + " Chay!", "success");
+      return;
+    }
     setWallet((prev) => ({
       ...prev,
       chayBalance: Math.max(0, prev.chayBalance - amount),
@@ -117,7 +256,39 @@ export function PunishmentsPage() {
     showToast("Da xoa " + amount + " Chay!", "success");
   };
 
-  const activeAssignments = assignments.filter((a) => a.status === "active");
+  const handleCreatePunishment = () => {
+    if (!newPunishment.title.trim()) return;
+    if (houseQuery.data) {
+      createPunishmentMutation.mutate({
+        houseId,
+        title: newPunishment.title,
+        description: newPunishment.description || undefined,
+        chayCost: newPunishment.chayCost,
+        image: "/punishments/hourglass.jpg",
+      });
+      setNewPunishment({ title: "", description: "", chayCost: 1 });
+      setActionSheet(null);
+      showToast("Da tao hinh phat moi!", "success");
+      return;
+    }
+    setPunishments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        houseId: 1,
+        title: newPunishment.title,
+        description: newPunishment.description,
+        chayCost: newPunishment.chayCost,
+        image: "/punishments/hourglass.jpg",
+        isActive: true,
+      },
+    ]);
+    setNewPunishment({ title: "", description: "", chayCost: 1 });
+    setActionSheet(null);
+    showToast("Da tao hinh phat moi tam thoi!", "success");
+  };
+
+  const activeAssignments = visibleAssignments.filter((a) => a.status === "active");
 
   return (
     <div className="px-4 pt-4 space-y-4">
@@ -140,7 +311,7 @@ export function PunishmentsPage() {
         <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
-              <p className="text-2xl font-bold text-white">{wallet.chayBalance}</p>
+              <p className="text-2xl font-bold text-white">{visibleWallet.chayBalance}</p>
               <p className="text-xs text-white/50">Chay</p>
             </div>
             <Link2 className="w-6 h-6 text-[#FF3B30]" />
@@ -148,7 +319,7 @@ export function PunishmentsPage() {
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">
-                {assignments.filter((a) => a.status === "redeemed").length}
+                {visibleAssignments.filter((a) => a.status === "redeemed").length}
               </p>
               <p className="text-xs text-white/50">Redeemed</p>
             </div>
@@ -287,7 +458,7 @@ export function PunishmentsPage() {
         <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
           Punishment Catalog
         </h2>
-        {punishments.map((p, i) => (
+        {visiblePunishments.map((p, i) => (
           <motion.div
             key={p.id}
             initial={{ opacity: 0, y: 10 }}
@@ -306,7 +477,40 @@ export function PunishmentsPage() {
                 <p className="text-xs text-white/50 mt-1">{p.description}</p>
               </div>
               {isAdmin && (
-                <button className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0">
+                <button
+                  onClick={() => {
+                    if (houseQuery.data && subMember?.id) {
+                      assignPunishmentMutation.mutate({
+                        punishmentId: p.id,
+                        memberId: subMember.id,
+                        checklist: [
+                          { label: "Hoàn thành yêu cầu", completed: false },
+                          { label: "Xác nhận chuộc lỗi", completed: false },
+                        ],
+                      });
+                      showToast("Da gan hinh phat!", "success");
+                      return;
+                    }
+                    setAssignments((prev) => [
+                      ...prev,
+                      {
+                        id: Date.now(),
+                        punishmentId: p.id,
+                        memberId: subMember?.id ?? 2,
+                        assignedBy: 1,
+                        status: "active",
+                        assignedAt: new Date(),
+                        checklist: [
+                          { label: "Hoàn thành yêu cầu", completed: false },
+                          { label: "Xác nhận chuộc lỗi", completed: false },
+                        ],
+                        punishment: p,
+                      },
+                    ]);
+                    showToast("Da gan hinh phat tam thoi!", "success");
+                  }}
+                  className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
+                >
                   Assign
                 </button>
               )}
@@ -321,7 +525,7 @@ export function PunishmentsPage() {
           {
             label: "New Punishment",
             icon: <Plus className="w-5 h-5 text-white" />,
-            onClick: () => showToast("Tao hinh phat moi!", "info"),
+            onClick: () => setActionSheet("new"),
             color: "#FF3B30",
           },
           {
@@ -340,6 +544,67 @@ export function PunishmentsPage() {
       />
 
       {/* Action Sheets */}
+      <BottomSheet
+        isOpen={actionSheet === "new"}
+        onClose={() => setActionSheet(null)}
+        title="New Punishment"
+      >
+        <div className="space-y-4">
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <input
+              type="text"
+              value={newPunishment.title}
+              onChange={(event) =>
+                setNewPunishment((current) => ({
+                  ...current,
+                  title: event.target.value,
+                }))
+              }
+              placeholder="Punishment title..."
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Description</label>
+            <textarea
+              value={newPunishment.description}
+              onChange={(event) =>
+                setNewPunishment((current) => ({
+                  ...current,
+                  description: event.target.value,
+                }))
+              }
+              placeholder="Describe what must be done..."
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none resize-none"
+            />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Chay Cost</label>
+            <input
+              type="number"
+              min={0}
+              value={newPunishment.chayCost}
+              onChange={(event) =>
+                setNewPunishment((current) => ({
+                  ...current,
+                  chayCost: Number(event.target.value),
+                }))
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
+            />
+          </div>
+          <button
+            onClick={handleCreatePunishment}
+            disabled={!newPunishment.title.trim()}
+            className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
+          >
+            Create Punishment
+          </button>
+        </div>
+      </BottomSheet>
+
       <BottomSheet
         isOpen={actionSheet === "add"}
         onClose={() => setActionSheet(null)}

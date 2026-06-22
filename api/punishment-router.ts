@@ -8,7 +8,7 @@ import {
   houseMembers,
   logs,
 } from "@db/schema";
-import { eq, and } from "drizzle-orm";
+import { eq, and, inArray } from "drizzle-orm";
 
 export const punishmentRouter = createRouter({
   list: authedQuery
@@ -46,7 +46,7 @@ export const punishmentRouter = createRouter({
           image: input.image,
           createdBy: actor?.id || 0,
         })
-        .$returningId();
+        .returning({ id: punishments.id });
 
       return { id: punishment.id, ...input };
     }),
@@ -112,21 +112,44 @@ export const punishmentRouter = createRouter({
     });
     if (!member) return [];
 
-    return db.query.punishmentAssignments.findMany({
+    const assignments = await db.query.punishmentAssignments.findMany({
       where: and(
         eq(punishmentAssignments.memberId, member.id),
         eq(punishmentAssignments.status, "active")
       ),
     });
+    return Promise.all(
+      assignments.map(async (assignment) => ({
+        ...assignment,
+        punishment: await db.query.punishments.findFirst({
+          where: eq(punishments.id, assignment.punishmentId),
+        }),
+      })),
+    );
   }),
 
   allAssignments: authedQuery
     .input(z.object({ houseId: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
-      return db.query.punishmentAssignments.findMany({
-        where: eq(punishmentAssignments.assignedBy, input.houseId),
+      const members = await db.query.houseMembers.findMany({
+        where: eq(houseMembers.houseId, input.houseId),
       });
+      const memberIds = members.map((member) => member.id);
+      if (memberIds.length === 0) return [];
+
+      const assignments = await db.query.punishmentAssignments.findMany({
+        where: inArray(punishmentAssignments.memberId, memberIds),
+      });
+
+      return Promise.all(
+        assignments.map(async (assignment) => ({
+          ...assignment,
+          punishment: await db.query.punishments.findFirst({
+            where: eq(punishments.id, assignment.punishmentId),
+          }),
+        })),
+      );
     }),
 
   redeem: authedQuery

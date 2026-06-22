@@ -21,17 +21,22 @@ import {
   mockMembers,
   taskCategories,
 } from "@/shared/mockData/mockData";
+import { trpc } from "@/providers/trpc";
+import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 export function TasksPage() {
-  const { mockSystemRole, showToast } =
-    useAppStore();
-  const isAdmin = mockSystemRole === "admin";
+  const { showToast } = useAppStore();
+  const { isAdmin } = useCurrentUser();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["daily"])
   );
   const [habitsState, setHabitsState] = useState(mockHabits);
+  const [checkedHabitIds, setCheckedHabitIds] = useState<Set<number>>(
+    new Set(mockHabits.filter((habit) => habit.checkedToday).map((habit) => habit.id))
+  );
   const [createSheet, setCreateSheet] = useState(false);
-  const [createType, setCreateType] = useState<"task" | "habit">("task");
+  const [createType, setCreateType] = useState<"task" | "habit" | "wheel">("task");
+  const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [taskType, setTaskType] = useState<"regular" | "special" | "superSpecial">("regular");
   const [habitType, setHabitType] = useState<"wanted" | "unwanted">("wanted");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
@@ -39,6 +44,11 @@ export function TasksPage() {
   const [description, setDescription] = useState("");
   const [chymReward, setChymReward] = useState(0);
   const [chayPenalty, setChayPenalty] = useState(0);
+  const [wheelTitle, setWheelTitle] = useState("");
+  const [wheelDescription, setWheelDescription] = useState("");
+  const [wheelOptions, setWheelOptions] = useState(
+    "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay"
+  );
   interface TaskItem {
     id: number;
     houseId: number;
@@ -52,7 +62,72 @@ export function TasksPage() {
   }
   const [tasksState, setTasksState] = useState<TaskItem[]>(mockTasks as TaskItem[]);
 
-  const subMember = mockMembers.find((m) => m.lifestyleRole === "submissive");
+  const utils = trpc.useUtils();
+  const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
+  const houseId = houseQuery.data?.id ?? 1;
+  const tasksQuery = trpc.task.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const habitsQuery = trpc.habit.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const wheelsQuery = trpc.wheel.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const createTaskMutation = trpc.task.create.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+    },
+  });
+  const createHabitMutation = trpc.habit.create.useMutation({
+    onSuccess: async () => {
+      await utils.habit.list.invalidate();
+    },
+  });
+  const assignTaskMutation = trpc.task.assign.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+    },
+  });
+  const acceptTaskMutation = trpc.task.accept.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+    },
+  });
+  const submitTaskMutation = trpc.task.submit.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+    },
+  });
+  const reviewTaskMutation = trpc.task.review.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+      await utils.house.get.invalidate();
+    },
+  });
+  const createWheelMutation = trpc.wheel.create.useMutation({
+    onSuccess: async () => {
+      await utils.wheel.list.invalidate();
+    },
+  });
+  const spinWheelMutation = trpc.wheel.spin.useMutation({
+    onSuccess: async () => {
+      await utils.wheel.list.invalidate();
+    },
+  });
+  const checkinMutation = trpc.habit.checkin.useMutation();
+
+  const members = houseQuery.data?.members ?? mockMembers;
+  const subMember = members.find((m) => m.lifestyleRole === "submissive");
+  const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
+  const visibleHabits = (habitsQuery.data ?? habitsState).map((habit) => ({
+    ...habit,
+    checkedToday: checkedHabitIds.has(habit.id),
+  }));
+  const visibleWheels = wheelsQuery.data ?? [];
 
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => {
@@ -64,13 +139,74 @@ export function TasksPage() {
   };
 
   const toggleHabit = (id: number) => {
-    setHabitsState((prev) =>
-      prev.map((h) => (h.id === id ? { ...h, checkedToday: !h.checkedToday } : h))
-    );
+    setCheckedHabitIds((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+    if (houseQuery.data) {
+      checkinMutation.mutate({ habitId: id });
+    } else {
+      setHabitsState((prev) =>
+        prev.map((h) => (h.id === id ? { ...h, checkedToday: !h.checkedToday } : h))
+      );
+    }
   };
 
   const handleCreateTask = () => {
     if (!title.trim()) return;
+    if (editingTaskId) {
+      if (houseQuery.data) {
+        showToast("Chỉnh sửa task cần bổ sung API update ở backend", "info");
+        return;
+      }
+      setTasksState((prev) =>
+        prev.map((task) =>
+          task.id === editingTaskId
+            ? {
+                ...task,
+                title,
+                description: description || "",
+                category: taskType === "regular" ? frequency : taskType,
+                chymReward,
+                chayPenalty,
+              }
+            : task
+        )
+      );
+      setCreateSheet(false);
+      resetForm();
+      showToast("Đã cập nhật nhiệm vụ tạm thời!", "success");
+      return;
+    }
+    if (houseQuery.data) {
+      if (createType === "habit") {
+        createHabitMutation.mutate({
+          houseId,
+          title,
+          description: description || undefined,
+          type: habitType,
+          frequency,
+          chymReward,
+          chayPenalty,
+        });
+      } else {
+        createTaskMutation.mutate({
+          houseId,
+          title,
+          description: description || undefined,
+          category: taskType === "regular" ? frequency : taskType,
+          chymReward,
+          chayPenalty,
+          assignedTo: subMember?.id,
+        });
+      }
+      setCreateSheet(false);
+      resetForm();
+      showToast(createType === "task" ? "Đã tạo nhiệm vụ mới!" : "Đã tạo habit mới!", "success");
+      return;
+    }
     const newTask = {
       id: tasksState.length + 1,
       houseId: 1,
@@ -89,11 +225,37 @@ export function TasksPage() {
   };
 
   const resetForm = () => {
+    setEditingTaskId(null);
     setTitle("");
     setDescription("");
     setChymReward(0);
     setChayPenalty(0);
     setFrequency("daily");
+    setTaskType("regular");
+  };
+
+  const openTaskEditor = (task: TaskItem) => {
+    setEditingTaskId(task.id);
+    setCreateType("task");
+    setTitle(task.title);
+    setDescription(task.description || "");
+    setChymReward(task.chymReward);
+    setChayPenalty(task.chayPenalty);
+    if (task.category === "special" || task.category === "superSpecial") {
+      setTaskType(task.category);
+    } else {
+      setTaskType("regular");
+      setFrequency(
+        task.category === "weekly" || task.category === "monthly" ? task.category : "daily"
+      );
+    }
+    setCreateSheet(true);
+  };
+
+  const resetWheelForm = () => {
+    setWheelTitle("");
+    setWheelDescription("");
+    setWheelOptions("Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay");
   };
 
   const getCategoryColor = (key: string) => {
@@ -101,11 +263,77 @@ export function TasksPage() {
     return cat?.color || "#FF2A85";
   };
 
+  const assignTask = (taskId: number) => {
+    if (!houseQuery.data || !subMember?.id) return;
+    assignTaskMutation.mutate({ taskId, memberId: subMember.id });
+    showToast("Đã giao việc!", "success");
+  };
+
+  const acceptTask = (taskId: number) => {
+    if (!houseQuery.data) return;
+    acceptTaskMutation.mutate({ taskId });
+    showToast("Đã nhận task!", "success");
+  };
+
+  const submitTask = (taskId: number) => {
+    if (!houseQuery.data) return;
+    submitTaskMutation.mutate({ taskId });
+    showToast("Đã gửi báo cáo!", "success");
+  };
+
+  const reviewTask = (taskId: number, decision: "approve" | "reject") => {
+    if (!houseQuery.data) return;
+    reviewTaskMutation.mutate({ taskId, decision });
+    showToast(decision === "approve" ? "Đã duyệt task!" : "Đã trả task về active!", "success");
+  };
+
+  const createWheel = () => {
+    if (!wheelTitle.trim()) return;
+    if (!houseQuery.data) {
+      showToast("Wheel cần backend để lưu", "error");
+      return;
+    }
+
+    const options = wheelOptions
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((label) => ({ label, weight: 1 }));
+
+    if (options.length < 2) {
+      showToast("Wheel cần ít nhất 2 lựa chọn", "error");
+      return;
+    }
+
+    createWheelMutation.mutate({
+      houseId,
+      title: wheelTitle,
+      description: wheelDescription || undefined,
+      options,
+      assignedTo: subMember?.id,
+    });
+    setCreateSheet(false);
+    resetWheelForm();
+    showToast("Đã tạo wheel!", "success");
+  };
+
+  const spinWheel = (wheelId: number) => {
+    if (!houseQuery.data) return;
+    spinWheelMutation.mutate(
+      { wheelId },
+      {
+        onSuccess: (data) => {
+          showToast(`Wheel result: ${data.result}`, "success");
+        },
+      }
+    );
+  };
+
   const renderTasksForCategory = (categoryKey: string) => {
     const filtered =
       categoryKey === "completed"
-        ? tasksState.filter((t) => t.status === "completed")
-        : tasksState.filter(
+        ? visibleTasks.filter((t) => t.status === "completed")
+        : visibleTasks.filter(
             (t) => t.category === categoryKey && t.status !== "completed"
           );
 
@@ -127,7 +355,12 @@ export function TasksPage() {
             )}
           </div>
           {isAdmin && (
-            <button className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 ml-2">
+            <button
+              onClick={() => openTaskEditor(task)}
+              className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/5 ml-2"
+              aria-label="Sửa nhiệm vụ"
+              title="Sửa nhiệm vụ"
+            >
               <Pen className="w-4 h-4 text-white/30" />
             </button>
           )}
@@ -159,12 +392,30 @@ export function TasksPage() {
         <div className="flex gap-2 mt-3">
           {isAdmin ? (
             <>
-              {task.assignedTo ? (
-                <button className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors">
-                  Đang chờ báo cáo
-                </button>
+              {task.status === "submitted" ? (
+                <>
+                  <button
+                    onClick={() => reviewTask(task.id, "approve")}
+                    className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                  >
+                    Duyệt
+                  </button>
+                  <button
+                    onClick={() => reviewTask(task.id, "reject")}
+                    className="flex-1 py-2 rounded-lg bg-[#FF3B30]/10 text-[#FF3B30] text-xs font-medium hover:bg-[#FF3B30]/20 transition-colors"
+                  >
+                    Trả lại
+                  </button>
+                </>
+              ) : task.assignedTo ? (
+                <span className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium text-center">
+                  Đang thực hiện
+                </span>
               ) : (
-                <button className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors">
+                <button
+                  onClick={() => assignTask(task.id)}
+                  className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors"
+                >
                   Giao việc
                 </button>
               )}
@@ -175,20 +426,25 @@ export function TasksPage() {
                 <>
                   {task.category === "special" || task.category === "superSpecial" ? (
                     !task.assignedTo ? (
-                      <button className="flex-1 py-2 rounded-lg bg-[#FF2A85] text-white text-xs font-medium hover:bg-[#FF2A85]/90 transition-colors">
+                      <button
+                        onClick={() => acceptTask(task.id)}
+                        className="flex-1 py-2 rounded-lg bg-[#FF2A85] text-white text-xs font-medium hover:bg-[#FF2A85]/90 transition-colors"
+                      >
                         Nhận Task
                       </button>
-                    ) : task.assignedTo === 2 ? (
-                      <button className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors">
+                    ) : (
+                      <button
+                        onClick={() => submitTask(task.id)}
+                        className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                      >
                         Báo cáo
                       </button>
-                    ) : (
-                      <span className="flex-1 py-2 rounded-lg bg-white/5 text-white/30 text-xs font-medium text-center">
-                        Đã có ngườii nhận
-                      </span>
                     )
                   ) : (
-                    <button className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors">
+                    <button
+                      onClick={() => submitTask(task.id)}
+                      className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                    >
                       Báo cáo
                     </button>
                   )}
@@ -222,7 +478,7 @@ export function TasksPage() {
         </div>
 
         {/* Wallets */}
-        <div className="w-44 grid grid-rows-2 gap-2">
+        <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{subMember?.wallet.chymBalance}</p>
@@ -250,7 +506,7 @@ export function TasksPage() {
           Habits
         </h2>
         <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-          {habitsState.map((habit) => (
+          {visibleHabits.map((habit) => (
             <motion.button
               key={habit.id}
               whileTap={{ scale: 0.95 }}
@@ -287,10 +543,56 @@ export function TasksPage() {
       {/* Manage button for admin */}
       {isAdmin && (
         <div className="flex justify-end gap-2">
-          <button className="px-3 py-1.5 rounded-lg bg-[#1A1A22] border border-white/5 text-xs text-white/60 flex items-center gap-1.5 hover:bg-white/5 transition-colors">
+          <button
+            onClick={() => {
+              setCreateType("task");
+              setCreateSheet(true);
+            }}
+            className="px-3 py-1.5 rounded-lg bg-[#1A1A22] border border-white/5 text-xs text-white/60 flex items-center gap-1.5 hover:bg-white/5 transition-colors"
+          >
             <CheckSquare className="w-3.5 h-3.5" /> Quản lý
           </button>
         </div>
+      )}
+
+      {visibleWheels.length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.08 }}
+          className="space-y-3"
+        >
+          <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+            Wheels
+          </h2>
+          {visibleWheels.map((wheel) => {
+            const options = JSON.parse(wheel.options) as Array<{ label: string }>;
+            return (
+              <div
+                key={wheel.id}
+                className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0">
+                    <h3 className="font-semibold text-white text-sm">{wheel.title}</h3>
+                    {wheel.description && (
+                      <p className="text-xs text-white/50 mt-1">{wheel.description}</p>
+                    )}
+                    <p className="text-[10px] text-white/30 mt-2">
+                      {options.map((option) => option.label).join(" / ")}
+                    </p>
+                  </div>
+                  <button
+                    onClick={() => spinWheel(wheel.id)}
+                    className="px-3 py-1.5 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 transition-colors flex-shrink-0"
+                  >
+                    Spin
+                  </button>
+                </div>
+              </div>
+            );
+          })}
+        </motion.div>
       )}
 
       {/* Task Categories */}
@@ -315,8 +617,8 @@ export function TasksPage() {
                 <span className="text-xs text-white/30">
                   {
                     (cat.key === "completed"
-                      ? tasksState.filter((t) => t.status === "completed")
-                      : tasksState.filter(
+                      ? visibleTasks.filter((t) => t.status === "completed")
+                      : visibleTasks.filter(
                           (t) => t.category === cat.key && t.status !== "completed"
                         )
                     ).length
@@ -354,7 +656,10 @@ export function TasksPage() {
           {
             label: "Send a Wheel",
             icon: <Send className="w-5 h-5 text-white" />,
-            onClick: () => showToast("Surprise Wheel coming soon!", "info"),
+            onClick: () => {
+              setCreateType("wheel");
+              setCreateSheet(true);
+            },
             color: "#A155FF",
           },
           {
@@ -385,8 +690,56 @@ export function TasksPage() {
           setCreateSheet(false);
           resetForm();
         }}
-        title={createType === "task" ? "Create New Task" : "Create New Habit"}
+        title={
+          editingTaskId
+            ? "Edit Task"
+            : createType === "task"
+            ? "Create New Task"
+            : createType === "habit"
+              ? "Create New Habit"
+              : "Create Wheel"
+        }
       >
+        {createType === "wheel" ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Wheel Title</label>
+              <input
+                type="text"
+                value={wheelTitle}
+                onChange={(event) => setWheelTitle(event.target.value)}
+                placeholder="Surprise Wheel..."
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Description</label>
+              <textarea
+                value={wheelDescription}
+                onChange={(event) => setWheelDescription(event.target.value)}
+                placeholder="What is this wheel for?"
+                rows={2}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Options, one per line</label>
+              <textarea
+                value={wheelOptions}
+                onChange={(event) => setWheelOptions(event.target.value)}
+                rows={5}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
+              />
+            </div>
+            <button
+              onClick={createWheel}
+              disabled={!wheelTitle.trim()}
+              className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 disabled:opacity-50 transition-colors"
+            >
+              Create Wheel
+            </button>
+          </div>
+        ) : (
         <div className="space-y-4">
           {/* Type selector */}
           {createType === "task" ? (
@@ -506,9 +859,10 @@ export function TasksPage() {
             disabled={!title.trim()}
             className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            Create {createType === "task" ? "Task" : "Habit"}
+            {editingTaskId ? "Save Task" : `Create ${createType === "task" ? "Task" : "Habit"}`}
           </button>
         </div>
+        )}
       </BottomSheet>
     </div>
   );

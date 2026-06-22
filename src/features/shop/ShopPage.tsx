@@ -63,6 +63,10 @@ export function ShopPage() {
     description: "",
     rarity: "common" as Rarity,
   });
+  // ─ Gift sheet ─
+  const [giftSheetRewardId, setGiftSheetRewardId] = useState<number | null>(null);
+  const [giftMessage, setGiftMessage] = useState("");
+  const [giftReason, setGiftReason] = useState("");
   const utils = trpc.useUtils();
   const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
   const houseId = houseQuery.data?.id ?? 1;
@@ -152,10 +156,30 @@ export function ShopPage() {
   };
 
   const handleGift = (rewardId?: number) => {
-    if (houseQuery.data && rewardId && subMember?.id) {
-      giftRewardMutation.mutate({ rewardId, memberId: subMember.id });
-    }
-    showToast("Đã tặng phần thưởng!", "success");
+    if (!rewardId) return;
+    // Open the gift message/reason sheet instead of calling directly
+    setGiftSheetRewardId(rewardId);
+    setGiftMessage("");
+    setGiftReason("");
+  };
+
+  const confirmGift = () => {
+    if (!giftSheetRewardId || !subMember?.id) return;
+    giftRewardMutation.mutate(
+      {
+        rewardId: giftSheetRewardId,
+        memberId: subMember.id,
+        giftMessage: giftMessage.trim() || undefined,
+        giftReason: giftReason.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setGiftSheetRewardId(null);
+          showToast("Đã tặng phần thưởng! 🎁", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const handleAddPoints = () => {
@@ -954,6 +978,77 @@ export function ShopPage() {
             </span>
           </div>
         ) : null}
+      </BottomSheet>
+
+      {/* ── Gift Reward Sheet ── */}
+      <BottomSheet
+        isOpen={giftSheetRewardId !== null}
+        onClose={() => setGiftSheetRewardId(null)}
+        title="Tặng Phần Thưởng 🎁"
+      >
+        <div className="space-y-4">
+          {/* Reward preview */}
+          {giftSheetRewardId && (() => {
+            const r = visibleRewards.find((rw) => rw.id === giftSheetRewardId);
+            return r ? (
+              <div className="flex items-center gap-3 p-3 rounded-xl bg-[#A155FF]/5 border border-[#A155FF]/20">
+                <img
+                  src={r.image || "/shop/reward_star.jpg"}
+                  alt={r.title}
+                  className="w-10 h-10 rounded-lg object-cover flex-shrink-0"
+                />
+                <div>
+                  <p className="text-sm font-semibold text-white">{r.title}</p>
+                  <p className="text-xs text-white/40">Tặng cho {subMember?.nickname ?? "thành viên"}</p>
+                </div>
+              </div>
+            ) : null;
+          })()}
+
+          {/* Gift Message */}
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">
+              💌 Lời nhắn (tùy chọn)
+            </label>
+            <textarea
+              id="gift-message-textarea"
+              value={giftMessage}
+              onChange={(e) => setGiftMessage(e.target.value)}
+              placeholder="Viết lời nhắn kèm theo món quà..."
+              rows={3}
+              maxLength={2000}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
+            />
+            <p className="text-[10px] text-white/20 mt-1 text-right">{giftMessage.length}/2000</p>
+          </div>
+
+          {/* Gift Reason */}
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">
+              ✨ Lý do tặng (tùy chọn)
+            </label>
+            <input
+              id="gift-reason-input"
+              type="text"
+              value={giftReason}
+              onChange={(e) => setGiftReason(e.target.value)}
+              placeholder="Vì sao bạn muốn tặng reward này..."
+              maxLength={2000}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
+            />
+          </div>
+
+          {/* Confirm */}
+          <button
+            onClick={confirmGift}
+            disabled={giftRewardMutation.isPending || !subMember?.id}
+            className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #A155FF, #FF2A85)" }}
+          >
+            <Gift className="w-4 h-4" />
+            {giftRewardMutation.isPending ? "Đang gửi..." : "Xác nhận Tặng"}
+          </button>
+        </div>
       </BottomSheet>
     </div>
   );

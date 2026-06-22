@@ -1,8 +1,16 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { rewards, rewardPurchases, wallets, houseMembers, logs } from "@db/schema";
+import {
+  rewards,
+  rewardPurchases,
+  rewardGiftDetails,
+  wallets,
+  houseMembers,
+  logs,
+} from "@db/schema";
 import { eq } from "drizzle-orm";
+import { createNotification } from "./lib/notifications";
 
 export const rewardRouter = createRouter({
   list: authedQuery
@@ -128,6 +136,8 @@ export const rewardRouter = createRouter({
       z.object({
         rewardId: z.number(),
         memberId: z.number(),
+        giftMessage: z.string().max(2000).optional(),
+        giftReason: z.string().max(2000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -141,10 +151,19 @@ export const rewardRouter = createRouter({
         where: eq(houseMembers.userId, ctx.user.id),
       });
 
-      await db.insert(rewardPurchases).values({
-        rewardId: input.rewardId,
-        memberId: input.memberId,
-        giftedBy: actor?.id || 0,
+      const [purchase] = await db
+        .insert(rewardPurchases)
+        .values({
+          rewardId: input.rewardId,
+          memberId: input.memberId,
+          giftedBy: actor?.id || 0,
+        })
+        .returning({ id: rewardPurchases.id });
+
+      await db.insert(rewardGiftDetails).values({
+        purchaseId: purchase.id,
+        giftMessage: input.giftMessage ?? null,
+        giftReason: input.giftReason ?? null,
       });
 
       await db.insert(logs).values({
@@ -152,7 +171,26 @@ export const rewardRouter = createRouter({
         action: "REWARD_GIFTED",
         actorId: actor?.id || 0,
         targetId: input.memberId,
-        details: JSON.stringify({ rewardId: reward.id }),
+        details: JSON.stringify({
+          rewardId: reward.id,
+          giftMessage: input.giftMessage,
+          giftReason: input.giftReason,
+        }),
+      });
+
+      await createNotification({
+        houseId: reward.houseId,
+        recipientId: input.memberId,
+        actorId: actor?.id ?? null,
+        type: "reward_gifted",
+        title: "Bạn nhận được reward",
+        message: input.giftMessage || reward.title,
+        entityType: "reward",
+        entityId: reward.id,
+        metadata: {
+          giftReason: input.giftReason,
+          rewardTitle: reward.title,
+        },
       });
 
       return { success: true };

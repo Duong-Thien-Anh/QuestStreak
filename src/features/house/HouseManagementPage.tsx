@@ -9,10 +9,12 @@ import {
   ArrowLeftRight,
   User,
   HelpCircle,
+  UserPlus,
 } from "lucide-react";
 import { mockMembers } from "@/shared/mockData/mockData";
 import { trpc } from "@/providers/trpc";
 import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
+import { InviteManagementPanel } from "./InviteManagementPanel";
 
 type LocalMember = {
   id: number;
@@ -323,6 +325,21 @@ export function HouseManagementPage() {
               </button>
             )}
           </div>
+        </motion.div>
+      )}
+
+      {isAdmin && house?.id && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.22 }}
+          className="mt-2 p-4 bg-[#1A1A22] rounded-xl border border-white/5"
+        >
+          <div className="flex items-center gap-2 mb-4">
+            <UserPlus className="w-4 h-4 text-[#00F2FE]" />
+            <h3 className="text-sm font-semibold text-white">Quản lý Invite</h3>
+          </div>
+          <InviteManagementPanel houseId={house.id} />
         </motion.div>
       )}
 

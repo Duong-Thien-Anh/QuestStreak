@@ -9,17 +9,54 @@ import { ShopPage } from "@/features/shop/ShopPage";
 import { PunishmentsPage } from "@/features/punishments/PunishmentsPage";
 import { NotebookPage } from "@/features/notebook/NotebookPage";
 import { HouseManagementPage } from "@/features/house/HouseManagementPage";
+import { InviteJoinPage } from "@/features/auth/InviteJoinPage";
 import Login from "@/features/auth/LoginPage";
 import NotFound from "@/features/not-found/NotFoundPage";
+import { trpc } from "@/providers/trpc";
 
 function MainApp() {
   const { activeTab, showHouseManagement, toast, clearToast } = useAppStore();
+
+  // Detect whether the authenticated user belongs to a house
+  const houseQuery = trpc.house.get.useQuery(undefined, {
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  // While loading, show a minimal spinner so there's no layout flash
+  if (houseQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D0D11] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#FF2A85]/40 border-t-[#FF2A85] animate-spin" />
+      </div>
+    );
+  }
+
+  // User authenticated but not a member of any house → invite join flow
+  if (houseQuery.isFetched && houseQuery.data === null) {
+    return (
+      <>
+        <InviteJoinPage />
+        <Toast
+          message={toast?.message || ""}
+          type={toast?.type || "info"}
+          visible={!!toast}
+          onClose={clearToast}
+        />
+      </>
+    );
+  }
 
   if (showHouseManagement) {
     return (
       <div className="min-h-screen bg-[#0D0D11] text-white flex flex-col">
         <HouseManagementPage />
-        <Toast message={toast?.message || ""} type={toast?.type || "info"} visible={!!toast} onClose={clearToast} />
+        <Toast
+          message={toast?.message || ""}
+          type={toast?.type || "info"}
+          visible={!!toast}
+          onClose={clearToast}
+        />
       </div>
     );
   }

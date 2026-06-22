@@ -1,10 +1,11 @@
 import { useAppStore } from "@/shared/store/useAppStore";
 import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 import { useAuth } from "@/features/auth/hooks/useAuth";
-import { Menu, MessageSquare, Crown, LogOut } from "lucide-react";
+import { Menu, Crown, LogOut } from "lucide-react";
+import { NotificationBell } from "@/shared/components/NotificationBell";
 
 export function TopBar() {
-  const { setShowHouseManagement, showToast } = useAppStore();
+  const { setShowHouseManagement } = useAppStore();
   const { isAdmin } = useCurrentUser();
   const { logout, isLoading: isLoggingOut } = useAuth();
 
@@ -36,17 +37,8 @@ export function TopBar() {
       </button>
 
       <div className="w-20 flex items-center justify-end gap-1">
-        {isAdmin ? (
-          <button
-            onClick={() => showToast("Tin nhắn sẽ được bổ sung sau khi backend ổn định", "info")}
-            className="w-10 h-10 flex items-center justify-center rounded-lg hover:bg-white/5 transition-colors relative"
-            aria-label="Tin nhắn"
-            title="Tin nhắn"
-          >
-            <MessageSquare className="w-5 h-5 text-white/70" />
-            <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-[#FF2A85] rounded-full" />
-          </button>
-        ) : null}
+        {/* Notification Bell — visible to all */}
+        <NotificationBell />
 
         <button
           onClick={logout}

@@ -1,9 +1,10 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { tasks, wallets, houseMembers, logs } from "@db/schema";
+import { tasks, wallets, houseMembers, logs, taskSubmissions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
 import { awardCompletionProgress } from "./lib/gamification";
+import { createNotification } from "./lib/notifications";
 
 export const taskRouter = createRouter({
   list: authedQuery
@@ -72,6 +73,22 @@ export const taskRouter = createRouter({
         })
         .returning({ id: tasks.id });
 
+      await createNotification({
+        houseId: input.houseId,
+        recipientId: input.assignedTo ?? null,
+        actorId: actor?.id ?? null,
+        type: input.assignedTo ? "task_assigned" : "task_created",
+        title: input.assignedTo ? "Task mới được giao" : "Task mới được tạo",
+        message: input.title,
+        entityType: "task",
+        entityId: task.id,
+        metadata: {
+          category: input.category,
+          chymReward: input.chymReward,
+          chayPenalty: input.chayPenalty,
+        },
+      });
+
       return { id: task.id, ...input };
     }),
 
@@ -109,10 +126,26 @@ export const taskRouter = createRouter({
     )
     .mutation(async ({ input }) => {
       const db = getDb();
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, input.taskId),
+      });
+      if (!task) throw new Error("Task not found");
+
       await db
         .update(tasks)
         .set({ assignedTo: input.memberId, status: "active" })
         .where(eq(tasks.id, input.taskId));
+
+      await createNotification({
+        houseId: task.houseId,
+        recipientId: input.memberId,
+        actorId: task.createdBy,
+        type: "task_assigned",
+        title: "Task được giao cho bạn",
+        message: task.title,
+        entityType: "task",
+        entityId: task.id,
+      });
 
       return { success: true };
     }),
@@ -139,18 +172,90 @@ export const taskRouter = createRouter({
         .set({ assignedTo: member.id, status: "active" })
         .where(eq(tasks.id, input.taskId));
 
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, input.taskId),
+      });
+      if (task) {
+        await createNotification({
+          houseId: task.houseId,
+          actorId: member.id,
+          type: "task_assigned",
+          title: "Task đã được nhận",
+          message: task.title,
+          entityType: "task",
+          entityId: task.id,
+        });
+      }
+
       return { success: true };
     }),
 
   submit: authedQuery
-    .input(z.object({ taskId: z.number() }))
-    .mutation(async ({ input }) => {
+    .input(
+      z.object({
+        taskId: z.number(),
+        note: z.string().max(2000).optional(),
+        proofUrl: z.string().url().max(2000).optional(),
+        proofType: z.string().max(50).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const [member, task] = await Promise.all([
+        db.query.houseMembers.findFirst({
+          where: eq(houseMembers.userId, ctx.user.id),
+        }),
+        db.query.tasks.findFirst({
+          where: eq(tasks.id, input.taskId),
+        }),
+      ]);
+      if (!member) throw new Error("Member not found");
+      if (!task) throw new Error("Task not found");
+      if (task.assignedTo && task.assignedTo !== member.id) {
+        throw new Error("Task is assigned to another member");
+      }
+
       await db
         .update(tasks)
         .set({ status: "submitted" })
         .where(eq(tasks.id, input.taskId));
-      return { success: true };
+
+      const [submission] = await db
+        .insert(taskSubmissions)
+        .values({
+          taskId: input.taskId,
+          memberId: member.id,
+          note: input.note ?? null,
+          proofUrl: input.proofUrl ?? null,
+          proofType: input.proofType ?? null,
+        })
+        .returning();
+
+      await createNotification({
+        houseId: task.houseId,
+        actorId: member.id,
+        type: "task_submitted",
+        title: "Task chờ duyệt",
+        message: input.note || task.title,
+        entityType: "task",
+        entityId: task.id,
+        metadata: {
+          submissionId: submission.id,
+          hasProof: Boolean(input.proofUrl),
+        },
+      });
+
+      return { success: true, submission };
+    }),
+
+  submissions: adminQuery
+    .input(z.object({ taskId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      return db.query.taskSubmissions.findMany({
+        where: eq(taskSubmissions.taskId, input.taskId),
+        orderBy: desc(taskSubmissions.submittedAt),
+      });
     }),
 
   review: adminQuery
@@ -158,6 +263,7 @@ export const taskRouter = createRouter({
       z.object({
         taskId: z.number(),
         decision: z.enum(["approve", "reject"]),
+        reviewNote: z.string().max(2000).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -201,19 +307,95 @@ export const taskRouter = createRouter({
           details: JSON.stringify({ taskId: task.id, reward: task.chymReward }),
         });
 
+        await createNotification({
+          houseId: task.houseId,
+          recipientId: task.assignedTo,
+          actorId: actor?.id ?? null,
+          type: "task_completed",
+          title: "Task đã hoàn thành",
+          message: task.title,
+          entityType: "task",
+          entityId: task.id,
+          metadata: { reward: task.chymReward },
+        });
+
+        const latestSubmission = await db.query.taskSubmissions.findFirst({
+          where: eq(taskSubmissions.taskId, task.id),
+          orderBy: desc(taskSubmissions.submittedAt),
+        });
+        if (latestSubmission) {
+          await db
+            .update(taskSubmissions)
+            .set({
+              status: "approved",
+              reviewedBy: actor?.id ?? null,
+              reviewedAt: new Date(),
+              reviewNote: input.reviewNote ?? null,
+            })
+            .where(eq(taskSubmissions.id, latestSubmission.id));
+        }
+
         if (task.assignedTo) {
-          await awardCompletionProgress({
+          const progress = await awardCompletionProgress({
             memberId: task.assignedTo,
             sourceType: "task",
             sourceId: task.id,
             chymReward: task.chymReward,
           });
+
+          await Promise.all(
+            progress.achievementsUnlocked.map((achievement) =>
+              createNotification({
+                houseId: task.houseId,
+                recipientId: task.assignedTo,
+                actorId: actor?.id ?? null,
+                type: "achievement_unlocked",
+                title: "Achievement đã mở khóa",
+                message: achievement.title,
+                entityType: "achievement",
+                entityId: achievement.id,
+                metadata: { key: achievement.key, xpReward: achievement.xpReward },
+              })
+            )
+          );
         }
       } else {
         await db
           .update(tasks)
           .set({ status: "active" })
           .where(eq(tasks.id, input.taskId));
+
+        const actor = await db.query.houseMembers.findFirst({
+          where: eq(houseMembers.userId, ctx.user.id),
+        });
+
+        await createNotification({
+          houseId: task.houseId,
+          recipientId: task.assignedTo,
+          actorId: actor?.id ?? null,
+          type: "task_rejected",
+          title: "Task cần làm lại",
+          message: task.title,
+          entityType: "task",
+          entityId: task.id,
+          metadata: { reviewNote: input.reviewNote },
+        });
+
+        const latestSubmission = await db.query.taskSubmissions.findFirst({
+          where: eq(taskSubmissions.taskId, task.id),
+          orderBy: desc(taskSubmissions.submittedAt),
+        });
+        if (latestSubmission) {
+          await db
+            .update(taskSubmissions)
+            .set({
+              status: "rejected",
+              reviewedBy: actor?.id ?? null,
+              reviewedAt: new Date(),
+              reviewNote: input.reviewNote ?? null,
+            })
+            .where(eq(taskSubmissions.id, latestSubmission.id));
+        }
       }
 
       return { success: true };

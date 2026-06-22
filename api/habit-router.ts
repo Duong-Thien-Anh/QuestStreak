@@ -4,6 +4,7 @@ import { getDb } from "./queries/connection";
 import { habits, habitCheckins, houseMembers } from "@db/schema";
 import { eq, and, gte } from "drizzle-orm";
 import { awardCompletionProgress } from "./lib/gamification";
+import { createNotification } from "./lib/notifications";
 
 export const habitRouter = createRouter({
   list: authedQuery
@@ -105,6 +106,36 @@ export const habitRouter = createRouter({
         sourceId: input.habitId,
         chymReward: habit.chymReward,
       });
+
+      await createNotification({
+        houseId: habit.houseId,
+        actorId: member.id,
+        type: "habit_checked_in",
+        title: "Habit đã được check-in",
+        message: habit.title,
+        entityType: "habit",
+        entityId: habit.id,
+        metadata: {
+          xpAwarded: progress.xpAwarded,
+          currentStreak: progress.currentStreak,
+        },
+      });
+
+      await Promise.all(
+        progress.achievementsUnlocked.map((achievement) =>
+          createNotification({
+            houseId: habit.houseId,
+            recipientId: member.id,
+            actorId: member.id,
+            type: "achievement_unlocked",
+            title: "Achievement đã mở khóa",
+            message: achievement.title,
+            entityType: "achievement",
+            entityId: achievement.id,
+            metadata: { key: achievement.key, xpReward: achievement.xpReward },
+          })
+        )
+      );
 
       return { checked: true, progress };
     }),

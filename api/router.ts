@@ -10,6 +10,8 @@ import { notebookRouter } from "./notebook-router";
 import { logRouter } from "./log-router";
 import { wheelRouter } from "./wheel-router";
 import { gamificationRouter } from "./gamification-router";
+import { notificationRouter } from "./notification-router";
+import { inviteRouter } from "./invite-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -24,6 +26,8 @@ export const appRouter = createRouter({
   punishment: punishmentRouter,
   wheel: wheelRouter,
   gamification: gamificationRouter,
+  notification: notificationRouter,
+  invite: inviteRouter,
   notebook: notebookRouter,
   log: logRouter,
 });

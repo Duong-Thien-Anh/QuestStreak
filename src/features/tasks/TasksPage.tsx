@@ -13,6 +13,7 @@ import {
   Send,
   CheckSquare,
 } from "lucide-react";
+import { GamificationPanel } from "@/shared/components/GamificationPanel";
 import { FAB } from "@/shared/components/FAB";
 import { BottomSheet } from "@/shared/components/BottomSheet";
 import {
@@ -49,6 +50,11 @@ export function TasksPage() {
   const [wheelOptions, setWheelOptions] = useState(
     "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay"
   );
+  // ─ Submit proof sheet ─
+  const [submitSheetTaskId, setSubmitSheetTaskId] = useState<number | null>(null);
+  const [submitNote, setSubmitNote] = useState("");
+  const [submitProofUrl, setSubmitProofUrl] = useState("");
+  const [submitProofType, setSubmitProofType] = useState<"image" | "video" | "link" | "">("image");
   interface TaskItem {
     id: number;
     houseId: number;
@@ -277,8 +283,30 @@ export function TasksPage() {
 
   const submitTask = (taskId: number) => {
     if (!houseQuery.data) return;
-    submitTaskMutation.mutate({ taskId });
-    showToast("Đã gửi báo cáo!", "success");
+    // Open the proof/note sheet instead of submitting directly
+    setSubmitSheetTaskId(taskId);
+    setSubmitNote("");
+    setSubmitProofUrl("");
+    setSubmitProofType("image");
+  };
+
+  const confirmSubmitTask = () => {
+    if (!submitSheetTaskId) return;
+    submitTaskMutation.mutate(
+      {
+        taskId: submitSheetTaskId,
+        note: submitNote.trim() || undefined,
+        proofUrl: submitProofUrl.trim() || undefined,
+        proofType: submitProofUrl.trim() ? submitProofType || "link" : undefined,
+      },
+      {
+        onSuccess: () => {
+          setSubmitSheetTaskId(null);
+          showToast("Đã gửi báo cáo!", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const reviewTask = (taskId: number, decision: "approve" | "reject") => {
@@ -495,6 +523,12 @@ export function TasksPage() {
           </div>
         </div>
       </motion.div>
+
+      {/* Gamification: Streak / XP / Level */}
+      <GamificationPanel
+        memberId={subMember?.id}
+        memberName={subMember?.nickname ?? undefined}
+      />
 
       {/* Habits Section */}
       <motion.div
@@ -863,6 +897,78 @@ export function TasksPage() {
           </button>
         </div>
         )}
+      </BottomSheet>
+
+      {/* ── Submit Proof Sheet ── */}
+      <BottomSheet
+        isOpen={submitSheetTaskId !== null}
+        onClose={() => setSubmitSheetTaskId(null)}
+        title="Báo cáo nhiệm vụ"
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-white/40">
+            Thêm ghi chú hoặc link bằng chứng trước khi gửi báo cáo.
+          </p>
+
+          {/* Note */}
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Ghi chú (tùy chọn)</label>
+            <textarea
+              id="submit-note-textarea"
+              value={submitNote}
+              onChange={(e) => setSubmitNote(e.target.value)}
+              placeholder="Mô tả những gì bạn đã làm..."
+              rows={3}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none resize-none"
+            />
+          </div>
+
+          {/* Proof URL */}
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Link bằng chứng (tùy chọn)</label>
+            <input
+              id="submit-proof-url"
+              type="url"
+              value={submitProofUrl}
+              onChange={(e) => setSubmitProofUrl(e.target.value)}
+              placeholder="https://..."
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
+            />
+          </div>
+
+          {/* Proof type */}
+          {submitProofUrl.trim() && (
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Loại bằng chứng</label>
+              <div className="flex gap-2">
+                {(["image", "video", "link"] as const).map((t) => (
+                  <button
+                    key={t}
+                    onClick={() => setSubmitProofType(t)}
+                    className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all border ${
+                      submitProofType === t
+                        ? "border-[#00F2FE]/50 bg-[#00F2FE]/10 text-[#00F2FE]"
+                        : "border-white/10 text-white/40 hover:text-white/60"
+                    }`}
+                  >
+                    {t === "image" ? "🖼 Ảnh" : t === "video" ? "🎬 Video" : "🔗 Link"}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* Submit */}
+          <button
+            onClick={confirmSubmitTask}
+            disabled={submitTaskMutation.isPending}
+            className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
+            style={{ background: "linear-gradient(135deg, #00F2FE, #A155FF)" }}
+          >
+            <Send className="w-4 h-4" />
+            {submitTaskMutation.isPending ? "Đang gửi..." : "Gửi Báo Cáo"}
+          </button>
+        </div>
       </BottomSheet>
     </div>
   );

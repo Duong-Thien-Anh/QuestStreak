@@ -9,6 +9,7 @@ import {
   bigint,
   boolean,
   uniqueIndex,
+  index,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ──────────────────────────────────────────────────────────
@@ -21,6 +22,11 @@ export const frequencyEnum = pgEnum("frequency", ["daily", "weekly", "monthly"])
 export const checkinStatusEnum = pgEnum("checkinStatus", ["done", "missed"]);
 export const taskCategoryEnum = pgEnum("taskCategory", ["daily", "weekly", "monthly", "special", "superSpecial"]);
 export const taskStatusEnum = pgEnum("taskStatus", ["pending", "active", "submitted", "completed", "failed"]);
+export const taskSubmissionStatusEnum = pgEnum("taskSubmissionStatus", [
+  "submitted",
+  "approved",
+  "rejected",
+]);
 export const rarityEnum = pgEnum("rarity", ["common", "rare", "epic", "legendary"]);
 export const purchaseStatusEnum = pgEnum("purchaseStatus", ["active", "used", "expired"]);
 export const assignmentStatusEnum = pgEnum("assignmentStatus", ["active", "redeemed", "forgiven"]);
@@ -29,7 +35,20 @@ export const limitTypeEnum = pgEnum("limitType", ["limit", "desire"]);
 export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active", "void"]);
 export const moodEnum = pgEnum("mood", ["sad", "neutral", "happy", "excited", "loved"]);
 export const visibilityEnum = pgEnum("visibility", ["public", "private"]);
+export const inviteStatusEnum = pgEnum("inviteStatus", ["active", "accepted", "revoked", "expired"]);
 export const streakSourceEnum = pgEnum("streakSource", ["habit", "task"]);
+export const notificationTypeEnum = pgEnum("notificationType", [
+  "task_created",
+  "task_assigned",
+  "task_submitted",
+  "task_completed",
+  "task_rejected",
+  "habit_checked_in",
+  "achievement_unlocked",
+  "reward_gifted",
+  "wallet_updated",
+  "system",
+]);
 export const achievementCriteriaEnum = pgEnum("achievementCriteria", [
   "total_completions",
   "current_streak",
@@ -90,6 +109,36 @@ export const houseMembers = pgTable("houseMembers", {
 });
 
 export type HouseMember = typeof houseMembers.$inferSelect;
+
+// ─── House Invites ────────────────────────────────────────────────
+
+export const houseInvites = pgTable(
+  "houseInvites",
+  {
+    id: serial("id").primaryKey(),
+    houseId: bigint("houseId", { mode: "number" }).notNull(),
+    code: varchar("code", { length: 32 }).notNull(),
+    invitedBy: bigint("invitedBy", { mode: "number" }).notNull(),
+    intendedNickname: varchar("intendedNickname", { length: 255 }),
+    lifestyleRole: lifestyleRoleEnum("lifestyleRole").default("submissive").notNull(),
+    gender: genderEnum("gender").default("other").notNull(),
+    status: inviteStatusEnum("status").default("active").notNull(),
+    expiresAt: timestamp("expiresAt"),
+    acceptedBy: bigint("acceptedBy", { mode: "number" }),
+    acceptedAt: timestamp("acceptedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("house_invites_code_idx").on(table.code),
+    index("house_invites_house_status_idx").on(table.houseId, table.status),
+  ]
+);
+
+export type HouseInvite = typeof houseInvites.$inferSelect;
 
 // ─── Wallets ───────────────────────────────────────────────────────
 
@@ -244,6 +293,31 @@ export const tasks = pgTable("tasks", {
 
 export type Task = typeof tasks.$inferSelect;
 
+// ─── Task Submissions ─────────────────────────────────────────────
+
+export const taskSubmissions = pgTable(
+  "taskSubmissions",
+  {
+    id: serial("id").primaryKey(),
+    taskId: bigint("taskId", { mode: "number" }).notNull(),
+    memberId: bigint("memberId", { mode: "number" }).notNull(),
+    note: text("note"),
+    proofUrl: text("proofUrl"),
+    proofType: varchar("proofType", { length: 50 }),
+    status: taskSubmissionStatusEnum("status").default("submitted").notNull(),
+    reviewedBy: bigint("reviewedBy", { mode: "number" }),
+    reviewedAt: timestamp("reviewedAt"),
+    reviewNote: text("reviewNote"),
+    submittedAt: timestamp("submittedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("task_submissions_task_submitted_idx").on(table.taskId, table.submittedAt),
+    index("task_submissions_member_status_idx").on(table.memberId, table.status),
+  ]
+);
+
+export type TaskSubmission = typeof taskSubmissions.$inferSelect;
+
 // ─── Rewards ───────────────────────────────────────────────────────
 
 export const rewards = pgTable("rewards", {
@@ -273,6 +347,22 @@ export const rewardPurchases = pgTable("rewardPurchases", {
 });
 
 export type RewardPurchase = typeof rewardPurchases.$inferSelect;
+
+// ─── Reward Gift Details ──────────────────────────────────────────
+
+export const rewardGiftDetails = pgTable(
+  "rewardGiftDetails",
+  {
+    id: serial("id").primaryKey(),
+    purchaseId: bigint("purchaseId", { mode: "number" }).notNull(),
+    giftMessage: text("giftMessage"),
+    giftReason: text("giftReason"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("reward_gift_details_purchase_idx").on(table.purchaseId)]
+);
+
+export type RewardGiftDetail = typeof rewardGiftDetails.$inferSelect;
 
 // ─── Privileges ────────────────────────────────────────────────────
 
@@ -410,6 +500,32 @@ export const notes = pgTable("notes", {
 });
 
 export type Note = typeof notes.$inferSelect;
+
+// ─── Notifications ────────────────────────────────────────────────
+
+export const notifications = pgTable(
+  "notifications",
+  {
+    id: serial("id").primaryKey(),
+    houseId: bigint("houseId", { mode: "number" }).notNull(),
+    recipientId: bigint("recipientId", { mode: "number" }),
+    actorId: bigint("actorId", { mode: "number" }),
+    type: notificationTypeEnum("type").default("system").notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    message: text("message"),
+    entityType: varchar("entityType", { length: 50 }),
+    entityId: bigint("entityId", { mode: "number" }),
+    metadata: text("metadata"),
+    readAt: timestamp("readAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [
+    index("notifications_house_created_idx").on(table.houseId, table.createdAt),
+    index("notifications_recipient_read_idx").on(table.recipientId, table.readAt),
+  ]
+);
+
+export type Notification = typeof notifications.$inferSelect;
 
 // ─── Logs ──────────────────────────────────────────────────────────
 

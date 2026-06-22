@@ -1,0 +1,51 @@
+import "dotenv/config";
+import postgres from "postgres";
+
+const connectionString = process.env.DATABASE_URL;
+if (!connectionString) {
+  throw new Error("DATABASE_URL is required");
+}
+
+const sql = postgres(connectionString);
+
+try {
+  await sql`
+    DO $$
+    BEGIN
+      CREATE TYPE "inviteStatus" AS ENUM ('active', 'accepted', 'revoked', 'expired');
+    EXCEPTION WHEN duplicate_object THEN NULL;
+    END $$;
+  `;
+
+  await sql`
+    CREATE TABLE IF NOT EXISTS "houseInvites" (
+      "id" serial PRIMARY KEY NOT NULL,
+      "houseId" bigint NOT NULL,
+      "code" varchar(32) NOT NULL,
+      "invitedBy" bigint NOT NULL,
+      "intendedNickname" varchar(255),
+      "lifestyleRole" "lifestyleRole" DEFAULT 'submissive' NOT NULL,
+      "gender" "gender" DEFAULT 'other' NOT NULL,
+      "status" "inviteStatus" DEFAULT 'active' NOT NULL,
+      "expiresAt" timestamp,
+      "acceptedBy" bigint,
+      "acceptedAt" timestamp,
+      "createdAt" timestamp DEFAULT now() NOT NULL,
+      "updatedAt" timestamp DEFAULT now() NOT NULL
+    );
+  `;
+
+  await sql`
+    CREATE UNIQUE INDEX IF NOT EXISTS "house_invites_code_idx"
+    ON "houseInvites" ("code");
+  `;
+
+  await sql`
+    CREATE INDEX IF NOT EXISTS "house_invites_house_status_idx"
+    ON "houseInvites" ("houseId", "status");
+  `;
+
+  console.log("Invite schema applied.");
+} finally {
+  await sql.end();
+}

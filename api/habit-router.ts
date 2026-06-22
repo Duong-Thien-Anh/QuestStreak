@@ -3,6 +3,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { habits, habitCheckins, houseMembers } from "@db/schema";
 import { eq, and, gte } from "drizzle-orm";
+import { awardCompletionProgress } from "./lib/gamification";
 
 export const habitRouter = createRouter({
   list: authedQuery
@@ -70,6 +71,10 @@ export const habitRouter = createRouter({
         where: eq(houseMembers.userId, ctx.user.id),
       });
       if (!member) throw new Error("Member not found");
+      const habit = await db.query.habits.findFirst({
+        where: eq(habits.id, input.habitId),
+      });
+      if (!habit) throw new Error("Habit not found");
 
       // Check if already checked in today
       const today = new Date();
@@ -94,7 +99,14 @@ export const habitRouter = createRouter({
         status: "done",
       });
 
-      return { checked: true };
+      const progress = await awardCompletionProgress({
+        memberId: member.id,
+        sourceType: "habit",
+        sourceId: input.habitId,
+        chymReward: habit.chymReward,
+      });
+
+      return { checked: true, progress };
     }),
 
   getCheckins: authedQuery

@@ -9,6 +9,7 @@ import { punishmentRouter } from "./punishment-router";
 import { notebookRouter } from "./notebook-router";
 import { logRouter } from "./log-router";
 import { wheelRouter } from "./wheel-router";
+import { gamificationRouter } from "./gamification-router";
 import { createRouter, publicQuery } from "./middleware";
 
 export const appRouter = createRouter({
@@ -22,6 +23,7 @@ export const appRouter = createRouter({
   privilege: privilegeRouter,
   punishment: punishmentRouter,
   wheel: wheelRouter,
+  gamification: gamificationRouter,
   notebook: notebookRouter,
   log: logRouter,
 });

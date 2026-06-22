@@ -1,6 +1,5 @@
 import { getDb } from "../api/queries/connection";
 import {
-  users,
   houses,
   houseMembers,
   wallets,
@@ -15,6 +14,7 @@ import {
   journalEntries,
   notes,
 } from "./schema";
+import { ensureDefaultAchievements, ensureMemberProgress } from "../api/lib/gamification";
 
 async function seed() {
   const db = getDb();
@@ -86,6 +86,13 @@ async function seed() {
   });
 
   console.log("Created wallets");
+
+  await ensureMemberProgress(db, adminMember.id);
+  await ensureMemberProgress(db, subMember.id);
+  console.log("Created member progress");
+
+  await ensureDefaultAchievements(db);
+  console.log("Created achievements");
 
   // Create habits
   await db.insert(habits).values([

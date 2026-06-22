@@ -8,6 +8,7 @@ import {
   integer,
   bigint,
   boolean,
+  uniqueIndex,
 } from "drizzle-orm/pg-core";
 
 // ─── Enums ──────────────────────────────────────────────────────────
@@ -28,6 +29,13 @@ export const limitTypeEnum = pgEnum("limitType", ["limit", "desire"]);
 export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active", "void"]);
 export const moodEnum = pgEnum("mood", ["sad", "neutral", "happy", "excited", "loved"]);
 export const visibilityEnum = pgEnum("visibility", ["public", "private"]);
+export const streakSourceEnum = pgEnum("streakSource", ["habit", "task"]);
+export const achievementCriteriaEnum = pgEnum("achievementCriteria", [
+  "total_completions",
+  "current_streak",
+  "xp",
+  "level",
+]);
 
 // ─── Users (managed by auth system) ────────────────────────────────
 
@@ -97,6 +105,83 @@ export const wallets = pgTable("wallets", {
 });
 
 export type Wallet = typeof wallets.$inferSelect;
+
+// ─── Member Progress ──────────────────────────────────────────────
+
+export const memberProgress = pgTable("memberProgress", {
+  id: serial("id").primaryKey(),
+  memberId: bigint("memberId", { mode: "number" }).notNull().unique(),
+  xp: integer("xp").default(0).notNull(),
+  level: integer("level").default(1).notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type MemberProgress = typeof memberProgress.$inferSelect;
+
+// ─── Streaks ───────────────────────────────────────────────────────
+
+export const streaks = pgTable(
+  "streaks",
+  {
+    id: serial("id").primaryKey(),
+    memberId: bigint("memberId", { mode: "number" }).notNull(),
+    sourceType: streakSourceEnum("sourceType").notNull(),
+    sourceId: bigint("sourceId", { mode: "number" }).notNull(),
+    currentStreak: integer("currentStreak").default(0).notNull(),
+    longestStreak: integer("longestStreak").default(0).notNull(),
+    lastCompletedAt: timestamp("lastCompletedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("streaks_member_source_idx").on(table.memberId, table.sourceType, table.sourceId),
+  ]
+);
+
+export type Streak = typeof streaks.$inferSelect;
+
+// ─── Achievements ─────────────────────────────────────────────────
+
+export const achievements = pgTable(
+  "achievements",
+  {
+    id: serial("id").primaryKey(),
+    key: varchar("key", { length: 100 }).notNull(),
+    title: varchar("title", { length: 255 }).notNull(),
+    description: text("description"),
+    icon: varchar("icon", { length: 50 }).default("trophy").notNull(),
+    xpReward: integer("xpReward").default(0).notNull(),
+    criteriaType: achievementCriteriaEnum("criteriaType").notNull(),
+    criteriaValue: integer("criteriaValue").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [uniqueIndex("achievements_key_idx").on(table.key)]
+);
+
+export type Achievement = typeof achievements.$inferSelect;
+
+// ─── Member Achievements ──────────────────────────────────────────
+
+export const memberAchievements = pgTable(
+  "memberAchievements",
+  {
+    id: serial("id").primaryKey(),
+    memberId: bigint("memberId", { mode: "number" }).notNull(),
+    achievementId: bigint("achievementId", { mode: "number" }).notNull(),
+    unlockedAt: timestamp("unlockedAt").defaultNow().notNull(),
+  },
+  (table) => [
+    uniqueIndex("member_achievements_member_achievement_idx").on(table.memberId, table.achievementId),
+  ]
+);
+
+export type MemberAchievement = typeof memberAchievements.$inferSelect;
 
 // ─── Habits ────────────────────────────────────────────────────────
 

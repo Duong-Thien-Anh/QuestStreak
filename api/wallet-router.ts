@@ -1,7 +1,7 @@
 import { z } from "zod";
 import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { wallets, houseMembers, logs } from "@db/schema";
+import { wallets, houseMembers, logs, memberProgress } from "@db/schema";
 import { eq } from "drizzle-orm";
 
 export const walletRouter = createRouter({
@@ -12,7 +12,14 @@ export const walletRouter = createRouter({
       const wallet = await db.query.wallets.findFirst({
         where: eq(wallets.memberId, input.memberId),
       });
-      return wallet || { chymBalance: 0, chayBalance: 0 };
+      const progress = await db.query.memberProgress.findFirst({
+        where: eq(memberProgress.memberId, input.memberId),
+      });
+      return {
+        ...(wallet || { chymBalance: 0, chayBalance: 0 }),
+        xp: progress?.xp ?? 0,
+        level: progress?.level ?? 1,
+      };
     }),
 
   addChym: adminQuery

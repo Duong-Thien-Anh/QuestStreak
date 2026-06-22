@@ -3,6 +3,7 @@ import { createRouter, authedQuery, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { tasks, wallets, houseMembers, logs } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
+import { awardCompletionProgress } from "./lib/gamification";
 
 export const taskRouter = createRouter({
   list: authedQuery
@@ -165,6 +166,9 @@ export const taskRouter = createRouter({
         where: eq(tasks.id, input.taskId),
       });
       if (!task) throw new Error("Task not found");
+      if (input.decision === "approve" && task.status === "completed") {
+        return { success: true };
+      }
 
       if (input.decision === "approve") {
         // Credit Chym
@@ -196,6 +200,15 @@ export const taskRouter = createRouter({
           targetId: task.assignedTo,
           details: JSON.stringify({ taskId: task.id, reward: task.chymReward }),
         });
+
+        if (task.assignedTo) {
+          await awardCompletionProgress({
+            memberId: task.assignedTo,
+            sourceType: "task",
+            sourceId: task.id,
+            chymReward: task.chymReward,
+          });
+        }
       } else {
         await db
           .update(tasks)

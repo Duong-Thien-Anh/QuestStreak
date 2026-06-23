@@ -1,6 +1,7 @@
 import { create } from "zustand";
 
 export type Tab = "tasks" | "shop" | "punishments" | "notebook";
+export type ManagementPanel = "account" | "room" | null;
 
 export interface AppState {
   // Navigation
@@ -10,6 +11,8 @@ export interface AppState {
   // UI State
   showHouseManagement: boolean;
   setShowHouseManagement: (show: boolean) => void;
+  managementPanel: ManagementPanel;
+  setManagementPanel: (panel: ManagementPanel) => void;
   showCreateSheet: boolean;
   setShowCreateSheet: (show: boolean) => void;
   createSheetType: "task" | "wheel" | "reward" | "privilege" | "punishment" | "note" | "journal" | "agreement" | null;
@@ -43,7 +46,11 @@ export const useAppStore = create<AppState>((set) => ({
 
   // UI State
   showHouseManagement: false,
-  setShowHouseManagement: (show) => set({ showHouseManagement: show }),
+  setShowHouseManagement: (show) =>
+    set({ showHouseManagement: show, managementPanel: show ? "room" : null }),
+  managementPanel: null,
+  setManagementPanel: (panel) =>
+    set({ managementPanel: panel, showHouseManagement: panel !== null }),
   showCreateSheet: false,
   setShowCreateSheet: (show) => set({ showCreateSheet: show }),
   createSheetType: null,

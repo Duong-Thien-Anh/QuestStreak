@@ -9,6 +9,8 @@ import {
   houses,
   logs,
   memberProgress,
+  roomCodes,
+  roomJoinRequests,
   wallets,
 } from "@db/schema";
 import { createNotification } from "./lib/notifications";
@@ -35,10 +37,6 @@ async function createUniqueInviteCode() {
   }
 
   throw new Error("Failed to generate invite code");
-}
-
-function isInviteExpired(expiresAt: Date | null) {
-  return Boolean(expiresAt && expiresAt.getTime() <= Date.now());
 }
 
 export const inviteRouter = createRouter({
@@ -143,23 +141,24 @@ export const inviteRouter = createRouter({
     .input(z.object({ code: z.string().min(1).max(32) }))
     .query(async ({ input }) => {
       const db = getDb();
-      const invite = await db.query.houseInvites.findFirst({
-        where: eq(houseInvites.code, input.code),
+      const roomCode = await db.query.roomCodes.findFirst({
+        where: eq(roomCodes.code, input.code),
       });
-      if (!invite) return null;
-
-      const house = await db.query.houses.findFirst({
-        where: eq(houses.id, invite.houseId),
-      });
-
-      return {
-        houseName: house?.name ?? "Lunis House",
-        intendedNickname: invite.intendedNickname,
-        lifestyleRole: invite.lifestyleRole,
-        gender: invite.gender,
-        status: isInviteExpired(invite.expiresAt) && invite.status === "active" ? "expired" : invite.status,
-        expiresAt: invite.expiresAt,
-      };
+      if (roomCode) {
+        const room = await db.query.houses.findFirst({
+          where: eq(houses.id, roomCode.houseId),
+        });
+        return {
+          houseName: room?.name ?? "Lunis House",
+          intendedNickname: null,
+          lifestyleRole: "submissive" as const,
+          gender: "other" as const,
+          status: "active" as const,
+          expiresAt: null,
+          requiresApproval: roomCode.approvalRequired,
+        };
+      }
+      return null;
     }),
 
   join: authedQuery
@@ -179,61 +178,98 @@ export const inviteRouter = createRouter({
         throw new Error("User already belongs to a house");
       }
 
-      const invite = await db.query.houseInvites.findFirst({
-        where: and(eq(houseInvites.code, input.code), eq(houseInvites.status, "active")),
+      const roomCode = await db.query.roomCodes.findFirst({
+        where: eq(roomCodes.code, input.code),
       });
-      if (!invite) throw new Error("Invite is invalid");
+      if (roomCode) {
+        const room = await db.query.houses.findFirst({
+          where: eq(houses.id, roomCode.houseId),
+        });
+        if (!room) throw new Error("Room is invalid");
 
-      if (isInviteExpired(invite.expiresAt)) {
-        await db
-          .update(houseInvites)
-          .set({ status: "expired" })
-          .where(eq(houseInvites.id, invite.id));
-        throw new Error("Invite has expired");
+        if (roomCode.approvalRequired) {
+          const existingRequest = await db.query.roomJoinRequests.findFirst({
+            where: and(
+              eq(roomJoinRequests.houseId, room.id),
+              eq(roomJoinRequests.userId, ctx.user.id),
+            ),
+          });
+          const requestData = {
+            houseId: room.id,
+            userId: ctx.user.id,
+            nickname: input.nickname ?? ctx.user.name ?? "Thành viên mới",
+            gender: input.gender ?? "other",
+            status: "pending" as const,
+            reviewedBy: null,
+            reviewedAt: null,
+          };
+
+          const [request] =
+            existingRequest && existingRequest.houseId === room.id
+              ? await db
+                  .update(roomJoinRequests)
+                  .set(requestData)
+                  .where(eq(roomJoinRequests.id, existingRequest.id))
+                  .returning()
+              : await db.insert(roomJoinRequests).values(requestData).returning();
+
+          await db.insert(logs).values({
+            houseId: room.id,
+            action: "MEMBER_JOIN_REQUESTED_BY_ROOM_CODE",
+            actorId: request.id,
+            details: JSON.stringify({ code: input.code, userId: ctx.user.id }),
+          });
+
+          await createNotification({
+            houseId: room.id,
+            recipientId: room.ownerId,
+            actorId: request.id,
+            type: "system",
+            title: "Có yêu cầu tham gia phòng mới",
+            message: request.nickname,
+            entityType: "roomJoinRequest",
+            entityId: request.id,
+            metadata: { code: input.code, userId: ctx.user.id },
+          });
+
+          return { ...request, joinStatus: "pending" as const };
+        }
+
+        const [member] = await db
+          .insert(houseMembers)
+          .values({
+            houseId: room.id,
+            userId: ctx.user.id,
+            nickname: input.nickname ?? ctx.user.name ?? "Thành viên mới",
+            lifestyleRole: "submissive",
+            gender: input.gender ?? "other",
+          })
+          .returning();
+
+        await db.insert(wallets).values({ memberId: member.id });
+        await db.insert(memberProgress).values({ memberId: member.id });
+
+        await db.insert(logs).values({
+          houseId: room.id,
+          action: "MEMBER_JOINED_BY_ROOM_CODE",
+          actorId: member.id,
+          details: JSON.stringify({ code: input.code }),
+        });
+
+        await createNotification({
+          houseId: room.id,
+          actorId: member.id,
+          type: "system",
+          title: "Thành viên mới đã tham gia phòng",
+          message: member.nickname,
+          entityType: "member",
+          entityId: member.id,
+          metadata: { code: input.code },
+        });
+
+        return { ...member, joinStatus: "joined" as const };
       }
 
-      const [member] = await db
-        .insert(houseMembers)
-        .values({
-          houseId: invite.houseId,
-          userId: ctx.user.id,
-          nickname: input.nickname ?? invite.intendedNickname ?? ctx.user.name ?? "Thành viên mới",
-          lifestyleRole: invite.lifestyleRole,
-          gender: input.gender ?? invite.gender,
-        })
-        .returning();
-
-      await db.insert(wallets).values({ memberId: member.id });
-      await db.insert(memberProgress).values({ memberId: member.id });
-
-      await db
-        .update(houseInvites)
-        .set({
-          status: "accepted",
-          acceptedBy: member.id,
-          acceptedAt: new Date(),
-        })
-        .where(eq(houseInvites.id, invite.id));
-
-      await db.insert(logs).values({
-        houseId: invite.houseId,
-        action: "MEMBER_JOINED_BY_INVITE",
-        actorId: member.id,
-        targetId: invite.id,
-        details: JSON.stringify({ code: invite.code }),
-      });
-
-      await createNotification({
-        houseId: invite.houseId,
-        actorId: member.id,
-        type: "system",
-        title: "Thành viên mới đã vào house",
-        message: member.nickname ?? ctx.user.name ?? "Thành viên mới",
-        entityType: "member",
-        entityId: member.id,
-        metadata: { inviteId: invite.id },
-      });
-
-      return { success: true, member };
+      throw new Error("Room code is invalid");
     }),
 });

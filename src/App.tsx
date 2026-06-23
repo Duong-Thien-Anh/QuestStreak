@@ -16,7 +16,7 @@ import NotFound from "@/features/not-found/NotFoundPage";
 import { trpc } from "@/providers/trpc";
 
 function MainApp() {
-  const { activeTab, showHouseManagement, toast, clearToast } = useAppStore();
+  const { activeTab, managementPanel, toast, clearToast } = useAppStore();
 
   // Detect whether the authenticated user belongs to a house
   const houseQuery = trpc.house.get.useQuery(undefined, {
@@ -48,7 +48,7 @@ function MainApp() {
     );
   }
 
-  if (showHouseManagement) {
+  if (managementPanel) {
     return (
       <div className="min-h-screen bg-[#0D0D11] text-white flex flex-col">
         <HouseManagementPage />

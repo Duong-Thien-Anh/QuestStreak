@@ -1,8 +1,33 @@
 import { z } from "zod";
+import { nanoid } from "nanoid";
 import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { houses, houseMembers, wallets, memberProgress } from "@db/schema";
-import { eq } from "drizzle-orm";
+import {
+  houses,
+  houseMembers,
+  wallets,
+  memberProgress,
+  roomCodes,
+  roomJoinRequests,
+} from "@db/schema";
+import { desc, eq } from "drizzle-orm";
+
+function createRoomCode() {
+  return nanoid(10);
+}
+
+async function createUniqueRoomCode() {
+  const db = getDb();
+  for (let attempt = 0; attempt < 5; attempt += 1) {
+    const code = createRoomCode();
+    const existing = await db.query.roomCodes.findFirst({
+      where: eq(roomCodes.code, code),
+    });
+    if (!existing) return code;
+  }
+
+  throw new Error("Failed to generate room code");
+}
 
 export const houseRouter = createRouter({
   get: authedQuery.query(async ({ ctx }) => {
@@ -21,6 +46,17 @@ export const houseRouter = createRouter({
     });
 
     if (!house) return null;
+
+    let roomCode = await db.query.roomCodes.findFirst({
+      where: eq(roomCodes.houseId, house.id),
+    });
+    if (!roomCode) {
+      const code = await createUniqueRoomCode();
+      [roomCode] = await db
+        .insert(roomCodes)
+        .values({ houseId: house.id, code })
+        .returning();
+    }
 
     // Get all members with their wallets
     const allMembers = await db.query.houseMembers.findMany({
@@ -46,7 +82,22 @@ export const houseRouter = createRouter({
       })
     );
 
-    return { ...house, members: membersWithWallets };
+    const canManageRoom =
+      member.lifestyleRole === "dominant" || member.lifestyleRole === "switch";
+    const pendingJoinRequests = canManageRoom
+      ? await db.query.roomJoinRequests.findMany({
+          where: eq(roomJoinRequests.houseId, house.id),
+          orderBy: [desc(roomJoinRequests.createdAt)],
+        })
+      : [];
+
+    return {
+      ...house,
+      roomCode: roomCode.code,
+      roomApprovalRequired: roomCode.approvalRequired,
+      pendingJoinRequests,
+      members: membersWithWallets,
+    };
   }),
 
   create: authedQuery
@@ -76,6 +127,11 @@ export const houseRouter = createRouter({
         })
         .returning({ id: houses.id });
 
+      await db.insert(roomCodes).values({
+        houseId: house.id,
+        code: await createUniqueRoomCode(),
+      });
+
       // Create member record for owner
       const [member] = await db
         .insert(houseMembers)
@@ -92,6 +148,163 @@ export const houseRouter = createRouter({
       await db.insert(memberProgress).values({ memberId: member.id });
 
       return house;
+    }),
+
+  update: domQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        name: z.string().min(1).max(255),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+        throw new Error("House membership not found");
+      }
+
+      const [house] = await db
+        .update(houses)
+        .set({ name: input.name })
+        .where(eq(houses.id, input.houseId))
+        .returning();
+
+      return house;
+    }),
+
+  "roomCode.rotate": domQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+        throw new Error("House membership not found");
+      }
+
+      const roomCode = await createUniqueRoomCode();
+      const existing = await db.query.roomCodes.findFirst({
+        where: eq(roomCodes.houseId, input.houseId),
+      });
+
+      if (existing) {
+        const [updated] = await db
+          .update(roomCodes)
+          .set({ code: roomCode })
+          .where(eq(roomCodes.houseId, input.houseId))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(roomCodes)
+        .values({ houseId: input.houseId, code: roomCode })
+        .returning();
+      return created;
+    }),
+
+  "approval.update": domQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        approvalRequired: z.boolean(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+        throw new Error("House membership not found");
+      }
+
+      const existing = await db.query.roomCodes.findFirst({
+        where: eq(roomCodes.houseId, input.houseId),
+      });
+
+      if (existing) {
+        const [updated] = await db
+          .update(roomCodes)
+          .set({ approvalRequired: input.approvalRequired })
+          .where(eq(roomCodes.houseId, input.houseId))
+          .returning();
+        return updated;
+      }
+
+      const [created] = await db
+        .insert(roomCodes)
+        .values({
+          houseId: input.houseId,
+          code: await createUniqueRoomCode(),
+          approvalRequired: input.approvalRequired,
+        })
+        .returning();
+      return created;
+    }),
+
+  "joinRequest.review": domQuery
+    .input(
+      z.object({
+        requestId: z.number(),
+        decision: z.enum(["approve", "reject"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const request = await db.query.roomJoinRequests.findFirst({
+        where: eq(roomJoinRequests.id, input.requestId),
+      });
+      if (!request) throw new Error("Join request not found");
+      if (!ctx.currentMember || ctx.currentMember.houseId !== request.houseId) {
+        throw new Error("House membership not found");
+      }
+
+      if (request.status !== "pending") {
+        throw new Error("Join request already reviewed");
+      }
+
+      if (input.decision === "reject") {
+        await db
+          .update(roomJoinRequests)
+          .set({
+            status: "rejected",
+            reviewedBy: ctx.currentMember.id,
+            reviewedAt: new Date(),
+          })
+          .where(eq(roomJoinRequests.id, input.requestId));
+        return { success: true, status: "rejected" as const };
+      }
+
+      const existingMember = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, request.userId),
+      });
+
+      if (!existingMember) {
+        const [member] = await db
+          .insert(houseMembers)
+          .values({
+            houseId: request.houseId,
+            userId: request.userId,
+            nickname: request.nickname ?? "Thành viên mới",
+            lifestyleRole: "submissive",
+            gender: request.gender,
+          })
+          .returning({ id: houseMembers.id });
+
+        await db.insert(wallets).values({ memberId: member.id });
+        await db.insert(memberProgress).values({ memberId: member.id });
+      }
+
+      await db
+        .update(roomJoinRequests)
+        .set({
+          status: "approved",
+          reviewedBy: ctx.currentMember.id,
+          reviewedAt: new Date(),
+        })
+        .where(eq(roomJoinRequests.id, input.requestId));
+
+      return { success: true, status: "approved" as const };
     }),
 
   "member.update": domQuery
@@ -114,6 +327,62 @@ export const houseRouter = createRouter({
         .update(houseMembers)
         .set(updateData)
         .where(eq(houseMembers.id, input.memberId));
+
+      return { success: true };
+    }),
+
+  "member.remove": domQuery
+    .input(z.object({ memberId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const member = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.id, input.memberId),
+      });
+      if (!member) throw new Error("Member not found");
+      if (!ctx.currentMember || ctx.currentMember.houseId !== member.houseId) {
+        throw new Error("House membership not found");
+      }
+      if (member.userId === ctx.user.id) {
+        throw new Error("You cannot remove yourself from the room");
+      }
+
+      const house = await db.query.houses.findFirst({
+        where: eq(houses.id, member.houseId),
+      });
+      if (house?.ownerId === member.userId) {
+        throw new Error("Room owner cannot be removed");
+      }
+
+      await db.delete(wallets).where(eq(wallets.memberId, input.memberId));
+      await db
+        .delete(memberProgress)
+        .where(eq(memberProgress.memberId, input.memberId));
+      await db.delete(houseMembers).where(eq(houseMembers.id, input.memberId));
+
+      return { success: true };
+    }),
+
+  "member.selfUpdate": authedQuery
+    .input(
+      z.object({
+        nickname: z.string().max(255).optional(),
+        gender: z.enum(["male", "female", "other"]).optional(),
+        telegramAvatar: z.string().max(2048).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const updateData: Record<string, unknown> = {};
+      if (input.nickname !== undefined) updateData.nickname = input.nickname;
+      if (input.gender !== undefined) updateData.gender = input.gender;
+      if (input.telegramAvatar !== undefined) {
+        updateData.telegramAvatar = input.telegramAvatar;
+      }
+
+      await db
+        .update(houseMembers)
+        .set(updateData)
+        .where(eq(houseMembers.userId, ctx.user.id));
 
       return { success: true };
     }),

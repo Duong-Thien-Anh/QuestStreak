@@ -11,7 +11,7 @@ import { getSessionCookieOptions } from "./lib/cookies";
 import { env } from "./lib/env";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { userCredentials, users } from "@db/schema";
+import { userCredentials, userPreferences, users } from "@db/schema";
 import { eq } from "drizzle-orm";
 import { signSessionToken } from "./kimi/session";
 import { verifyZaloAccessToken } from "./zalo-auth";
@@ -152,7 +152,45 @@ export const authRouter = createRouter({
 
       return user;
     }),
-  me: authedQuery.query((opts) => opts.ctx.user),
+  me: authedQuery.query(async ({ ctx }) => {
+    const db = getDb();
+    const preferences = await db.query.userPreferences.findFirst({
+      where: eq(userPreferences.userId, ctx.user.id),
+    });
+
+    return {
+      ...ctx.user,
+      language: preferences?.language ?? "vi",
+    };
+  }),
+  updatePreferences: authedQuery
+    .input(
+      z.object({
+        language: z.enum(["en", "vi"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const existing = await db.query.userPreferences.findFirst({
+        where: eq(userPreferences.userId, ctx.user.id),
+      });
+
+      const [preferences] = existing
+        ? await db
+            .update(userPreferences)
+            .set({ language: input.language })
+            .where(eq(userPreferences.userId, ctx.user.id))
+            .returning()
+        : await db
+            .insert(userPreferences)
+            .values({ userId: ctx.user.id, language: input.language })
+            .returning();
+
+      return {
+        ...ctx.user,
+        language: preferences.language,
+      };
+    }),
   logout: authedQuery.mutation(async ({ ctx }) => {
     const opts = getSessionCookieOptions(ctx.req.headers);
     ctx.resHeaders.append(

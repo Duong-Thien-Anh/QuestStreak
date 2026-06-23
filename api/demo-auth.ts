@@ -120,8 +120,6 @@ export function createDemoAuthHandler() {
       demoUser.role,
     );
 
-    // Sign JWT with JWT_SECRET (falls back to APP_SECRET for local dev)
-    const jwtSecret = process.env.JWT_SECRET || process.env.APP_SECRET || "";
     const token = await signSessionToken({
       unionId: user.unionId,
       clientId: process.env.APP_ID || "demo-app",

@@ -17,6 +17,7 @@ import {
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const lifestyleRoleEnum = pgEnum("lifestyleRole", ["dominant", "submissive", "switch"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
+export const languageEnum = pgEnum("language", ["en", "vi"]);
 export const taskCategoryEnum = pgEnum("taskCategory", ["daily", "weekly", "monthly", "special", "superSpecial"]);
 export const taskStatusEnum = pgEnum("taskStatus", ["pending", "active", "submitted", "completed", "failed"]);
 export const taskSubmissionStatusEnum = pgEnum("taskSubmissionStatus", [
@@ -33,6 +34,11 @@ export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active
 export const moodEnum = pgEnum("mood", ["sad", "neutral", "happy", "excited", "loved"]);
 export const visibilityEnum = pgEnum("visibility", ["public", "private"]);
 export const inviteStatusEnum = pgEnum("inviteStatus", ["active", "accepted", "revoked", "expired"]);
+export const joinRequestStatusEnum = pgEnum("joinRequestStatus", [
+  "pending",
+  "approved",
+  "rejected",
+]);
 export const streakSourceEnum = pgEnum("streakSource", ["task"]);
 export const notificationTypeEnum = pgEnum("notificationType", [
   "task_created",
@@ -72,6 +78,23 @@ export const users = pgTable("users", {
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
 
+export const userPreferences = pgTable(
+  "userPreferences",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number" }).notNull(),
+    language: languageEnum("language").default("vi").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [uniqueIndex("user_preferences_user_idx").on(table.userId)],
+);
+
+export type UserPreference = typeof userPreferences.$inferSelect;
+
 // ─── User Login Credentials ──────────────────────────────────────
 
 export const userCredentials = pgTable(
@@ -109,6 +132,52 @@ export const houses = pgTable("houses", {
 });
 
 export type House = typeof houses.$inferSelect;
+
+export const roomCodes = pgTable(
+  "roomCodes",
+  {
+    id: serial("id").primaryKey(),
+    houseId: bigint("houseId", { mode: "number" }).notNull(),
+    code: varchar("code", { length: 32 }).notNull(),
+    approvalRequired: boolean("approvalRequired").default(false).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("room_codes_house_idx").on(table.houseId),
+    uniqueIndex("room_codes_code_idx").on(table.code),
+  ],
+);
+
+export type RoomCode = typeof roomCodes.$inferSelect;
+
+export const roomJoinRequests = pgTable(
+  "roomJoinRequests",
+  {
+    id: serial("id").primaryKey(),
+    houseId: bigint("houseId", { mode: "number" }).notNull(),
+    userId: bigint("userId", { mode: "number" }).notNull(),
+    nickname: varchar("nickname", { length: 255 }),
+    gender: genderEnum("gender").default("other").notNull(),
+    status: joinRequestStatusEnum("status").default("pending").notNull(),
+    reviewedBy: bigint("reviewedBy", { mode: "number" }),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("room_join_requests_house_user_idx").on(table.houseId, table.userId),
+    index("room_join_requests_house_status_idx").on(table.houseId, table.status),
+  ],
+);
+
+export type RoomJoinRequest = typeof roomJoinRequests.$inferSelect;
 
 // ─── House Members ─────────────────────────────────────────────────
 

@@ -11,6 +11,7 @@ type PreviewData = {
   gender: "male" | "female" | "other";
   status: "active" | "accepted" | "expired" | "revoked";
   expiresAt: Date | null;
+  requiresApproval?: boolean;
 };
 
 const roleLabel: Record<string, string> = {
@@ -33,7 +34,7 @@ export function InviteJoinPage() {
   const [previewLoading, setPreviewLoading] = useState(false);
   const [nickname, setNickname] = useState("");
   const [gender, setGender] = useState<"male" | "female" | "other">("other");
-  const [joined, setJoined] = useState(false);
+  const [joinStatus, setJoinStatus] = useState<"joined" | "pending" | null>(null);
   const [autoPreviewRequested, setAutoPreviewRequested] = useState(false);
   const [houseName, setHouseName] = useState("Lunis House");
 
@@ -43,27 +44,32 @@ export function InviteJoinPage() {
   );
 
   const joinMutation = trpc.invite.join.useMutation({
-    onSuccess: () => {
-      setJoined(true);
-      void utils.house.get.invalidate();
-      showToast("Chào mừng đến Lunis House! 🎉", "success");
+    onSuccess: (data) => {
+      const nextStatus = data.joinStatus === "pending" ? "pending" : "joined";
+      setJoinStatus(nextStatus);
+      if (nextStatus === "joined") {
+        void utils.house.get.invalidate();
+        showToast("Chào mừng đến Lunis House! 🎉", "success");
+        return;
+      }
+      showToast("Đã gửi yêu cầu tham gia phòng", "success");
     },
     onError: (err) => showToast(err.message, "error"),
   });
   const createHouseMutation = trpc.house.create.useMutation({
     onSuccess: async () => {
-      setJoined(true);
+      setJoinStatus("joined");
       await utils.house.get.invalidate();
-      showToast("Đã tạo house mới", "success");
+      showToast("Đã tạo phòng mới", "success");
     },
     onError: (err) => showToast(err.message, "error"),
   });
 
   useEffect(() => {
     const params = new URLSearchParams(window.location.search);
-    const inviteCode = params.get("invite") ?? params.get("code");
-    if (inviteCode) {
-      setCode(inviteCode);
+    const roomCode = params.get("room") ?? params.get("code");
+    if (roomCode) {
+      setCode(roomCode);
       setAutoPreviewRequested(true);
     }
   }, []);
@@ -79,7 +85,7 @@ export function InviteJoinPage() {
         setGender((result.data as PreviewData).gender);
       }
       if (!result.data) {
-        showToast("Không tìm thấy invite code này", "error");
+        showToast("Không tìm thấy mã phòng này", "error");
       }
     } finally {
       setPreviewLoading(false);
@@ -110,7 +116,8 @@ export function InviteJoinPage() {
 
   const isActive = preview?.status === "active";
 
-  if (joined) {
+  if (joinStatus) {
+    const pending = joinStatus === "pending";
     return (
       <div className="min-h-screen bg-[#0D0D11] flex items-center justify-center px-6">
         <motion.div
@@ -126,9 +133,19 @@ export function InviteJoinPage() {
           >
             <Check className="w-10 h-10 text-white" />
           </motion.div>
-          <h1 className="text-2xl font-bold text-white">Chào mừng!</h1>
-          <p className="text-white/50 text-sm">Bạn đã tham gia Lunis House thành công.</p>
-          <p className="text-white/30 text-xs">Trang sẽ tự động cập nhật...</p>
+          <h1 className="text-2xl font-bold text-white">
+            {pending ? "Đang chờ duyệt" : "Chào mừng!"}
+          </h1>
+          <p className="text-white/50 text-sm">
+            {pending
+              ? "Yêu cầu tham gia phòng đã được gửi cho Task Creator."
+              : "Bạn đã tham gia Lunis House thành công."}
+          </p>
+          <p className="text-white/30 text-xs">
+            {pending
+              ? "Bạn sẽ vào phòng sau khi được duyệt."
+              : "Trang sẽ tự động cập nhật..."}
+          </p>
         </motion.div>
       </div>
     );
@@ -159,7 +176,7 @@ export function InviteJoinPage() {
             <Crown className="w-8 h-8 text-white" />
           </div>
           <h1 className="text-2xl font-bold text-white">Lunis House</h1>
-          <p className="text-white/40 text-sm">Nhập invite code để tham gia</p>
+          <p className="text-white/40 text-sm">Nhập mã phòng để tham gia</p>
         </div>
 
         {/* Code Input */}
@@ -173,7 +190,7 @@ export function InviteJoinPage() {
                 setCode(e.target.value);
                 setPreview(null);
               }}
-              placeholder="Invite code"
+              placeholder="Mã phòng"
               maxLength={32}
               className="w-full px-4 py-4 rounded-xl bg-[#1A1A22] border border-white/10 text-[#00F2FE] font-mono text-xl tracking-widest text-center placeholder:text-white/15 focus:border-[#00F2FE]/40 focus:outline-none transition-colors"
               onKeyDown={(e) => e.key === "Enter" && void handlePreview()}
@@ -193,9 +210,9 @@ export function InviteJoinPage() {
 
         <div className="rounded-2xl border border-white/10 bg-[#1A1A22]/70 p-4 space-y-3">
           <div>
-            <p className="text-sm font-semibold text-white">Tạo house mới</p>
+            <p className="text-sm font-semibold text-white">Tạo phòng mới</p>
             <p className="mt-1 text-xs text-white/40">
-              Nếu bạn là người đầu tiên, tạo house để trở thành Dom rồi gửi invite cho người còn lại.
+              Nếu bạn là người đầu tiên, đặt tên phòng để trở thành người ra task rồi gửi mã phòng cho người còn lại.
             </p>
           </div>
           <input
@@ -204,7 +221,7 @@ export function InviteJoinPage() {
             onChange={(event) => setHouseName(event.target.value)}
             maxLength={255}
             className="w-full px-4 py-3 rounded-xl bg-[#141418] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
-            placeholder="Tên house"
+            placeholder="Tên phòng"
           />
           <button
             onClick={handleCreateHouse}
@@ -216,7 +233,7 @@ export function InviteJoinPage() {
             ) : (
               <Crown className="w-4 h-4" />
             )}
-            Tạo house với vai trò Dom
+            Tạo phòng với vai trò ra task
           </button>
         </div>
 
@@ -237,14 +254,14 @@ export function InviteJoinPage() {
                 <div className="flex items-center gap-2 text-[#FF3B30]">
                   <AlertTriangle className="w-4 h-4" />
                   <span className="text-xs font-semibold">
-                    {preview.status === "expired" ? "Invite code đã hết hạn" : "Invite code không hợp lệ"}
+                    {preview.status === "expired" ? "Mã phòng đã hết hạn" : "Mã phòng không hợp lệ"}
                   </span>
                 </div>
               )}
 
               <div className="space-y-2">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs text-white/40">House</span>
+                  <span className="text-xs text-white/40">Phòng</span>
                   <span className="text-sm font-semibold text-white">{preview.houseName}</span>
                 </div>
                 {preview.intendedNickname && (
@@ -260,6 +277,12 @@ export function InviteJoinPage() {
                     style={{ color: roleColor[preview.lifestyleRole] }}
                   >
                     {roleLabel[preview.lifestyleRole]}
+                  </span>
+                </div>
+                <div className="flex items-center justify-between">
+                  <span className="text-xs text-white/40">Duyệt thành viên</span>
+                  <span className="text-sm font-medium text-white">
+                    {preview.requiresApproval ? "Cần duyệt" : "Vào ngay"}
                   </span>
                 </div>
                 {preview.expiresAt && (
@@ -303,7 +326,7 @@ export function InviteJoinPage() {
                       <Loader2 className="w-4 h-4 animate-spin" />
                     ) : (
                       <>
-                        Tham gia House
+                        {preview.requiresApproval ? "Gửi yêu cầu tham gia" : "Tham gia House"}
                         <ArrowRight className="w-4 h-4" />
                       </>
                     )}

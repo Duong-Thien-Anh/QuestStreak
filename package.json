@@ -14,6 +14,8 @@
     "format": "prettier --write .",
     "test": "vitest run",
     "auth:setup": "node scripts/apply-user-login-schema.mjs",
+    "db:language": "node scripts/apply-language-schema.mjs",
+    "db:room-code": "node scripts/apply-room-code-schema.mjs",
     "db:drop-habits": "node scripts/drop-habit-schema.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",

@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { useAppStore } from "@/shared/store/useAppStore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -11,6 +11,7 @@ import {
   Zap,
   Send,
   CheckSquare,
+  Trash2,
 } from "lucide-react";
 import { GamificationPanel } from "@/shared/components/GamificationPanel";
 import { FAB } from "@/shared/components/FAB";
@@ -32,6 +33,7 @@ export function TasksPage() {
   const [createSheet, setCreateSheet] = useState(false);
   const [createType, setCreateType] = useState<"task" | "wheel">("task");
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
+  const [editingWheelId, setEditingWheelId] = useState<number | null>(null);
   const [taskType, setTaskType] = useState<"regular" | "special" | "superSpecial">("regular");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
   const [title, setTitle] = useState("");
@@ -43,6 +45,8 @@ export function TasksPage() {
   const [wheelOptions, setWheelOptions] = useState(
     "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay"
   );
+  const [spinningWheelId, setSpinningWheelId] = useState<number | null>(null);
+  const [wheelRotations, setWheelRotations] = useState<Record<number, number>>({});
   // ─ Submit proof sheet ─
   const [submitSheetTaskId, setSubmitSheetTaskId] = useState<number | null>(null);
   const [submitNote, setSubmitNote] = useState("");
@@ -122,6 +126,16 @@ export function TasksPage() {
       await utils.wheel.list.invalidate();
     },
   });
+  const updateWheelMutation = trpc.wheel.update.useMutation({
+    onSuccess: async () => {
+      await utils.wheel.list.invalidate();
+    },
+  });
+  const deleteWheelMutation = trpc.wheel.delete.useMutation({
+    onSuccess: async () => {
+      await utils.wheel.list.invalidate();
+    },
+  });
   const spinWheelMutation = trpc.wheel.spin.useMutation({
     onSuccess: async () => {
       await utils.wheel.list.invalidate();
@@ -132,6 +146,16 @@ export function TasksPage() {
   const subMember = members.find((m) => m.lifestyleRole === "submissive");
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
   const visibleWheels = wheelsQuery.data ?? [];
+  const wheelPalette = ["#FF2A85", "#A155FF", "#00F2FE", "#FFD700", "#FF7A59", "#35D07F"];
+  const wheelPreviewOptions = useMemo(
+    () =>
+      wheelOptions
+        .split("\n")
+        .map((line) => line.trim())
+        .filter(Boolean)
+        .map((label) => ({ label, weight: 1 })),
+    [wheelOptions]
+  );
 
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => {
@@ -229,9 +253,33 @@ export function TasksPage() {
   };
 
   const resetWheelForm = () => {
+    setEditingWheelId(null);
     setWheelTitle("");
     setWheelDescription("");
     setWheelOptions("Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay");
+  };
+
+  const openWheelEditor = (wheel: (typeof visibleWheels)[number]) => {
+    const options = parseWheelOptions(wheel.options);
+    setEditingWheelId(wheel.id);
+    setCreateType("wheel");
+    setWheelTitle(wheel.title);
+    setWheelDescription(wheel.description ?? "");
+    setWheelOptions(options.map((option) => option.label).join("\n"));
+    setCreateSheet(true);
+  };
+
+  const deleteWheel = (wheel: (typeof visibleWheels)[number]) => {
+    if (!window.confirm(`Xóa vòng quay "${wheel.title}"?`)) return;
+    deleteWheelMutation.mutate(
+      { wheelId: wheel.id },
+      {
+        onSuccess: () => {
+          showToast("Đã xóa vòng quay", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const getCategoryColor = (key: string) => {
@@ -298,7 +346,7 @@ export function TasksPage() {
     setReviewNote("");
   };
 
-  const createWheel = () => {
+  const saveWheel = () => {
     if (!wheelTitle.trim()) return;
     if (!houseQuery.data) {
       showToast("Wheel cần backend để lưu", "error");
@@ -316,27 +364,119 @@ export function TasksPage() {
       return;
     }
 
-    createWheelMutation.mutate({
-      houseId,
-      title: wheelTitle,
-      description: wheelDescription || undefined,
-      options,
-      assignedTo: subMember?.id,
-    });
+    if (editingWheelId) {
+      updateWheelMutation.mutate(
+        {
+          wheelId: editingWheelId,
+          title: wheelTitle,
+          description: wheelDescription || undefined,
+          options,
+          assignedTo: subMember?.id ?? null,
+        },
+        {
+          onSuccess: () => {
+            showToast("Đã cập nhật vòng quay!", "success");
+          },
+          onError: (err) => showToast(err.message, "error"),
+        }
+      );
+    } else {
+      createWheelMutation.mutate(
+        {
+          houseId,
+          title: wheelTitle,
+          description: wheelDescription || undefined,
+          options,
+          assignedTo: subMember?.id,
+        },
+        {
+          onSuccess: () => {
+            showToast("Đã tạo wheel!", "success");
+          },
+          onError: (err) => showToast(err.message, "error"),
+        }
+      );
+    }
     setCreateSheet(false);
     resetWheelForm();
-    showToast("Đã tạo wheel!", "success");
   };
 
   const spinWheel = (wheelId: number) => {
     if (!houseQuery.data) return;
+    const nextRotation = (wheelRotations[wheelId] ?? 0) + 720 + ((wheelId * 53) % 360);
+    setSpinningWheelId(wheelId);
+    setWheelRotations((current) => ({ ...current, [wheelId]: nextRotation }));
     spinWheelMutation.mutate(
       { wheelId },
       {
         onSuccess: (data) => {
           showToast(`Wheel result: ${data.result}`, "success");
         },
+        onSettled: () => {
+          setTimeout(() => setSpinningWheelId(null), 500);
+        },
       }
+    );
+  };
+
+  const parseWheelOptions = (optionsJson: string) => {
+    try {
+      return JSON.parse(optionsJson) as Array<{ label: string; weight?: number }>;
+    } catch {
+      return [];
+    }
+  };
+
+  const renderWheelModel = (
+    options: Array<{ label: string; weight?: number }>,
+    rotation = 0,
+    size: "sm" | "lg" = "sm"
+  ) => {
+    const normalized = options.length > 0 ? options : [{ label: "Option 1" }, { label: "Option 2" }];
+    const segment = 100 / normalized.length;
+    const gradient = normalized
+      .map((_, index) => {
+        const color = wheelPalette[index % wheelPalette.length];
+        return `${color} ${index * segment}% ${(index + 1) * segment}%`;
+      })
+      .join(", ");
+    const wheelSize = size === "lg" ? "h-56 w-56" : "h-36 w-36";
+    const labelRadius = size === "lg" ? 84 : 52;
+
+    return (
+      <div className="relative mx-auto flex justify-center">
+        <div className="absolute -top-1 z-20 h-0 w-0 border-l-[10px] border-r-[10px] border-t-[18px] border-l-transparent border-r-transparent border-t-white drop-shadow" />
+        <motion.div
+          animate={{ rotate: rotation }}
+          transition={{ duration: 1.4, ease: [0.16, 1, 0.3, 1] }}
+          className={`relative ${wheelSize} rounded-full border-4 border-white/15 shadow-[0_0_28px_rgba(161,85,255,0.25)]`}
+          style={{
+            background: `conic-gradient(${gradient})`,
+          }}
+        >
+          <div className="absolute inset-3 rounded-full border border-black/20" />
+          {normalized.slice(0, 8).map((option, index) => {
+            const angle = (360 / normalized.length) * index + 360 / normalized.length / 2 - 90;
+            const x = Math.cos((angle * Math.PI) / 180) * labelRadius;
+            const y = Math.sin((angle * Math.PI) / 180) * labelRadius;
+            return (
+              <span
+                key={`${option.label}-${index}`}
+                className="absolute left-1/2 top-1/2 max-w-[74px] -translate-x-1/2 -translate-y-1/2 truncate rounded bg-black/20 px-1.5 py-0.5 text-[9px] font-semibold text-white shadow-sm"
+                style={{
+                  transform: `translate(calc(-50% + ${x}px), calc(-50% + ${y}px)) rotate(${angle + 90}deg)`,
+                }}
+                title={option.label}
+              >
+                {option.label}
+              </span>
+            );
+          })}
+          <div className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-[#0D0D11] text-xs font-bold text-white shadow-lg">
+            SPIN
+          </div>
+        </motion.div>
+      </div>
     );
   };
 
@@ -533,28 +673,56 @@ export function TasksPage() {
             Wheels
           </h2>
           {visibleWheels.map((wheel) => {
-            const options = JSON.parse(wheel.options) as Array<{ label: string }>;
+            const options = parseWheelOptions(wheel.options);
+            const isSpinning = spinningWheelId === wheel.id;
             return (
               <div
                 key={wheel.id}
                 className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
               >
-                <div className="flex items-start justify-between gap-3">
+                <div className="flex items-center gap-4">
+                  <div className="shrink-0">
+                    {renderWheelModel(options, wheelRotations[wheel.id] ?? 0, "sm")}
+                  </div>
                   <div className="min-w-0">
-                    <h3 className="font-semibold text-white text-sm">{wheel.title}</h3>
+                    <div className="flex items-start justify-between gap-2">
+                      <h3 className="font-semibold text-white text-sm">{wheel.title}</h3>
+                      {isAdmin && (
+                        <div className="flex shrink-0 items-center gap-1">
+                          <button
+                            onClick={() => openWheelEditor(wheel)}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-white/5"
+                            aria-label="Sửa vòng quay"
+                            title="Sửa vòng quay"
+                          >
+                            <Pen className="h-4 w-4 text-white/40" />
+                          </button>
+                          <button
+                            onClick={() => deleteWheel(wheel)}
+                            disabled={deleteWheelMutation.isPending}
+                            className="flex h-8 w-8 items-center justify-center rounded-lg transition-colors hover:bg-[#FF3B30]/10 disabled:opacity-50"
+                            aria-label="Xóa vòng quay"
+                            title="Xóa vòng quay"
+                          >
+                            <Trash2 className="h-4 w-4 text-[#FF3B30]/70" />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                     {wheel.description && (
                       <p className="text-xs text-white/50 mt-1">{wheel.description}</p>
                     )}
                     <p className="text-[10px] text-white/30 mt-2">
                       {options.map((option) => option.label).join(" / ")}
                     </p>
+                    <button
+                      onClick={() => spinWheel(wheel.id)}
+                      disabled={isSpinning || spinWheelMutation.isPending}
+                      className="mt-3 rounded-lg bg-[#A155FF] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#A155FF]/90 disabled:opacity-60"
+                    >
+                      {isSpinning ? "Spinning..." : "Spin"}
+                    </button>
                   </div>
-                  <button
-                    onClick={() => spinWheel(wheel.id)}
-                    className="px-3 py-1.5 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 transition-colors flex-shrink-0"
-                  >
-                    Spin
-                  </button>
                 </div>
               </div>
             );
@@ -624,6 +792,7 @@ export function TasksPage() {
             label: "Send a Wheel",
             icon: <Send className="w-5 h-5 text-white" />,
             onClick: () => {
+              resetWheelForm();
               setCreateType("wheel");
               setCreateSheet(true);
             },
@@ -647,17 +816,28 @@ export function TasksPage() {
         onClose={() => {
           setCreateSheet(false);
           resetForm();
+          resetWheelForm();
         }}
         title={
           editingTaskId
             ? "Edit Task"
             : createType === "task"
             ? "Create New Task"
+            : editingWheelId
+            ? "Edit Wheel"
             : "Create Wheel"
         }
       >
         {createType === "wheel" ? (
           <div className="space-y-4">
+            <div className="rounded-2xl border border-[#A155FF]/20 bg-[#A155FF]/5 p-4">
+              {renderWheelModel(wheelPreviewOptions, 0, "lg")}
+              <p className="mt-3 text-center text-xs text-white/45">
+                {wheelPreviewOptions.length >= 2
+                  ? `${wheelPreviewOptions.length} lựa chọn sẽ được tạo thành vòng quay`
+                  : "Thêm ít nhất 2 lựa chọn để tạo vòng quay"}
+              </p>
+            </div>
             <div>
               <label className="text-xs text-white/50 mb-2 block">Wheel Title</label>
               <input
@@ -688,11 +868,21 @@ export function TasksPage() {
               />
             </div>
             <button
-              onClick={createWheel}
-              disabled={!wheelTitle.trim()}
+              onClick={saveWheel}
+              disabled={
+                !wheelTitle.trim() ||
+                createWheelMutation.isPending ||
+                updateWheelMutation.isPending
+              }
               className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 disabled:opacity-50 transition-colors"
             >
-              Create Wheel
+              {editingWheelId
+                ? updateWheelMutation.isPending
+                  ? "Saving..."
+                  : "Save Wheel"
+                : createWheelMutation.isPending
+                ? "Creating..."
+                : "Create Wheel"}
             </button>
           </div>
         ) : (

@@ -23,7 +23,7 @@ export function useGamification(memberId: number | undefined) {
   const xpInCurrentLevel = xp % XP_PER_LEVEL;
   const xpProgress = (xpInCurrentLevel / XP_PER_LEVEL) * 100;
 
-  // Aggregate streak info across all tracked habits/tasks
+  // Aggregate streak info across tracked tasks.
   const streaks = data?.streaks ?? [];
   const maxCurrentStreak = streaks.length
     ? Math.max(...streaks.map((s) => s.currentStreak))

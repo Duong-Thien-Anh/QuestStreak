@@ -20,7 +20,6 @@ try {
         'task_submitted',
         'task_completed',
         'task_rejected',
-        'habit_checked_in',
         'achievement_unlocked',
         'reward_gifted',
         'wallet_updated',

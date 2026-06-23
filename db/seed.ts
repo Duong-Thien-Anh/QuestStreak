@@ -3,7 +3,6 @@ import {
   houses,
   houseMembers,
   wallets,
-  habits,
   tasks,
   rewards,
   privileges,
@@ -93,52 +92,6 @@ async function seed() {
 
   await ensureDefaultAchievements(db);
   console.log("Created achievements");
-
-  // Create habits
-  await db.insert(habits).values([
-    {
-      houseId: house.id,
-      title: "Thức dậy đúng giờ",
-      description: "Dậy trước 7h sáng mỗi ngày",
-      type: "wanted",
-      frequency: "daily",
-      chymReward: 2,
-      chayPenalty: 1,
-      createdBy: adminMember.id,
-    },
-    {
-      houseId: house.id,
-      title: "Uống đủ nước",
-      description: "Uống ít nhất 2 lít nước mỗi ngày",
-      type: "wanted",
-      frequency: "daily",
-      chymReward: 1,
-      chayPenalty: 0,
-      createdBy: adminMember.id,
-    },
-    {
-      houseId: house.id,
-      title: "Không ăn vặt",
-      description: "Không ăn đồ ngọt sau 8h tối",
-      type: "unwanted",
-      frequency: "daily",
-      chymReward: 0,
-      chayPenalty: 2,
-      createdBy: adminMember.id,
-    },
-    {
-      houseId: house.id,
-      title: "Không chửi thề",
-      description: "Giữ lễ phép trong giao tiếp",
-      type: "unwanted",
-      frequency: "daily",
-      chymReward: 0,
-      chayPenalty: 1,
-      createdBy: adminMember.id,
-    },
-  ]);
-
-  console.log("Created habits");
 
   // Create tasks
   await db.insert(tasks).values([

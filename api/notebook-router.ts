@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   limits,
@@ -23,7 +23,7 @@ export const notebookRouter = createRouter({
       });
     }),
 
-  "limits.create": adminQuery
+  "limits.create": domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -50,7 +50,7 @@ export const notebookRouter = createRouter({
       return { id: item.id, ...input };
     }),
 
-  "limits.delete": adminQuery
+  "limits.delete": domQuery
     .input(z.object({ limitId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -224,8 +224,11 @@ export const notebookRouter = createRouter({
       });
       if (!member) return [];
 
-      // Admin sees all notes, members see public + their own private
-      if (ctx.user.role === "admin") {
+      // Dom/switch sees all notes; Sub sees public notes.
+      if (
+        member.lifestyleRole === "dominant" ||
+        member.lifestyleRole === "switch"
+      ) {
         return db.query.notes.findMany({
           where: eq(notes.houseId, input.houseId),
         });

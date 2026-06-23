@@ -1,11 +1,11 @@
 import { z } from "zod";
-import { createRouter, adminQuery } from "./middleware";
+import { createRouter, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { logs } from "@db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export const logRouter = createRouter({
-  list: adminQuery
+  list: domQuery
     .input(
       z.object({
         houseId: z.number(),

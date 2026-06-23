@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { houses, houseMembers, wallets, memberProgress } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -89,11 +89,12 @@ export const houseRouter = createRouter({
 
       // Create wallet
       await db.insert(wallets).values({ memberId: member.id });
+      await db.insert(memberProgress).values({ memberId: member.id });
 
       return house;
     }),
 
-  "member.update": adminQuery
+  "member.update": domQuery
     .input(
       z.object({
         memberId: z.number(),
@@ -117,7 +118,7 @@ export const houseRouter = createRouter({
       return { success: true };
     }),
 
-  "member.add": adminQuery
+  "member.add": domQuery
     .input(
       z.object({
         houseId: z.number(),

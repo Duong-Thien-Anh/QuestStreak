@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Copy,
   Check,
+  Link as LinkIcon,
   Plus,
   Trash2,
   Clock,
@@ -43,7 +44,24 @@ function formatExpiry(date: Date | null | string): string {
   return d.toLocaleDateString("vi-VN", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-function CopyButton({ text }: { text: string }) {
+function getInviteLink(code: string) {
+  return `${window.location.origin}/?invite=${encodeURIComponent(code)}`;
+}
+
+function getEffectiveStatus(invite: HouseInvite): InviteStatus {
+  if (invite.status !== "active" || !invite.expiresAt) return invite.status;
+  return new Date(invite.expiresAt).getTime() <= Date.now() ? "expired" : "active";
+}
+
+function CopyButton({
+  text,
+  title = "Copy code",
+  icon = "copy",
+}: {
+  text: string;
+  title?: string;
+  icon?: "copy" | "link";
+}) {
   const [copied, setCopied] = useState(false);
   const copy = () => {
     void navigator.clipboard.writeText(text).then(() => {
@@ -55,11 +73,13 @@ function CopyButton({ text }: { text: string }) {
     <button
       onClick={copy}
       className="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-white/10 transition-colors flex-shrink-0"
-      title="Copy code"
+      title={title}
     >
       {copied
         ? <Check className="w-4 h-4 text-[#34D399]" />
-        : <Copy className="w-4 h-4 text-white/50" />}
+        : icon === "link"
+          ? <LinkIcon className="w-4 h-4 text-white/50" />
+          : <Copy className="w-4 h-4 text-white/50" />}
     </button>
   );
 }
@@ -131,8 +151,12 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
               <p className="font-mono text-xl tracking-widest text-[#00F2FE] flex-1 bg-[#141418] rounded-lg px-3 py-2">
                 {newlyCreated}
               </p>
-              <CopyButton text={newlyCreated} />
+              <CopyButton text={newlyCreated} title="Copy invite code" />
+              <CopyButton text={getInviteLink(newlyCreated)} title="Copy invite link" icon="link" />
             </div>
+            <p className="mt-2 text-[11px] text-white/35 break-all">
+              {getInviteLink(newlyCreated)}
+            </p>
             <button
               onClick={() => setNewlyCreated(null)}
               className="mt-2 text-[10px] text-white/30 hover:text-white/50"
@@ -255,7 +279,9 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
 
         <div className="space-y-2">
           {invites.map((invite, i) => {
-            const cfg = statusConfig[invite.status] ?? statusConfig.expired;
+            const effectiveStatus = getEffectiveStatus(invite);
+            const cfg = statusConfig[effectiveStatus] ?? statusConfig.expired;
+            const inviteLink = getInviteLink(invite.code);
             return (
               <motion.div
                 key={invite.id}
@@ -271,13 +297,12 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
                       <p className="font-mono text-sm text-[#00F2FE] tracking-wider">
                         {invite.code}
                       </p>
-                      <CopyButton text={invite.code} />
+                      <CopyButton text={invite.code} title="Copy invite code" />
+                      <CopyButton text={inviteLink} title="Copy invite link" icon="link" />
                     </div>
                     <div className="flex items-center gap-3 mt-1.5 flex-wrap">
                       {invite.intendedNickname && (
-                        <span className="text-[10px] text-white/50">
-                          👤 {invite.intendedNickname}
-                        </span>
+                        <span className="text-[10px] text-white/50">{invite.intendedNickname}</span>
                       )}
                       <span
                         className="text-[10px] px-1.5 py-0.5 rounded-full font-semibold"
@@ -295,7 +320,7 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
                   </div>
 
                   {/* Revoke */}
-                  {invite.status === "active" && (
+                  {effectiveStatus === "active" && (
                     <button
                       onClick={() => revokeMutation.mutate({ inviteId: invite.id })}
                       disabled={revokeMutation.isPending}

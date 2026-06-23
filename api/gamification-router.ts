@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { eq } from "drizzle-orm";
+import { and, eq } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { memberAchievements, memberProgress, streaks, wallets } from "@db/schema";
@@ -20,7 +20,7 @@ export const gamificationRouter = createRouter({
           where: eq(memberProgress.memberId, input.memberId),
         }),
         db.query.streaks.findMany({
-          where: eq(streaks.memberId, input.memberId),
+          where: and(eq(streaks.memberId, input.memberId), eq(streaks.sourceType, "task")),
         }),
         db.query.achievements.findMany(),
         db.query.memberAchievements.findMany({

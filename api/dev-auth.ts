@@ -2,7 +2,6 @@ import type { Context } from "hono";
 import { setCookie } from "hono/cookie";
 import { Session } from "@contracts/constants";
 import {
-  habits,
   houseMembers,
   houses,
   limits,
@@ -148,37 +147,6 @@ async function ensureStarterData(houseId: number, ownerMemberId: number, subMemb
         chayPenalty: 5,
         status: "active",
         assignedTo: subMemberId,
-        createdBy: ownerMemberId,
-      },
-    ]);
-  }
-
-  const existingHabits = await db.query.habits.findMany({
-    where: eq(habits.houseId, houseId),
-  });
-
-  if (existingHabits.length === 0) {
-    await db.insert(habits).values([
-      {
-        houseId,
-        title: "Thức dậy đúng giờ",
-        description: "Dậy trước 7h sáng mỗi ngày",
-        type: "wanted",
-        frequency: "daily",
-        chymReward: 2,
-        chayPenalty: 1,
-        icon: "heart",
-        createdBy: ownerMemberId,
-      },
-      {
-        houseId,
-        title: "Không ăn vặt",
-        description: "Không ăn đồ ngọt sau 8h tối",
-        type: "unwanted",
-        frequency: "daily",
-        chymReward: 0,
-        chayPenalty: 2,
-        icon: "ban",
         createdBy: ownerMemberId,
       },
     ]);

@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   rewards,
@@ -22,7 +22,7 @@ export const rewardRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -55,7 +55,7 @@ export const rewardRouter = createRouter({
       return { id: reward.id, ...input };
     }),
 
-  update: adminQuery
+  update: domQuery
     .input(
       z.object({
         rewardId: z.number(),
@@ -79,7 +79,7 @@ export const rewardRouter = createRouter({
       return { success: true };
     }),
 
-  delete: adminQuery
+  delete: domQuery
     .input(z.object({ rewardId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -131,7 +131,7 @@ export const rewardRouter = createRouter({
       return { success: true, newBalance: wallet.chymBalance - reward.cost };
     }),
 
-  gift: adminQuery
+  gift: domQuery
     .input(
       z.object({
         rewardId: z.number(),

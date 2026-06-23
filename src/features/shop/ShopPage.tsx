@@ -4,7 +4,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Star,
   Gift,
-  Sparkles,
+  Heart,
   Plus,
   Minus,
   Zap,
@@ -65,6 +65,7 @@ export function ShopPage() {
   });
   // ─ Gift sheet ─
   const [giftSheetRewardId, setGiftSheetRewardId] = useState<number | null>(null);
+  const [selectedGiftMemberId, setSelectedGiftMemberId] = useState<number | null>(null);
   const [giftMessage, setGiftMessage] = useState("");
   const [giftReason, setGiftReason] = useState("");
   const utils = trpc.useUtils();
@@ -140,6 +141,7 @@ export function ShopPage() {
   const visiblePrivileges = privilegesQuery.data ?? privileges;
   const visibleWallet = walletQuery.data ?? wallet;
   const purchasedCount = purchasesQuery.data?.length ?? 0;
+  const selectedGiftMember = members.find((member) => member.id === selectedGiftMemberId);
 
   const handlePurchase = (rewardId: number, cost: number) => {
     if (visibleWallet.chymBalance < cost) {
@@ -157,25 +159,33 @@ export function ShopPage() {
 
   const handleGift = (rewardId?: number) => {
     if (!rewardId) return;
-    // Open the gift message/reason sheet instead of calling directly
+    if (!houseQuery.data) {
+      showToast("Gift reward cần backend để lưu", "info");
+      return;
+    }
     setGiftSheetRewardId(rewardId);
+    setSelectedGiftMemberId(subMember?.id ?? members[0]?.id ?? null);
     setGiftMessage("");
     setGiftReason("");
   };
 
   const confirmGift = () => {
-    if (!giftSheetRewardId || !subMember?.id) return;
+    if (!giftSheetRewardId || !selectedGiftMemberId) return;
     giftRewardMutation.mutate(
       {
         rewardId: giftSheetRewardId,
-        memberId: subMember.id,
+        memberId: selectedGiftMemberId,
         giftMessage: giftMessage.trim() || undefined,
         giftReason: giftReason.trim() || undefined,
       },
       {
-        onSuccess: () => {
+        onSuccess: async () => {
+          await utils.reward.myPurchases.invalidate();
+          await utils.notification.list.invalidate();
+          await utils.notification.unreadCount.invalidate();
           setGiftSheetRewardId(null);
-          showToast("Đã tặng phần thưởng! 🎁", "success");
+          setSelectedGiftMemberId(null);
+          showToast("Đã tặng phần thưởng!", "success");
         },
         onError: (err) => showToast(err.message, "error"),
       }
@@ -466,12 +476,12 @@ export function ShopPage() {
       >
         <div className="relative flex-shrink-0">
           <img
-            src="/avatars/sub.jpg"
+            src={subMember?.telegramAvatar || "/avatars/sub.jpg"}
             alt="Avatar"
-            className="w-20 h-20 rounded-xl object-cover border-2 border-[#A155FF]/30"
+            className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#A155FF] flex items-center justify-center">
-            <Sparkles className="w-3 h-3 text-white" />
+          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF2A85] flex items-center justify-center">
+            <Heart className="w-3 h-3 text-white" />
           </div>
         </div>
         <div className="flex-1 grid grid-rows-2 gap-2">
@@ -983,8 +993,11 @@ export function ShopPage() {
       {/* ── Gift Reward Sheet ── */}
       <BottomSheet
         isOpen={giftSheetRewardId !== null}
-        onClose={() => setGiftSheetRewardId(null)}
-        title="Tặng Phần Thưởng 🎁"
+        onClose={() => {
+          setGiftSheetRewardId(null);
+          setSelectedGiftMemberId(null);
+        }}
+        title="Tặng Phần Thưởng"
       >
         <div className="space-y-4">
           {/* Reward preview */}
@@ -999,16 +1012,35 @@ export function ShopPage() {
                 />
                 <div>
                   <p className="text-sm font-semibold text-white">{r.title}</p>
-                  <p className="text-xs text-white/40">Tặng cho {subMember?.nickname ?? "thành viên"}</p>
+                  <p className="text-xs text-white/40">
+                    Tặng cho {selectedGiftMember?.nickname ?? "thành viên"}
+                  </p>
                 </div>
               </div>
             ) : null;
           })()}
 
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">
+              Người nhận
+            </label>
+            <select
+              value={selectedGiftMemberId ?? ""}
+              onChange={(event) => setSelectedGiftMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Member"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
+          </div>
+
           {/* Gift Message */}
           <div>
             <label className="text-xs text-white/50 mb-2 block">
-              💌 Lời nhắn (tùy chọn)
+              Lời nhắn (tùy chọn)
             </label>
             <textarea
               id="gift-message-textarea"
@@ -1025,7 +1057,7 @@ export function ShopPage() {
           {/* Gift Reason */}
           <div>
             <label className="text-xs text-white/50 mb-2 block">
-              ✨ Lý do tặng (tùy chọn)
+              Lý do tặng (tùy chọn)
             </label>
             <input
               id="gift-reason-input"
@@ -1041,7 +1073,7 @@ export function ShopPage() {
           {/* Confirm */}
           <button
             onClick={confirmGift}
-            disabled={giftRewardMutation.isPending || !subMember?.id}
+            disabled={giftRewardMutation.isPending || !selectedGiftMemberId}
             className="w-full py-3.5 rounded-xl font-bold text-white text-sm flex items-center justify-center gap-2 transition-opacity disabled:opacity-60"
             style={{ background: "linear-gradient(135deg, #A155FF, #FF2A85)" }}
           >

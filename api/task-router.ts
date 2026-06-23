@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { tasks, wallets, houseMembers, logs, taskSubmissions } from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
@@ -34,7 +34,7 @@ export const taskRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -92,7 +92,7 @@ export const taskRouter = createRouter({
       return { id: task.id, ...input };
     }),
 
-  update: adminQuery
+  update: domQuery
     .input(
       z.object({
         taskId: z.number(),
@@ -117,7 +117,7 @@ export const taskRouter = createRouter({
       return { success: true };
     }),
 
-  assign: adminQuery
+  assign: domQuery
     .input(
       z.object({
         taskId: z.number(),
@@ -150,7 +150,7 @@ export const taskRouter = createRouter({
       return { success: true };
     }),
 
-  delete: adminQuery
+  delete: domQuery
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -248,7 +248,7 @@ export const taskRouter = createRouter({
       return { success: true, submission };
     }),
 
-  submissions: adminQuery
+  submissions: domQuery
     .input(z.object({ taskId: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
@@ -258,7 +258,7 @@ export const taskRouter = createRouter({
       });
     }),
 
-  review: adminQuery
+  review: domQuery
     .input(
       z.object({
         taskId: z.number(),
@@ -401,7 +401,7 @@ export const taskRouter = createRouter({
       return { success: true };
     }),
 
-  toggleStatus: adminQuery
+  toggleStatus: domQuery
     .input(z.object({ taskId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();

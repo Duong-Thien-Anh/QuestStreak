@@ -1,7 +1,7 @@
 import { nanoid } from "nanoid";
 import { z } from "zod";
 import { and, desc, eq } from "drizzle-orm";
-import { createRouter, adminQuery, authedQuery, publicQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   houseInvites,
@@ -42,7 +42,7 @@ function isInviteExpired(expiresAt: Date | null) {
 }
 
 export const inviteRouter = createRouter({
-  list: adminQuery
+  list: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -56,7 +56,7 @@ export const inviteRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -116,7 +116,7 @@ export const inviteRouter = createRouter({
       return invite;
     }),
 
-  revoke: adminQuery
+  revoke: domQuery
     .input(z.object({ inviteId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
@@ -237,4 +237,3 @@ export const inviteRouter = createRouter({
       return { success: true, member };
     }),
 });
-

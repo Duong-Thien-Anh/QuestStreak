@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Crown, Check, AlertTriangle, Clock, ArrowRight, Loader2 } from "lucide-react";
 import { trpc } from "@/providers/trpc";
@@ -32,7 +32,10 @@ export function InviteJoinPage() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [nickname, setNickname] = useState("");
+  const [gender, setGender] = useState<"male" | "female" | "other">("other");
   const [joined, setJoined] = useState(false);
+  const [autoPreviewRequested, setAutoPreviewRequested] = useState(false);
+  const [houseName, setHouseName] = useState("Lunis House");
 
   const previewQuery = trpc.invite.preview.useQuery(
     { code: code.trim() },
@@ -47,21 +50,47 @@ export function InviteJoinPage() {
     },
     onError: (err) => showToast(err.message, "error"),
   });
+  const createHouseMutation = trpc.house.create.useMutation({
+    onSuccess: async () => {
+      setJoined(true);
+      await utils.house.get.invalidate();
+      showToast("Đã tạo house mới", "success");
+    },
+    onError: (err) => showToast(err.message, "error"),
+  });
 
-  const handlePreview = async () => {
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const inviteCode = params.get("invite") ?? params.get("code");
+    if (inviteCode) {
+      setCode(inviteCode);
+      setAutoPreviewRequested(true);
+    }
+  }, []);
+
+  const handlePreview = useCallback(async () => {
     const trimmed = code.trim();
     if (!trimmed || trimmed.length < 4) return;
     setPreviewLoading(true);
     try {
       const result = await previewQuery.refetch();
       setPreview(result.data as PreviewData | null);
+      if (result.data) {
+        setGender((result.data as PreviewData).gender);
+      }
       if (!result.data) {
         showToast("Không tìm thấy invite code này", "error");
       }
     } finally {
       setPreviewLoading(false);
     }
-  };
+  }, [code, previewQuery, showToast]);
+
+  useEffect(() => {
+    if (!autoPreviewRequested || code.trim().length < 4) return;
+    setAutoPreviewRequested(false);
+    void handlePreview();
+  }, [autoPreviewRequested, code, handlePreview]);
 
   const handleJoin = () => {
     const trimmed = code.trim();
@@ -69,6 +98,13 @@ export function InviteJoinPage() {
     joinMutation.mutate({
       code: trimmed,
       nickname: nickname.trim() || undefined,
+      gender,
+    });
+  };
+
+  const handleCreateHouse = () => {
+    createHouseMutation.mutate({
+      name: houseName.trim() || "Lunis House",
     });
   };
 
@@ -134,10 +170,10 @@ export function InviteJoinPage() {
               type="text"
               value={code}
               onChange={(e) => {
-                setCode(e.target.value.toUpperCase());
+                setCode(e.target.value);
                 setPreview(null);
               }}
-              placeholder="XXXXXXXXXXXX"
+              placeholder="Invite code"
               maxLength={32}
               className="w-full px-4 py-4 rounded-xl bg-[#1A1A22] border border-white/10 text-[#00F2FE] font-mono text-xl tracking-widest text-center placeholder:text-white/15 focus:border-[#00F2FE]/40 focus:outline-none transition-colors"
               onKeyDown={(e) => e.key === "Enter" && void handlePreview()}
@@ -152,6 +188,35 @@ export function InviteJoinPage() {
               <Loader2 className="w-4 h-4 animate-spin" />
             ) : null}
             Xem trước
+          </button>
+        </div>
+
+        <div className="rounded-2xl border border-white/10 bg-[#1A1A22]/70 p-4 space-y-3">
+          <div>
+            <p className="text-sm font-semibold text-white">Tạo house mới</p>
+            <p className="mt-1 text-xs text-white/40">
+              Nếu bạn là người đầu tiên, tạo house để trở thành Dom rồi gửi invite cho người còn lại.
+            </p>
+          </div>
+          <input
+            type="text"
+            value={houseName}
+            onChange={(event) => setHouseName(event.target.value)}
+            maxLength={255}
+            className="w-full px-4 py-3 rounded-xl bg-[#141418] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
+            placeholder="Tên house"
+          />
+          <button
+            onClick={handleCreateHouse}
+            disabled={createHouseMutation.isPending}
+            className="w-full py-3 rounded-xl text-sm font-semibold text-white border border-[#FF2A85]/30 bg-[#FF2A85]/10 hover:bg-[#FF2A85]/15 disabled:opacity-50 transition-all flex items-center justify-center gap-2"
+          >
+            {createHouseMutation.isPending ? (
+              <Loader2 className="w-4 h-4 animate-spin" />
+            ) : (
+              <Crown className="w-4 h-4" />
+            )}
+            Tạo house với vai trò Dom
           </button>
         </div>
 
@@ -219,6 +284,15 @@ export function InviteJoinPage() {
                     placeholder={preview.intendedNickname ?? "Biệt danh của bạn (tùy chọn)"}
                     className="w-full px-4 py-3 rounded-xl bg-[#1A1A22] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
                   />
+                  <select
+                    value={gender}
+                    onChange={(e) => setGender(e.target.value as typeof gender)}
+                    className="w-full px-4 py-3 rounded-xl bg-[#1A1A22] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
+                  >
+                    <option value="other">Other</option>
+                    <option value="female">Female</option>
+                    <option value="male">Male</option>
+                  </select>
                   <button
                     onClick={handleJoin}
                     disabled={joinMutation.isPending}

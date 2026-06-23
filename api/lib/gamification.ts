@@ -2,7 +2,6 @@ import { and, eq } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import {
   achievements,
-  habitCheckins,
   memberAchievements,
   memberProgress,
   streaks,
@@ -10,7 +9,7 @@ import {
   type Achievement,
 } from "@db/schema";
 
-type CompletionSource = "habit" | "task";
+type CompletionSource = "task";
 type Db = ReturnType<typeof getDb>;
 
 const XP_PER_LEVEL = 100;
@@ -19,7 +18,7 @@ const DEFAULT_ACHIEVEMENTS = [
   {
     key: "first_step",
     title: "Bước đầu tiên",
-    description: "Hoàn thành habit hoặc task đầu tiên.",
+    description: "Hoàn thành task đầu tiên.",
     icon: "sparkles",
     xpReward: 10,
     criteriaType: "total_completions",
@@ -67,8 +66,8 @@ export function calculateLevel(xp: number) {
   return Math.max(1, Math.floor(xp / XP_PER_LEVEL) + 1);
 }
 
-export function getCompletionXp(sourceType: CompletionSource, chymReward: number) {
-  const baseXp = sourceType === "habit" ? 10 : 25;
+export function getCompletionXp(chymReward: number) {
+  const baseXp = 25;
   return baseXp + Math.max(0, chymReward) * 2;
 }
 
@@ -109,16 +108,11 @@ export async function ensureMemberProgress(db: Db, memberId: number) {
 }
 
 async function getCompletionCount(db: Db, memberId: number) {
-  const [habitCompletions, taskCompletions] = await Promise.all([
-    db.query.habitCheckins.findMany({
-      where: and(eq(habitCheckins.memberId, memberId), eq(habitCheckins.status, "done")),
-    }),
-    db.query.tasks.findMany({
-      where: and(eq(tasks.assignedTo, memberId), eq(tasks.status, "completed")),
-    }),
-  ]);
+  const taskCompletions = await db.query.tasks.findMany({
+    where: and(eq(tasks.assignedTo, memberId), eq(tasks.status, "completed")),
+  });
 
-  return habitCompletions.length + taskCompletions.length;
+  return taskCompletions.length;
 }
 
 function meetsCriteria(
@@ -189,7 +183,7 @@ export async function awardCompletionProgress(input: {
   const progress = await ensureMemberProgress(db, input.memberId);
   const completionXp = alreadyCompletedToday
     ? 0
-    : getCompletionXp(input.sourceType, input.chymReward);
+    : getCompletionXp(input.chymReward);
   let xp = progress.xp + completionXp;
   let level = calculateLevel(xp);
 
@@ -202,7 +196,9 @@ export async function awardCompletionProgress(input: {
 
   const [memberStreaks, allAchievements, unlockedAchievements, totalCompletions] =
     await Promise.all([
-      db.query.streaks.findMany({ where: eq(streaks.memberId, input.memberId) }),
+      db.query.streaks.findMany({
+        where: and(eq(streaks.memberId, input.memberId), eq(streaks.sourceType, "task")),
+      }),
       db.query.achievements.findMany(),
       db.query.memberAchievements.findMany({
         where: eq(memberAchievements.memberId, input.memberId),

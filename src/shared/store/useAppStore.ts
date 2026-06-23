@@ -12,7 +12,7 @@ export interface AppState {
   setShowHouseManagement: (show: boolean) => void;
   showCreateSheet: boolean;
   setShowCreateSheet: (show: boolean) => void;
-  createSheetType: "task" | "habit" | "wheel" | "reward" | "privilege" | "punishment" | "note" | "journal" | "agreement" | null;
+  createSheetType: "task" | "wheel" | "reward" | "privilege" | "punishment" | "note" | "journal" | "agreement" | null;
   setCreateSheetType: (type: AppState["createSheetType"]) => void;
   selectedCategory: string | null;
   setSelectedCategory: (cat: string | null) => void;

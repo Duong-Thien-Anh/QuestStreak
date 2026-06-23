@@ -13,6 +13,8 @@
     "check": "tsc -b",
     "format": "prettier --write .",
     "test": "vitest run",
+    "auth:setup": "node scripts/apply-user-login-schema.mjs",
+    "db:drop-habits": "node scripts/drop-habit-schema.mjs",
     "db:generate": "drizzle-kit generate",
     "db:migrate": "drizzle-kit migrate",
     "db:push": "drizzle-kit push"
@@ -81,6 +83,7 @@
     "superjson": "^2.2.6",
     "tailwind-merge": "^3.4.0",
     "vaul": "^1.1.2",
+    "zmp-sdk": "^2.51.4",
     "zod": "^4.3.5",
     "zustand": "^5.0.14"
   },

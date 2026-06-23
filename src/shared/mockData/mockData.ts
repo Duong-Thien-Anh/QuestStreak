@@ -29,57 +29,6 @@ export const mockMembers = [
   },
 ];
 
-export const mockHabits = [
-  {
-    id: 1,
-    houseId: 1,
-    title: "Thức dậy đúng giờ",
-    description: "Dậy trước 7h sáng mỗi ngày",
-    type: "wanted" as const,
-    frequency: "daily" as const,
-    chymReward: 2,
-    chayPenalty: 1,
-    icon: "heart",
-    checkedToday: false,
-  },
-  {
-    id: 2,
-    houseId: 1,
-    title: "Uống đủ nước",
-    description: "Uống ít nhất 2 lít nước mỗi ngày",
-    type: "wanted" as const,
-    frequency: "daily" as const,
-    chymReward: 1,
-    chayPenalty: 0,
-    icon: "heart",
-    checkedToday: true,
-  },
-  {
-    id: 3,
-    houseId: 1,
-    title: "Không ăn vặt",
-    description: "Không ăn đồ ngọt sau 8h tối",
-    type: "unwanted" as const,
-    frequency: "daily" as const,
-    chymReward: 0,
-    chayPenalty: 2,
-    icon: "ban",
-    checkedToday: false,
-  },
-  {
-    id: 4,
-    houseId: 1,
-    title: "Không chửi thề",
-    description: "Giữ lễ phép trong giao tiếp",
-    type: "unwanted" as const,
-    frequency: "daily" as const,
-    chymReward: 0,
-    chayPenalty: 1,
-    icon: "ban",
-    checkedToday: false,
-  },
-];
-
 export const mockTasks = [
   {
     id: 1,

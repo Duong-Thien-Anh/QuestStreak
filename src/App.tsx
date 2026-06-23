@@ -11,6 +11,7 @@ import { NotebookPage } from "@/features/notebook/NotebookPage";
 import { HouseManagementPage } from "@/features/house/HouseManagementPage";
 import { InviteJoinPage } from "@/features/auth/InviteJoinPage";
 import Login from "@/features/auth/LoginPage";
+import DemoLogin from "@/features/auth/DemoLoginPage";
 import NotFound from "@/features/not-found/NotFoundPage";
 import { trpc } from "@/providers/trpc";
 
@@ -108,6 +109,7 @@ export default function App() {
     <Routes>
       <Route path="/" element={<MainApp />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/demo-login" element={<DemoLogin />} />
       <Route path="*" element={<NotFound />} />
     </Routes>
   );

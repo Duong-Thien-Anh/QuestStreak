@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { privileges, privilegeAssignments, houseMembers } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -14,7 +14,7 @@ export const privilegeRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -45,7 +45,7 @@ export const privilegeRouter = createRouter({
       return { id: priv.id, ...input };
     }),
 
-  update: adminQuery
+  update: domQuery
     .input(
       z.object({
         privilegeId: z.number(),
@@ -67,7 +67,7 @@ export const privilegeRouter = createRouter({
       return { success: true };
     }),
 
-  delete: adminQuery
+  delete: domQuery
     .input(z.object({ privilegeId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -75,7 +75,7 @@ export const privilegeRouter = createRouter({
       return { success: true };
     }),
 
-  assign: adminQuery
+  assign: domQuery
     .input(
       z.object({
         privilegeId: z.number(),

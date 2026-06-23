@@ -3,7 +3,6 @@ import { useAppStore } from "@/shared/store/useAppStore";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Heart,
-  Ban,
   Star,
   Link2,
   ChevronDown,
@@ -17,7 +16,6 @@ import { GamificationPanel } from "@/shared/components/GamificationPanel";
 import { FAB } from "@/shared/components/FAB";
 import { BottomSheet } from "@/shared/components/BottomSheet";
 import {
-  mockHabits,
   mockTasks,
   mockMembers,
   taskCategories,
@@ -31,15 +29,10 @@ export function TasksPage() {
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["daily"])
   );
-  const [habitsState, setHabitsState] = useState(mockHabits);
-  const [checkedHabitIds, setCheckedHabitIds] = useState<Set<number>>(
-    new Set(mockHabits.filter((habit) => habit.checkedToday).map((habit) => habit.id))
-  );
   const [createSheet, setCreateSheet] = useState(false);
-  const [createType, setCreateType] = useState<"task" | "habit" | "wheel">("task");
+  const [createType, setCreateType] = useState<"task" | "wheel">("task");
   const [editingTaskId, setEditingTaskId] = useState<number | null>(null);
   const [taskType, setTaskType] = useState<"regular" | "special" | "superSpecial">("regular");
-  const [habitType, setHabitType] = useState<"wanted" | "unwanted">("wanted");
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
@@ -55,6 +48,8 @@ export function TasksPage() {
   const [submitNote, setSubmitNote] = useState("");
   const [submitProofUrl, setSubmitProofUrl] = useState("");
   const [submitProofType, setSubmitProofType] = useState<"image" | "video" | "link" | "">("image");
+  const [reviewSheetTaskId, setReviewSheetTaskId] = useState<number | null>(null);
+  const [reviewNote, setReviewNote] = useState("");
   interface TaskItem {
     id: number;
     houseId: number;
@@ -66,6 +61,19 @@ export function TasksPage() {
     status: string;
     assignedTo: number | null;
   }
+  interface TaskSubmission {
+    id: number;
+    taskId: number;
+    memberId: number;
+    note: string | null;
+    proofUrl: string | null;
+    proofType: string | null;
+    status: "submitted" | "approved" | "rejected";
+    reviewedBy: number | null;
+    reviewedAt: Date | null;
+    reviewNote: string | null;
+    submittedAt: Date;
+  }
   const [tasksState, setTasksState] = useState<TaskItem[]>(mockTasks as TaskItem[]);
 
   const utils = trpc.useUtils();
@@ -75,22 +83,17 @@ export function TasksPage() {
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
   );
-  const habitsQuery = trpc.habit.list.useQuery(
-    { houseId },
-    { enabled: !!houseQuery.data?.id, retry: false }
-  );
   const wheelsQuery = trpc.wheel.list.useQuery(
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
   );
+  const submissionsQuery = trpc.task.submissions.useQuery(
+    { taskId: reviewSheetTaskId ?? 0 },
+    { enabled: !!reviewSheetTaskId && !!houseQuery.data?.id, retry: false }
+  );
   const createTaskMutation = trpc.task.create.useMutation({
     onSuccess: async () => {
       await utils.task.list.invalidate();
-    },
-  });
-  const createHabitMutation = trpc.habit.create.useMutation({
-    onSuccess: async () => {
-      await utils.habit.list.invalidate();
     },
   });
   const assignTaskMutation = trpc.task.assign.useMutation({
@@ -124,15 +127,10 @@ export function TasksPage() {
       await utils.wheel.list.invalidate();
     },
   });
-  const checkinMutation = trpc.habit.checkin.useMutation();
 
   const members = houseQuery.data?.members ?? mockMembers;
   const subMember = members.find((m) => m.lifestyleRole === "submissive");
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
-  const visibleHabits = (habitsQuery.data ?? habitsState).map((habit) => ({
-    ...habit,
-    checkedToday: checkedHabitIds.has(habit.id),
-  }));
   const visibleWheels = wheelsQuery.data ?? [];
 
   const toggleCategory = (key: string) => {
@@ -142,22 +140,6 @@ export function TasksPage() {
       else next.add(key);
       return next;
     });
-  };
-
-  const toggleHabit = (id: number) => {
-    setCheckedHabitIds((prev) => {
-      const next = new Set(prev);
-      if (next.has(id)) next.delete(id);
-      else next.add(id);
-      return next;
-    });
-    if (houseQuery.data) {
-      checkinMutation.mutate({ habitId: id });
-    } else {
-      setHabitsState((prev) =>
-        prev.map((h) => (h.id === id ? { ...h, checkedToday: !h.checkedToday } : h))
-      );
-    }
   };
 
   const handleCreateTask = () => {
@@ -187,30 +169,18 @@ export function TasksPage() {
       return;
     }
     if (houseQuery.data) {
-      if (createType === "habit") {
-        createHabitMutation.mutate({
-          houseId,
-          title,
-          description: description || undefined,
-          type: habitType,
-          frequency,
-          chymReward,
-          chayPenalty,
-        });
-      } else {
-        createTaskMutation.mutate({
-          houseId,
-          title,
-          description: description || undefined,
-          category: taskType === "regular" ? frequency : taskType,
-          chymReward,
-          chayPenalty,
-          assignedTo: subMember?.id,
-        });
-      }
+      createTaskMutation.mutate({
+        houseId,
+        title,
+        description: description || undefined,
+        category: taskType === "regular" ? frequency : taskType,
+        chymReward,
+        chayPenalty,
+        assignedTo: subMember?.id,
+      });
       setCreateSheet(false);
       resetForm();
-      showToast(createType === "task" ? "Đã tạo nhiệm vụ mới!" : "Đã tạo habit mới!", "success");
+      showToast("Đã tạo nhiệm vụ mới!", "success");
       return;
     }
     const newTask = {
@@ -311,8 +281,21 @@ export function TasksPage() {
 
   const reviewTask = (taskId: number, decision: "approve" | "reject") => {
     if (!houseQuery.data) return;
-    reviewTaskMutation.mutate({ taskId, decision });
+    reviewTaskMutation.mutate(
+      { taskId, decision, reviewNote: reviewNote.trim() || undefined },
+      {
+        onSuccess: () => {
+          setReviewSheetTaskId(null);
+          setReviewNote("");
+        },
+      }
+    );
     showToast(decision === "approve" ? "Đã duyệt task!" : "Đã trả task về active!", "success");
+  };
+
+  const openReviewSheet = (taskId: number) => {
+    setReviewSheetTaskId(taskId);
+    setReviewNote("");
   };
 
   const createWheel = () => {
@@ -423,16 +406,10 @@ export function TasksPage() {
               {task.status === "submitted" ? (
                 <>
                   <button
-                    onClick={() => reviewTask(task.id, "approve")}
-                    className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                    onClick={() => openReviewSheet(task.id)}
+                    className="flex-1 py-2 rounded-lg bg-[#A155FF]/10 text-[#A155FF] text-xs font-medium hover:bg-[#A155FF]/20 transition-colors"
                   >
-                    Duyệt
-                  </button>
-                  <button
-                    onClick={() => reviewTask(task.id, "reject")}
-                    className="flex-1 py-2 rounded-lg bg-[#FF3B30]/10 text-[#FF3B30] text-xs font-medium hover:bg-[#FF3B30]/20 transition-colors"
-                  >
-                    Trả lại
+                    Xem báo cáo
                   </button>
                 </>
               ) : task.assignedTo ? (
@@ -529,50 +506,6 @@ export function TasksPage() {
         memberId={subMember?.id}
         memberName={subMember?.nickname ?? undefined}
       />
-
-      {/* Habits Section */}
-      <motion.div
-        initial={{ opacity: 0, y: 15 }}
-        animate={{ opacity: 1, y: 0 }}
-        transition={{ delay: 0.05 }}
-      >
-        <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-          Habits
-        </h2>
-        <div className="flex gap-3 overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-          {visibleHabits.map((habit) => (
-            <motion.button
-              key={habit.id}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => toggleHabit(habit.id)}
-              className={`flex flex-col items-center gap-2 p-3 rounded-xl border min-w-[80px] transition-all ${
-                habit.checkedToday
-                  ? habit.type === "wanted"
-                    ? "border-[#FF2A85]/50 bg-[#FF2A85]/10"
-                    : "border-[#FF3B30]/50 bg-[#FF3B30]/10"
-                  : "border-white/5 bg-[#1A1A22]"
-              }`}
-            >
-              {habit.type === "wanted" ? (
-                <Heart
-                  className={`w-5 h-5 ${
-                    habit.checkedToday ? "text-[#FF2A85]" : "text-white/30"
-                  }`}
-                />
-              ) : (
-                <Ban
-                  className={`w-5 h-5 ${
-                    habit.checkedToday ? "text-[#FF3B30]" : "text-white/30"
-                  }`}
-                />
-              )}
-              <span className="text-[10px] text-white/70 text-center leading-tight whitespace-nowrap">
-                {habit.title}
-              </span>
-            </motion.button>
-          ))}
-        </div>
-      </motion.div>
 
       {/* Manage button for admin */}
       {isAdmin && (
@@ -705,15 +638,6 @@ export function TasksPage() {
             },
             color: "#FF2A85",
           },
-          {
-            label: "Create Habit",
-            icon: <Heart className="w-5 h-5 text-white" />,
-            onClick: () => {
-              setCreateType("habit");
-              setCreateSheet(true);
-            },
-            color: "#00F2FE",
-          },
         ]}
       />
 
@@ -729,9 +653,7 @@ export function TasksPage() {
             ? "Edit Task"
             : createType === "task"
             ? "Create New Task"
-            : createType === "habit"
-              ? "Create New Habit"
-              : "Create Wheel"
+            : "Create Wheel"
         }
       >
         {createType === "wheel" ? (
@@ -776,48 +698,26 @@ export function TasksPage() {
         ) : (
         <div className="space-y-4">
           {/* Type selector */}
-          {createType === "task" ? (
-            <div className="flex gap-2">
-              {[
-                { key: "regular" as const, label: "Task", icon: <Zap className="w-4 h-4" /> },
-                { key: "special" as const, label: "Special", icon: <Trophy className="w-4 h-4" /> },
-                { key: "superSpecial" as const, label: "Super Special", icon: <Star className="w-4 h-4" /> },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setTaskType(t.key)}
-                  className={`flex-1 py-3 rounded-xl border text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                    taskType === t.key
-                      ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
-                      : "border-white/10 text-white/40 hover:border-white/20"
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          ) : (
-            <div className="flex gap-2">
-              {[
-                { key: "wanted" as const, label: "Wanted", icon: <Heart className="w-4 h-4" /> },
-                { key: "unwanted" as const, label: "Unwanted", icon: <Ban className="w-4 h-4" /> },
-              ].map((t) => (
-                <button
-                  key={t.key}
-                  onClick={() => setHabitType(t.key)}
-                  className={`flex-1 py-3 rounded-xl border text-xs font-medium flex flex-col items-center gap-1 transition-all ${
-                    habitType === t.key
-                      ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
-                      : "border-white/10 text-white/40 hover:border-white/20"
-                  }`}
-                >
-                  {t.icon}
-                  {t.label}
-                </button>
-              ))}
-            </div>
-          )}
+          <div className="flex gap-2">
+            {[
+              { key: "regular" as const, label: "Task", icon: <Zap className="w-4 h-4" /> },
+              { key: "special" as const, label: "Special", icon: <Trophy className="w-4 h-4" /> },
+              { key: "superSpecial" as const, label: "Super Special", icon: <Star className="w-4 h-4" /> },
+            ].map((t) => (
+              <button
+                key={t.key}
+                onClick={() => setTaskType(t.key)}
+                className={`flex-1 py-3 rounded-xl border text-xs font-medium flex flex-col items-center gap-1 transition-all ${
+                  taskType === t.key
+                    ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
+                    : "border-white/10 text-white/40 hover:border-white/20"
+                }`}
+              >
+                {t.icon}
+                {t.label}
+              </button>
+            ))}
+          </div>
 
           {/* Frequency */}
           <div>
@@ -893,7 +793,7 @@ export function TasksPage() {
             disabled={!title.trim()}
             className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {editingTaskId ? "Save Task" : `Create ${createType === "task" ? "Task" : "Habit"}`}
+            {editingTaskId ? "Save Task" : "Create Task"}
           </button>
         </div>
         )}
@@ -969,6 +869,116 @@ export function TasksPage() {
             {submitTaskMutation.isPending ? "Đang gửi..." : "Gửi Báo Cáo"}
           </button>
         </div>
+      </BottomSheet>
+
+      {/* ── Review Proof Sheet ── */}
+      <BottomSheet
+        isOpen={reviewSheetTaskId !== null}
+        onClose={() => {
+          setReviewSheetTaskId(null);
+          setReviewNote("");
+        }}
+        title="Duyệt báo cáo"
+      >
+        {(() => {
+          const task = visibleTasks.find((item) => item.id === reviewSheetTaskId);
+          const submissions = (submissionsQuery.data as TaskSubmission[] | undefined) ?? [];
+          const latestSubmission = submissions[0];
+
+          return (
+            <div className="space-y-4">
+              <div className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
+                <p className="text-xs text-white/30 mb-1">Task</p>
+                <h3 className="text-sm font-semibold text-white">{task?.title ?? "Task"}</h3>
+                {task?.description && (
+                  <p className="mt-1 text-xs text-white/45 line-clamp-3">{task.description}</p>
+                )}
+              </div>
+
+              {submissionsQuery.isLoading ? (
+                <div className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
+                  <div className="h-4 w-2/3 rounded bg-white/5 animate-pulse" />
+                  <div className="mt-3 h-16 rounded bg-white/5 animate-pulse" />
+                </div>
+              ) : latestSubmission ? (
+                <div className="space-y-3">
+                  <div className="rounded-xl border border-[#00F2FE]/15 bg-[#00F2FE]/5 p-4">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-xs font-semibold text-[#00F2FE]">Báo cáo mới nhất</p>
+                      <span className="text-[10px] text-white/30">
+                        {new Date(latestSubmission.submittedAt).toLocaleString("vi-VN")}
+                      </span>
+                    </div>
+                    {latestSubmission.note ? (
+                      <p className="mt-3 whitespace-pre-wrap text-sm text-white/75">
+                        {latestSubmission.note}
+                      </p>
+                    ) : (
+                      <p className="mt-3 text-sm text-white/30">Không có ghi chú.</p>
+                    )}
+                  </div>
+
+                  {latestSubmission.proofUrl ? (
+                    <div className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
+                      <div className="mb-2 flex items-center justify-between gap-2">
+                        <p className="text-xs text-white/40">Bằng chứng</p>
+                        {latestSubmission.proofType && (
+                          <span className="rounded-md bg-white/5 px-2 py-1 text-[10px] uppercase text-white/45">
+                            {latestSubmission.proofType}
+                          </span>
+                        )}
+                      </div>
+                      <a
+                        href={latestSubmission.proofUrl}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="block break-all rounded-lg border border-[#00F2FE]/20 bg-[#00F2FE]/5 px-3 py-2 text-xs text-[#00F2FE] hover:bg-[#00F2FE]/10"
+                      >
+                        {latestSubmission.proofUrl}
+                      </a>
+                    </div>
+                  ) : (
+                    <div className="rounded-xl border border-white/5 bg-[#1A1A22] p-4 text-sm text-white/30">
+                      Không có link bằng chứng.
+                    </div>
+                  )}
+                </div>
+              ) : (
+                <div className="rounded-xl border border-[#FF3B30]/15 bg-[#FF3B30]/5 p-4 text-sm text-white/60">
+                  Chưa tìm thấy báo cáo cho task này.
+                </div>
+              )}
+
+              <div>
+                <label className="mb-2 block text-xs text-white/50">Review note</label>
+                <textarea
+                  value={reviewNote}
+                  onChange={(event) => setReviewNote(event.target.value)}
+                  placeholder="Ghi feedback khi duyệt hoặc trả lại..."
+                  rows={3}
+                  className="w-full resize-none rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  onClick={() => reviewSheetTaskId && reviewTask(reviewSheetTaskId, "reject")}
+                  disabled={reviewTaskMutation.isPending || !latestSubmission}
+                  className="rounded-xl border border-[#FF3B30]/30 bg-[#FF3B30]/10 py-3 text-sm font-semibold text-[#FF3B30] transition-colors hover:bg-[#FF3B30]/15 disabled:opacity-50"
+                >
+                  Trả lại
+                </button>
+                <button
+                  onClick={() => reviewSheetTaskId && reviewTask(reviewSheetTaskId, "approve")}
+                  disabled={reviewTaskMutation.isPending || !latestSubmission}
+                  className="rounded-xl bg-[#00F2FE] py-3 text-sm font-semibold text-[#0D0D11] transition-colors hover:bg-[#00F2FE]/90 disabled:opacity-50"
+                >
+                  Duyệt task
+                </button>
+              </div>
+            </div>
+          );
+        })()}
       </BottomSheet>
     </div>
   );

@@ -16,4 +16,6 @@ export const env = {
   kimiAuthUrl: required("KIMI_AUTH_URL"),
   kimiOpenUrl: required("KIMI_OPEN_URL"),
   ownerUnionId: process.env.OWNER_UNION_ID ?? "",
+  zaloAppId: process.env.ZALO_APP_ID ?? process.env.APP_ID ?? "",
+  zaloOpenApiUrl: process.env.ZALO_OPEN_API_URL ?? "https://graph.zalo.me/v2.0/me",
 };

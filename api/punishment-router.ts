@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   punishments,
@@ -20,7 +20,7 @@ export const punishmentRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -51,7 +51,7 @@ export const punishmentRouter = createRouter({
       return { id: punishment.id, ...input };
     }),
 
-  update: adminQuery
+  update: domQuery
     .input(
       z.object({
         punishmentId: z.number(),
@@ -73,7 +73,7 @@ export const punishmentRouter = createRouter({
       return { success: true };
     }),
 
-  delete: adminQuery
+  delete: domQuery
     .input(z.object({ punishmentId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();
@@ -81,7 +81,7 @@ export const punishmentRouter = createRouter({
       return { success: true };
     }),
 
-  assign: adminQuery
+  assign: domQuery
     .input(
       z.object({
         punishmentId: z.number(),
@@ -215,7 +215,7 @@ export const punishmentRouter = createRouter({
       return { success: true };
     }),
 
-  forgive: adminQuery
+  forgive: domQuery
     .input(z.object({ assignmentId: z.number() }))
     .mutation(async ({ ctx, input }) => {
       const db = getDb();

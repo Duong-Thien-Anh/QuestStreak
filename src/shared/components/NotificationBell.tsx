@@ -143,7 +143,7 @@ export function NotificationBell() {
   }, [open]);
 
   const handleNotificationClick = (n: Notification) => {
-    if (!n.readAt) {
+    if (n.recipientId !== null && !n.readAt) {
       markReadMutation.mutate({ notificationId: n.id });
     }
   };
@@ -247,7 +247,7 @@ export function NotificationBell() {
 
               {/* Items */}
               {notifications.map((n) => {
-                const isUnread = !n.readAt;
+                const isUnread = n.recipientId !== null && !n.readAt;
                 const color = getTypeColor(n.type);
                 return (
                   <button

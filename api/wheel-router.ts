@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { houseMembers, logs, wheelSpins, wheels } from "@db/schema";
 import { and, desc, eq } from "drizzle-orm";
@@ -32,7 +32,7 @@ export const wheelRouter = createRouter({
       });
     }),
 
-  create: adminQuery
+  create: domQuery
     .input(
       z.object({
         houseId: z.number(),
@@ -64,7 +64,7 @@ export const wheelRouter = createRouter({
     }),
 
 
-  update: adminQuery
+  update: domQuery
     .input(
       z.object({
         wheelId: z.number(),
@@ -88,7 +88,7 @@ export const wheelRouter = createRouter({
       return { success: true };
     }),
 
-  delete: adminQuery
+  delete: domQuery
     .input(z.object({ wheelId: z.number() }))
     .mutation(async ({ input }) => {
       const db = getDb();

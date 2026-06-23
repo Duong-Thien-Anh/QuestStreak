@@ -17,9 +17,6 @@ import {
 export const roleEnum = pgEnum("role", ["user", "admin"]);
 export const lifestyleRoleEnum = pgEnum("lifestyleRole", ["dominant", "submissive", "switch"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
-export const habitTypeEnum = pgEnum("habitType", ["wanted", "unwanted"]);
-export const frequencyEnum = pgEnum("frequency", ["daily", "weekly", "monthly"]);
-export const checkinStatusEnum = pgEnum("checkinStatus", ["done", "missed"]);
 export const taskCategoryEnum = pgEnum("taskCategory", ["daily", "weekly", "monthly", "special", "superSpecial"]);
 export const taskStatusEnum = pgEnum("taskStatus", ["pending", "active", "submitted", "completed", "failed"]);
 export const taskSubmissionStatusEnum = pgEnum("taskSubmissionStatus", [
@@ -36,14 +33,13 @@ export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active
 export const moodEnum = pgEnum("mood", ["sad", "neutral", "happy", "excited", "loved"]);
 export const visibilityEnum = pgEnum("visibility", ["public", "private"]);
 export const inviteStatusEnum = pgEnum("inviteStatus", ["active", "accepted", "revoked", "expired"]);
-export const streakSourceEnum = pgEnum("streakSource", ["habit", "task"]);
+export const streakSourceEnum = pgEnum("streakSource", ["task"]);
 export const notificationTypeEnum = pgEnum("notificationType", [
   "task_created",
   "task_assigned",
   "task_submitted",
   "task_completed",
   "task_rejected",
-  "habit_checked_in",
   "achievement_unlocked",
   "reward_gifted",
   "wallet_updated",
@@ -75,6 +71,29 @@ export const users = pgTable("users", {
 
 export type User = typeof users.$inferSelect;
 export type InsertUser = typeof users.$inferInsert;
+
+// ─── User Login Credentials ──────────────────────────────────────
+
+export const userCredentials = pgTable(
+  "userCredentials",
+  {
+    id: serial("id").primaryKey(),
+    userId: bigint("userId", { mode: "number" }).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    passwordHash: text("passwordHash").notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("user_credentials_user_idx").on(table.userId),
+    uniqueIndex("user_credentials_email_idx").on(table.email),
+  ]
+);
+
+export type UserCredential = typeof userCredentials.$inferSelect;
 
 // ─── Houses ────────────────────────────────────────────────────────
 
@@ -231,41 +250,6 @@ export const memberAchievements = pgTable(
 );
 
 export type MemberAchievement = typeof memberAchievements.$inferSelect;
-
-// ─── Habits ────────────────────────────────────────────────────────
-
-export const habits = pgTable("habits", {
-  id: serial("id").primaryKey(),
-  houseId: bigint("houseId", { mode: "number" }).notNull(),
-  title: varchar("title", { length: 255 }).notNull(),
-  description: text("description"),
-  type: habitTypeEnum("type").default("wanted").notNull(),
-  frequency: frequencyEnum("frequency").default("daily").notNull(),
-  daysOfWeek: text("daysOfWeek"),
-  chymReward: integer("chymReward").default(0).notNull(),
-  chayPenalty: integer("chayPenalty").default(0).notNull(),
-  icon: varchar("icon", { length: 50 }).default("heart"),
-  createdBy: bigint("createdBy", { mode: "number" }).notNull(),
-  createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt")
-    .defaultNow()
-    .notNull()
-    .$onUpdate(() => new Date()),
-});
-
-export type Habit = typeof habits.$inferSelect;
-
-// ─── Habit Checkins ────────────────────────────────────────────────
-
-export const habitCheckins = pgTable("habitCheckins", {
-  id: serial("id").primaryKey(),
-  habitId: bigint("habitId", { mode: "number" }).notNull(),
-  memberId: bigint("memberId", { mode: "number" }).notNull(),
-  checkedAt: timestamp("checkedAt").defaultNow().notNull(),
-  status: checkinStatusEnum("status").default("done").notNull(),
-});
-
-export type HabitCheckin = typeof habitCheckins.$inferSelect;
 
 // ─── Tasks ─────────────────────────────────────────────────────────
 

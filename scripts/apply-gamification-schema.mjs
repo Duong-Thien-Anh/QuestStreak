@@ -20,7 +20,7 @@ try {
   await sql`
     DO $$
     BEGIN
-      CREATE TYPE "streakSource" AS ENUM ('habit', 'task');
+      CREATE TYPE "streakSource" AS ENUM ('task');
     EXCEPTION WHEN duplicate_object THEN NULL;
     END $$;
   `;
@@ -95,7 +95,7 @@ try {
   await sql`
     INSERT INTO "achievements" ("key", "title", "description", "icon", "xpReward", "criteriaType", "criteriaValue")
     VALUES
-      ('first_step', 'Bước đầu tiên', 'Hoàn thành habit hoặc task đầu tiên.', 'sparkles', 10, 'total_completions', 1),
+      ('first_step', 'Bước đầu tiên', 'Hoàn thành task đầu tiên.', 'sparkles', 10, 'total_completions', 1),
       ('streak_3', 'Chuỗi 3 ngày', 'Giữ streak 3 ngày liên tiếp.', 'flame', 25, 'current_streak', 3),
       ('streak_7', 'Một tuần rực cháy', 'Giữ streak 7 ngày liên tiếp.', 'flame', 75, 'current_streak', 7),
       ('xp_100', '100 XP', 'Tích lũy 100 XP.', 'badge', 20, 'xp', 100),

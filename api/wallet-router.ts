@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { createRouter, authedQuery, adminQuery } from "./middleware";
+import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { wallets, houseMembers, logs, memberProgress } from "@db/schema";
 import { eq } from "drizzle-orm";
@@ -22,7 +22,7 @@ export const walletRouter = createRouter({
       };
     }),
 
-  addChym: adminQuery
+  addChym: domQuery
     .input(
       z.object({
         memberId: z.number(),
@@ -59,7 +59,7 @@ export const walletRouter = createRouter({
       return { chymBalance: newBalance };
     }),
 
-  removeChym: adminQuery
+  removeChym: domQuery
     .input(
       z.object({
         memberId: z.number(),
@@ -95,7 +95,7 @@ export const walletRouter = createRouter({
       return { chymBalance: newBalance };
     }),
 
-  addChay: adminQuery
+  addChay: domQuery
     .input(
       z.object({
         memberId: z.number(),
@@ -131,7 +131,7 @@ export const walletRouter = createRouter({
       return { chayBalance: newBalance };
     }),
 
-  forgiveChay: adminQuery
+  forgiveChay: domQuery
     .input(
       z.object({
         memberId: z.number(),

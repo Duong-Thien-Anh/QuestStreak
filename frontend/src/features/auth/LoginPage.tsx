@@ -3,6 +3,7 @@ import { useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { trpc } from "@/providers/trpc";
 import { ClipboardList, UserCheck } from "lucide-react";
+import { apiUrl } from "@/lib/api";
 
 const DEMO_ROLES = [
   {
@@ -34,10 +35,11 @@ export default function Login() {
     setError(null);
 
     try {
-      const response = await fetch("/api/auth/demo", {
+      const response = await fetch(apiUrl("/api/auth/demo"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username }),
+        credentials: "include",
       });
 
       if (!response.ok) {

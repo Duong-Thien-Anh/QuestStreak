@@ -12,6 +12,7 @@ import { useNavigate } from "react-router";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { trpc } from "@/providers/trpc";
+import { apiUrl } from "@/lib/api";
 
 // ─── Demo User Config ─────────────────────────────────────────────────────────
 
@@ -54,7 +55,7 @@ export default function DemoLoginPage() {
     setError(null);
 
     try {
-      const res = await fetch("/api/auth/demo", {
+      const res = await fetch(apiUrl("/api/auth/demo"), {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ username }),

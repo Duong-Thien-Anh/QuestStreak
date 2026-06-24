@@ -21,10 +21,10 @@
         "./src/*"
       ],
       "@contracts/*": [
-        "./contracts/*"
+        "../backend/contracts/*"
       ],
       "@db/*": [
-        "./db/*"
+        "../backend/db/*"
       ]
     },
     "moduleResolution": "bundler",

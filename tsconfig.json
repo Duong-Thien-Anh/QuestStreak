@@ -2,26 +2,26 @@
   "files": [],
   "references": [
     {
-      "path": "./tsconfig.app.json"
+      "path": "./frontend"
     },
     {
-      "path": "./tsconfig.node.json"
+      "path": "./backend/tsconfig.server.json"
     },
     {
-      "path": "./tsconfig.server.json"
+      "path": "./frontend/tsconfig.node.json"
     }
   ],
   "compilerOptions": {
     "baseUrl": ".",
     "paths": {
       "@/*": [
-        "./src/*"
+        "./frontend/src/*"
       ],
       "@contracts/*": [
-        "./contracts/*"
+        "./backend/contracts/*"
       ],
       "@db/*": [
-        "./db/*"
+        "./backend/db/*"
       ]
     }
   }

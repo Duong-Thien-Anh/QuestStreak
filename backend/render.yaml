@@ -1,0 +1,23 @@
+services:
+  - type: web
+    name: lunis-house-backend
+    runtime: node
+    region: singapore
+    plan: free
+    buildCommand: npm run build
+    startCommand: node dist/boot.js
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: APP_ID
+        sync: false
+      - key: APP_SECRET
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: KIMI_AUTH_URL
+        sync: false
+      - key: KIMI_OPEN_URL
+        sync: false
+      - key: OWNER_UNION_ID
+        sync: false

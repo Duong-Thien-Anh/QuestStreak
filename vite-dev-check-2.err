@@ -1,0 +1,44 @@
+Browserslist: browsers data (caniuse-lite) is 6 months old. Please run:
+  npx update-browserslist-db@latest
+  Why you should do it regularly: https://github.com/browserslist/update-db#readme
+DrizzleQueryError: Failed query: select "id", "unionId", "name", "email", "avatar", "role", "createdAt", "updatedAt", "lastSignInAt" from "users" "users" where "users"."unionId" = $1 limit $2
+params: demo:demo_dom_1,1
+    at PostgresJsPreparedQuery.queryWithCache (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/drizzle-orm/pg-core/session.js:41:15)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/drizzle-orm/postgres-js/session.js:37:20
+    at async upsertDemoUser (D:/Projects/Company/Lunis_house_mini_app/backend/api/demo-auth.ts:43:20)
+    at async eval (D:/Projects/Company/Lunis_house_mini_app/backend/api/demo-auth.ts:79:18)
+    at async dispatch (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/hono/dist/compose.js:22:17)
+    at async dispatch (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/hono/dist/compose.js:22:17)
+    at async cors2 (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/hono/dist/middleware/cors/index.js:76:5)
+    at async dispatch (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/hono/dist/compose.js:22:17)
+    at async file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/hono/dist/hono-base.js:306:25
+    at async getRequestListener.overrideGlobalObjects (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/@hono/vite-dev-server/dist/dev-server.js:108:32)
+    at async responseViaResponseObject (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/@hono/node-server/dist/index.mjs:478:15)
+    at async file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/@hono/node-server/dist/index.mjs:630:14 {
+  query: 'select "id", "unionId", "name", "email", "avatar", "role", "createdAt", "updatedAt", "lastSignInAt" from "users" "users" where "users"."unionId" = $1 limit $2',
+  params: [ 'demo:demo_dom_1', 1 ],
+  cause: PostgresError: password authentication failed for user "root"
+      at ErrorResponse (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/postgres/src/connection.js:817:22)
+      at handle (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/postgres/src/connection.js:489:6)
+      at Socket.data (file:///D:/Projects/Company/Lunis_house_mini_app/node_modules/postgres/src/connection.js:324:9)
+      at Socket.emit (node:events:508:28)
+      at addChunk (node:internal/streams/readable:563:12)
+      at readableAddChunkPushByteMode (node:internal/streams/readable:514:3)
+      at Readable.push (node:internal/streams/readable:394:5)
+      at TCP.onStreamRead (node:internal/stream_base_commons:189:23) {
+    severity_local: 'FATAL',
+    severity: 'FATAL',
+    code: '28P01',
+    file: 'auth.c',
+    line: '320',
+    routine: 'auth_failed'
+  }
+}
+npm error Lifecycle script `dev` failed with error:
+npm error code 4294967295
+npm error path D:\Projects\Company\Lunis_house_mini_app\frontend
+npm error workspace lunis-house-frontend@0.0.0
+npm error location D:\Projects\Company\Lunis_house_mini_app\frontend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vite

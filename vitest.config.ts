@@ -7,13 +7,13 @@ export default defineConfig({
   root: templateRoot,
   resolve: {
     alias: {
-      "@": path.resolve(templateRoot, "src"),
-      "@contracts": path.resolve(templateRoot, "contracts"),
-      "@assets": path.resolve(templateRoot, "attached_assets"),
+      "@": path.resolve(templateRoot, "frontend/src"),
+      "@contracts": path.resolve(templateRoot, "backend/contracts"),
+      "@db": path.resolve(templateRoot, "backend/db"),
     },
   },
   test: {
     environment: "node",
-    include: ["api/**/*.test.ts", "api/**/*.spec.ts"],
+    include: ["backend/api/**/*.test.ts", "backend/api/**/*.spec.ts"],
   },
 });

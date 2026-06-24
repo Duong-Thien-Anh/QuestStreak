@@ -1,4 +1,11 @@
-import "dotenv/config";
+import path from "node:path";
+import dotenv from "dotenv";
+
+const backendEnvPath = path.resolve(import.meta.dirname, "../../.env");
+const rootEnvPath = path.resolve(import.meta.dirname, "../../../.env");
+
+dotenv.config({ path: backendEnvPath });
+dotenv.config({ path: rootEnvPath });
 
 function required(name: string): string {
   const value = process.env[name];

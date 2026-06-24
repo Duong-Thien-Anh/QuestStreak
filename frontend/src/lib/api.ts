@@ -1,4 +1,4 @@
-const DEFAULT_PRODUCTION_API_ORIGIN = "https://lunis-house-backend.onrender.com";
+const DEFAULT_PRODUCTION_API_ORIGIN = "https://queststreak-1.onrender.com";
 
 const configuredApiOrigin = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
 

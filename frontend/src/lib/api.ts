@@ -1,9 +1,6 @@
-const DEFAULT_PRODUCTION_API_ORIGIN = "https://queststreak-1.onrender.com";
-
 const configuredApiOrigin = import.meta.env.VITE_API_URL?.replace(/\/$/, "");
 
-export const apiOrigin =
-  configuredApiOrigin || (import.meta.env.PROD ? DEFAULT_PRODUCTION_API_ORIGIN : "");
+export const apiOrigin = configuredApiOrigin || "";
 
 export function apiUrl(path: string) {
   return `${apiOrigin}${path}`;

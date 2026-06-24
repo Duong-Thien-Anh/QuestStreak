@@ -9,6 +9,8 @@ services:
     envVars:
       - key: NODE_ENV
         value: production
+      - key: DEMO_MODE
+        value: "true"
       - key: APP_ID
         sync: false
       - key: APP_SECRET

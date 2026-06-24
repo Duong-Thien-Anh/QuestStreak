@@ -14,6 +14,14 @@ import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+app.get("/", (c) =>
+  c.json({
+    ok: true,
+    service: "lunis-house-backend",
+  }),
+);
+app.get("/healthz", (c) => c.json({ ok: true }));
+
 app.use(
   "/api/*",
   cors({

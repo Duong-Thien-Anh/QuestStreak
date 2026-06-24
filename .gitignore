@@ -8,7 +8,7 @@ pnpm-debug.log*
 lerna-debug.log*
 
 # Error logs
-vite-dec.err
+vite-dev.err
 
 node_modules
 dist

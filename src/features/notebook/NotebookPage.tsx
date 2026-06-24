@@ -45,10 +45,10 @@ export function NotebookPage() {
     {
       id: 1,
       houseId: 1,
-      title: "Thoa thuan co ban",
-      purpose: "Thiet lap quy tac co ban cho moi quan he",
-      rules: '[{"rule":"Ton trong gioi han cua nhau","context":"Khong ep buoc vuot qua limit"},{"rule":"Bao cao trung thuc","context":"Khong noi doi ve task"}]',
-      consequences: '[{"trigger":"Vi pham quy tac","action":"Them 5 Chay"}]',
+      title: "Thỏa thuận cơ bản",
+      purpose: "Thiết lập quy tắc cơ bản cho mối quan hệ",
+      rules: '[{"rule":"Tôn trọng giới hạn của nhau","context":"Không ép buộc vượt quá limit"},{"rule":"Báo cáo trung thực","context":"Không nói dối về task"}]',
+      consequences: '[{"trigger":"Vi phạm quy tắc","action":"Thêm 5 Chày"}]',
       domSignature: true,
       subSignature: true,
       status: "active",
@@ -225,22 +225,22 @@ export function NotebookPage() {
         visibility: newNote.visibility,
       });
       setNewNote({ title: "", content: "", visibility: "private" });
-      showToast("Da them ghi chu!", "success");
+      showToast("Đã thêm ghi chú!", "success");
       return;
     }
     setNotes([...notes, { id: Date.now(), houseId: 1, memberId: 1, title: newNote.title, content: newNote.content, visibility: newNote.visibility as "public" | "private" }]);
     setNewNote({ title: "", content: "", visibility: "private" });
-    showToast("Da them ghi chu!", "success");
+    showToast("Đã thêm ghi chú!", "success");
   };
 
   const handleDeleteNote = (noteId: number) => {
     if (!houseQuery.data) {
       setNotes((prev) => prev.filter((note) => note.id !== noteId));
-      showToast("Da xoa ghi chu tam thoi!", "success");
+      showToast("Đã xóa ghi chú tạm thời!", "success");
       return;
     }
     deleteNoteMutation.mutate({ noteId });
-    showToast("Da xoa ghi chu!", "success");
+    showToast("Đã xóa ghi chú!", "success");
   };
 
   const handleAddJournal = () => {
@@ -306,7 +306,7 @@ export function NotebookPage() {
         consequences: newAgreement.consequences || undefined,
       });
       setNewAgreement({ title: "", purpose: "", rules: "", consequences: "" });
-      showToast("Da tao thoa thuan!", "success");
+      showToast("Đã tạo thỏa thuận!", "success");
       return;
     }
     const newAg: Agreement = {
@@ -324,13 +324,13 @@ export function NotebookPage() {
     };
     setAgreements([...agreements, newAg]);
     setNewAgreement({ title: "", purpose: "", rules: "", consequences: "" });
-    showToast("Da tao thoa thuan!", "success");
+    showToast("Đã tạo thỏa thuận!", "success");
   };
 
   const handleSignAgreement = (id: number, as: "dom" | "sub") => {
     if (houseQuery.data) {
       signAgreementMutation.mutate({ agreementId: id, signAs: as });
-      showToast("Da ky thoa thuan!", "success");
+      showToast("Đã ký thỏa thuận!", "success");
       return;
     }
     setAgreements((prev) =>
@@ -351,7 +351,7 @@ export function NotebookPage() {
         };
       })
     );
-    showToast("Da ky thoa thuan!", "success");
+    showToast("Đã ký thỏa thuận!", "success");
   };
 
   // Overview Screen

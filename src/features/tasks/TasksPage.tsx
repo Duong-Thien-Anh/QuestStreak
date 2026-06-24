@@ -43,7 +43,7 @@ export function TasksPage() {
   const [wheelTitle, setWheelTitle] = useState("");
   const [wheelDescription, setWheelDescription] = useState("");
   const [wheelOptions, setWheelOptions] = useState(
-    "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay"
+    "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chày"
   );
   const [spinningWheelId, setSpinningWheelId] = useState<number | null>(null);
   const [wheelRotations, setWheelRotations] = useState<Record<number, number>>({});
@@ -256,7 +256,7 @@ export function TasksPage() {
     setEditingWheelId(null);
     setWheelTitle("");
     setWheelDescription("");
-    setWheelOptions("Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chay");
+    setWheelOptions("Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chày");
   };
 
   const openWheelEditor = (wheel: (typeof visibleWheels)[number]) => {
@@ -966,7 +966,7 @@ export function TasksPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Chay Penalty</label>
+              <label className="text-xs text-white/50 mb-2 block">Chày Penalty</label>
               <input
                 type="number"
                 value={chayPenalty}
@@ -1056,7 +1056,7 @@ export function TasksPage() {
             style={{ background: "linear-gradient(135deg, #00F2FE, #A155FF)" }}
           >
             <Send className="w-4 h-4" />
-            {submitTaskMutation.isPending ? "Đang gửi..." : "Gửi Báo Cáo"}
+            {submitTaskMutation.isPending ? "Đang gửi..." : "Gửi báo cáo"}
           </button>
         </div>
       </BottomSheet>

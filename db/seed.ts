@@ -109,7 +109,7 @@ async function seed() {
     {
       houseId: house.id,
       title: "Nấu cơm tối",
-      description: "Chuẩn bị bữa tối cho 2 ngườii",
+      description: "Chuẩn bị bữa tối cho 2 người",
       category: "daily",
       chymReward: 5,
       chayPenalty: 3,
@@ -271,7 +271,7 @@ async function seed() {
     },
     {
       houseId: house.id,
-      content: "Không công khai với ngườii ngoài",
+      content: "Không công khai với người ngoài",
       type: "limit",
       createdBy: adminMember.id,
     },

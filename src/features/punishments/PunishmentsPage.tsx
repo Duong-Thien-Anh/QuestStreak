@@ -176,11 +176,11 @@ export function PunishmentsPage() {
   const handleRedeem = (assignment: Assignment) => {
     const allCompleted = assignment.checklist.every((item) => item.completed);
     if (!allCompleted) {
-      showToast("Vui long hoan thanh tat ca cac muc!", "error");
+      showToast("Vui lòng hoàn thành tất cả các mục!", "error");
       return;
     }
     if (visibleWallet.chayBalance < assignment.punishment.chayCost) {
-      showToast("Khong du Chay de chuoc loi!", "error");
+      showToast("Không đủ Chày để chuộc lỗi!", "error");
       return;
     }
     if (houseQuery.data) {
@@ -189,7 +189,7 @@ export function PunishmentsPage() {
         checklist: assignment.checklist,
       });
       setExpandedId(null);
-      showToast("Da chuoc loi thanh cong!", "success");
+      showToast("Đã chuộc lỗi thành công!", "success");
       return;
     }
     setWallet((prev) => ({
@@ -200,21 +200,21 @@ export function PunishmentsPage() {
       prev.map((a) => (a.id === assignment.id ? { ...a, status: "redeemed" } : a))
     );
     setExpandedId(null);
-    showToast("Da chuoc loi thanh cong!", "success");
+    showToast("Đã chuộc lỗi thành công!", "success");
   };
 
   const handleForgive = (assignmentId: number) => {
     if (houseQuery.data) {
       forgivePunishmentMutation.mutate({ assignmentId });
       setActionSheet(null);
-      showToast("Da tha thu!", "success");
+      showToast("Đã tha thứ!", "success");
       return;
     }
     setAssignments((prev) =>
       prev.map((a) => (a.id === assignmentId ? { ...a, status: "forgiven" } : a))
     );
     setActionSheet(null);
-    showToast("Da tha thu!", "success");
+    showToast("Đã tha thứ!", "success");
   };
 
   const handleAddDemerits = () => {
@@ -227,12 +227,12 @@ export function PunishmentsPage() {
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast("Da them " + amount + " Chay!", "success");
+      showToast("Đã thêm " + amount + " Chày!", "success");
       return;
     }
     setWallet((prev) => ({ ...prev, chayBalance: prev.chayBalance + amount }));
     setActionSheet(null);
-    showToast("Da them " + amount + " Chay!", "success");
+    showToast("Đã thêm " + amount + " Chày!", "success");
   };
 
   const handleForgiveDemerits = () => {
@@ -245,7 +245,7 @@ export function PunishmentsPage() {
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast("Da xoa " + amount + " Chay!", "success");
+      showToast("Đã xóa " + amount + " Chày!", "success");
       return;
     }
     setWallet((prev) => ({
@@ -253,7 +253,7 @@ export function PunishmentsPage() {
       chayBalance: Math.max(0, prev.chayBalance - amount),
     }));
     setActionSheet(null);
-    showToast("Da xoa " + amount + " Chay!", "success");
+    showToast("Đã xóa " + amount + " Chày!", "success");
   };
 
   const handleCreatePunishment = () => {
@@ -268,7 +268,7 @@ export function PunishmentsPage() {
       });
       setNewPunishment({ title: "", description: "", chayCost: 1 });
       setActionSheet(null);
-      showToast("Da tao hinh phat moi!", "success");
+      showToast("Đã tạo hình phạt mới!", "success");
       return;
     }
     setPunishments((prev) => [
@@ -285,7 +285,7 @@ export function PunishmentsPage() {
     ]);
     setNewPunishment({ title: "", description: "", chayCost: 1 });
     setActionSheet(null);
-    showToast("Da tao hinh phat moi tam thoi!", "success");
+    showToast("Đã tạo hình phạt mới tạm thời!", "success");
   };
 
   const activeAssignments = visibleAssignments.filter((a) => a.status === "active");
@@ -312,7 +312,7 @@ export function PunishmentsPage() {
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{visibleWallet.chayBalance}</p>
-              <p className="text-xs text-white/50">Chay</p>
+              <p className="text-xs text-white/50">Chày</p>
             </div>
             <Link2 className="w-6 h-6 text-[#FF3B30]" />
           </div>
@@ -359,7 +359,7 @@ export function PunishmentsPage() {
                         {assignment.punishment.title}
                       </h3>
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
-                        <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chay
+                        <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chày
                       </span>
                     </div>
                     <p className="text-xs text-white/50 mt-1">
@@ -442,7 +442,7 @@ export function PunishmentsPage() {
                         onClick={() => handleRedeem(assignment)}
                         className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors mt-2"
                       >
-                        Submit Redemption ({assignment.punishment.chayCost} Chay)
+                        Chuộc lỗi ({assignment.punishment.chayCost} Chày)
                       </button>
                     </div>
                   </motion.div>
@@ -471,7 +471,7 @@ export function PunishmentsPage() {
                 <div className="flex items-center gap-2 flex-wrap">
                   <h3 className="font-semibold text-white text-sm">{p.title}</h3>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
-                    <Link2 className="w-3 h-3" /> {p.chayCost} Chay
+                    <Link2 className="w-3 h-3" /> {p.chayCost} Chày
                   </span>
                 </div>
                 <p className="text-xs text-white/50 mt-1">{p.description}</p>
@@ -488,7 +488,7 @@ export function PunishmentsPage() {
                           { label: "Xác nhận chuộc lỗi", completed: false },
                         ],
                       });
-                      showToast("Da gan hinh phat!", "success");
+                      showToast("Đã gán hình phạt!", "success");
                       return;
                     }
                     setAssignments((prev) => [
@@ -507,7 +507,7 @@ export function PunishmentsPage() {
                         punishment: p,
                       },
                     ]);
-                    showToast("Da gan hinh phat tam thoi!", "success");
+                    showToast("Đã gán hình phạt tạm thời!", "success");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
                 >
@@ -581,7 +581,7 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Chay Cost</label>
+            <label className="text-xs text-white/50 mb-2 block">Chày Cost</label>
             <input
               type="number"
               min={0}
@@ -634,7 +634,7 @@ export function PunishmentsPage() {
             onClick={handleAddDemerits}
             className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 transition-colors"
           >
-            Add Chay
+            Thêm Chày
           </button>
         </div>
       </BottomSheet>

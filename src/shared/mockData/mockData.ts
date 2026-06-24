@@ -45,7 +45,7 @@ export const mockTasks = [
     id: 2,
     houseId: 1,
     title: "Nấu cơm tối",
-    description: "Chuẩn bị bữa tối cho 2 ngườii",
+    description: "Chuẩn bị bữa tối cho 2 người",
     category: "daily" as const,
     chymReward: 5,
     chayPenalty: 3,
@@ -150,7 +150,7 @@ export const mockPunishmentAssignments = [
 export const mockLimits = [
   { id: 1, houseId: 1, content: "Không làm đau cơ thể vĩnh viễn", type: "limit" as const },
   { id: 2, houseId: 1, content: "Không chụp ảnh/video mặt", type: "limit" as const },
-  { id: 3, houseId: 1, content: "Không công khai với ngườii ngoài", type: "limit" as const },
+  { id: 3, houseId: 1, content: "Không công khai với người ngoài", type: "limit" as const },
 ];
 
 export const mockDesires = [

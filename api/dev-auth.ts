@@ -280,7 +280,7 @@ async function ensureStarterData(houseId: number, ownerMemberId: number, subMemb
           { label: "Thêm 5 Chym", weight: 2 },
           { label: "Một nhiệm vụ nhẹ", weight: 2 },
           { label: "Một lời khen ngay lập tức", weight: 1 },
-          { label: "Thêm 3 Chay", weight: 1 },
+          { label: "Thêm 3 Chày", weight: 1 },
         ]),
         assignedTo: subMemberId,
         createdBy: ownerMemberId,

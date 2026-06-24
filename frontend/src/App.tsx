@@ -1,4 +1,4 @@
-import { Routes, Route } from "react-router";
+import { Navigate, Routes, Route } from "react-router";
 import { useAppStore } from "@/shared/store/useAppStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { TopBar } from "@/shared/layout/TopBar";
@@ -14,6 +14,7 @@ import Login from "@/features/auth/LoginPage";
 import DemoLogin from "@/features/auth/DemoLoginPage";
 import NotFound from "@/features/not-found/NotFoundPage";
 import { trpc } from "@/providers/trpc";
+import { LOGIN_PATH } from "@/const";
 
 function MainApp() {
   const { activeTab, managementPanel, toast, clearToast } = useAppStore();
@@ -31,6 +32,10 @@ function MainApp() {
         <div className="w-8 h-8 rounded-full border-2 border-[#FF2A85]/40 border-t-[#FF2A85] animate-spin" />
       </div>
     );
+  }
+
+  if (houseQuery.error?.data?.code === "UNAUTHORIZED") {
+    return <Navigate to={LOGIN_PATH} replace />;
   }
 
   // User authenticated but not a member of any house → invite join flow

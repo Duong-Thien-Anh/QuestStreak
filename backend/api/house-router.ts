@@ -29,15 +29,81 @@ async function createUniqueRoomCode() {
   throw new Error("Failed to generate room code");
 }
 
+async function createOwnedHouseForUser(input: {
+  userId: number;
+  userName?: string | null;
+  name?: string;
+}) {
+  const db = getDb();
+  const [house] = await db
+    .insert(houses)
+    .values({
+      name: input.name || "Lunis House",
+      ownerId: input.userId,
+    })
+    .returning({ id: houses.id });
+
+  await db.insert(roomCodes).values({
+    houseId: house.id,
+    code: await createUniqueRoomCode(),
+  });
+
+  const [member] = await db
+    .insert(houseMembers)
+    .values({
+      houseId: house.id,
+      userId: input.userId,
+      nickname: input.userName || "Chủ nhà",
+      lifestyleRole: "dominant",
+    })
+    .returning({ id: houseMembers.id });
+
+  await db.insert(wallets).values({ memberId: member.id });
+  await db.insert(memberProgress).values({ memberId: member.id });
+
+  return house;
+}
+
 export const houseRouter = createRouter({
   get: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const userId = ctx.user.id;
 
     // Find the user's house membership
-    const member = await db.query.houseMembers.findFirst({
+    let member = await db.query.houseMembers.findFirst({
       where: eq(houseMembers.userId, userId),
     });
+
+    if (!member && ctx.user.role === "admin") {
+      const ownedHouse = await db.query.houses.findFirst({
+        where: eq(houses.ownerId, userId),
+      });
+
+      if (ownedHouse) {
+        const [createdMember] = await db
+          .insert(houseMembers)
+          .values({
+            houseId: ownedHouse.id,
+            userId,
+            nickname: ctx.user.name || "Root Admin",
+            lifestyleRole: "dominant",
+          })
+          .returning({ id: houseMembers.id });
+
+        await db.insert(wallets).values({ memberId: createdMember.id });
+        await db.insert(memberProgress).values({ memberId: createdMember.id });
+      } else {
+        await createOwnedHouseForUser({
+          userId,
+          userName: ctx.user.name,
+          name: "Admin Control Room",
+        });
+      }
+
+      member = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, userId),
+      });
+    }
 
     if (!member) return null;
 
@@ -118,36 +184,11 @@ export const houseRouter = createRouter({
         throw new Error("User already belongs to a house");
       }
 
-      // Create house
-      const [house] = await db
-        .insert(houses)
-        .values({
-          name: input.name || "Lunis House",
-          ownerId: userId,
-        })
-        .returning({ id: houses.id });
-
-      await db.insert(roomCodes).values({
-        houseId: house.id,
-        code: await createUniqueRoomCode(),
+      return createOwnedHouseForUser({
+        userId,
+        userName: ctx.user.name,
+        name: input.name,
       });
-
-      // Create member record for owner
-      const [member] = await db
-        .insert(houseMembers)
-        .values({
-          houseId: house.id,
-          userId,
-          nickname: ctx.user.name || "Chủ nhà",
-          lifestyleRole: "dominant",
-        })
-        .returning({ id: houseMembers.id });
-
-      // Create wallet
-      await db.insert(wallets).values({ memberId: member.id });
-      await db.insert(memberProgress).values({ memberId: member.id });
-
-      return house;
     }),
 
   update: domQuery
@@ -159,7 +200,10 @@ export const houseRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+      if (
+        ctx.user.role !== "admin" &&
+        (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId)
+      ) {
         throw new Error("House membership not found");
       }
 
@@ -180,7 +224,10 @@ export const houseRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+      if (
+        ctx.user.role !== "admin" &&
+        (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId)
+      ) {
         throw new Error("House membership not found");
       }
 
@@ -214,7 +261,10 @@ export const houseRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      if (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId) {
+      if (
+        ctx.user.role !== "admin" &&
+        (!ctx.currentMember || ctx.currentMember.houseId !== input.houseId)
+      ) {
         throw new Error("House membership not found");
       }
 
@@ -255,7 +305,10 @@ export const houseRouter = createRouter({
         where: eq(roomJoinRequests.id, input.requestId),
       });
       if (!request) throw new Error("Join request not found");
-      if (!ctx.currentMember || ctx.currentMember.houseId !== request.houseId) {
+      if (
+        ctx.user.role !== "admin" &&
+        (!ctx.currentMember || ctx.currentMember.houseId !== request.houseId)
+      ) {
         throw new Error("House membership not found");
       }
 
@@ -268,7 +321,7 @@ export const houseRouter = createRouter({
           .update(roomJoinRequests)
           .set({
             status: "rejected",
-            reviewedBy: ctx.currentMember.id,
+            reviewedBy: ctx.currentMember?.id ?? null,
             reviewedAt: new Date(),
           })
           .where(eq(roomJoinRequests.id, input.requestId));
@@ -299,7 +352,7 @@ export const houseRouter = createRouter({
         .update(roomJoinRequests)
         .set({
           status: "approved",
-          reviewedBy: ctx.currentMember.id,
+          reviewedBy: ctx.currentMember?.id ?? null,
           reviewedAt: new Date(),
         })
         .where(eq(roomJoinRequests.id, input.requestId));
@@ -339,7 +392,10 @@ export const houseRouter = createRouter({
         where: eq(houseMembers.id, input.memberId),
       });
       if (!member) throw new Error("Member not found");
-      if (!ctx.currentMember || ctx.currentMember.houseId !== member.houseId) {
+      if (
+        ctx.user.role !== "admin" &&
+        (!ctx.currentMember || ctx.currentMember.houseId !== member.houseId)
+      ) {
         throw new Error("House membership not found");
       }
       if (member.userId === ctx.user.id) {

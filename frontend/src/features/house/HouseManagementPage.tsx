@@ -185,6 +185,7 @@ export function HouseManagementPage() {
     members.find((member) => member.userId === user?.id) ??
     members[0] ??
     null;
+  const isRootAdmin = user?.role === "admin";
 
   const [profileForm, setProfileForm] = useState({
     nickname: undefined as string | undefined,
@@ -461,6 +462,12 @@ export function HouseManagementPage() {
     }
   };
 
+  const currentRoleLabel = isRootAdmin
+    ? "Root Admin"
+    : displayMember
+    ? getRoleLabel(displayMember.lifestyleRole)
+    : "Guest";
+
   const copyText = (text: string) => {
     void navigator.clipboard.writeText(text);
     showToast("Đã copy", "success");
@@ -490,9 +497,26 @@ export function HouseManagementPage() {
           </h2>
         </div>
         <div className="rounded-full border border-[#FF2A85]/30 bg-[#FF2A85]/10 px-3 py-1 text-xs font-semibold text-[#FF2A85]">
-          {displayMember ? getRoleLabel(displayMember.lifestyleRole) : "Guest"}
+          {currentRoleLabel}
         </div>
       </div>
+
+      {isRootAdmin && (
+        <div className="rounded-xl border border-[#F59E0B]/25 bg-[#F59E0B]/10 p-3">
+          <div className="flex items-start gap-2">
+            <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#F59E0B]" />
+            <div>
+              <p className="text-sm font-semibold text-white">
+                Root admin dashboard
+              </p>
+              <p className="mt-1 text-xs leading-5 text-white/50">
+                Tài khoản admin có toàn quyền tạo, sửa phòng, quản lý thành viên
+                và duyệt yêu cầu mà không cần bước tạo phòng sau đăng nhập.
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
 
       <div className="grid grid-cols-2 gap-2">
         <div className="rounded-xl border border-white/5 bg-[#252532] p-3">
@@ -640,7 +664,7 @@ export function HouseManagementPage() {
                 "Your profile"}
             </h2>
             <p className="mt-1 text-xs text-white/45">
-              {displayMember ? getRoleLabel(displayMember.lifestyleRole) : "No house role yet"}
+              {currentRoleLabel}
             </p>
           </div>
         </div>
@@ -958,7 +982,7 @@ export function HouseManagementPage() {
           <div className="flex justify-between gap-4">
             <span>Your role</span>
             <span className="text-right text-white/80">
-              {displayMember ? getRoleLabel(displayMember.lifestyleRole) : "-"}
+              {currentRoleLabel}
             </span>
           </div>
         </div>
@@ -984,7 +1008,7 @@ export function HouseManagementPage() {
           <div className="flex justify-between gap-4 rounded-xl bg-[#252532] px-3 py-2">
             <span>{copy.currentRole}</span>
             <span className="text-right text-white/80">
-              {displayMember ? getRoleLabel(displayMember.lifestyleRole) : "-"}
+              {currentRoleLabel}
             </span>
           </div>
           <div className="flex justify-between gap-4 rounded-xl bg-[#252532] px-3 py-2">

@@ -7,10 +7,8 @@ import { renderTrpcPanel } from "@ajayche/trpc-panel";
 import { appRouter } from "./router";
 import { createContext } from "./context";
 import { env } from "./lib/env";
-import { createOAuthCallbackHandler } from "./kimi/auth";
 import { createDevLoginHandler } from "./dev-auth";
 import { createDemoAuthHandler } from "./demo-auth";
-import { Paths } from "@contracts/constants";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -32,9 +30,10 @@ app.use(
   })
 );
 app.use(bodyLimit({ maxSize: 50 * 1024 * 1024 }));
-app.get("/api/dev/login", createDevLoginHandler());
+if (!env.isProduction) {
+  app.get("/api/dev/login", createDevLoginHandler());
+}
 app.post("/api/auth/demo", createDemoAuthHandler());
-app.get(Paths.oauthCallback, createOAuthCallbackHandler());
 app.get("/api/panel", (c) => {
   const trpcUrl = new URL("/api/trpc", c.req.url).toString();
   return c.html(

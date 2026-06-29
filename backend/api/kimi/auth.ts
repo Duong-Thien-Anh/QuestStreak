@@ -11,6 +11,8 @@ import { users as kimiUsers } from "./platform";
 import { findUserByUnionId, upsertUser } from "../queries/users";
 import type { TokenResponse } from "./types";
 
+export type AuthPlatform = "web" | "telegram";
+
 async function exchangeAuthCode(
   code: string,
   redirectUri: string,
@@ -53,9 +55,25 @@ async function verifyAccessToken(
   return { userId, clientId };
 }
 
-export async function authenticateRequest(headers: Headers) {
+function getBearerToken(headers: Headers) {
+  const authHeader = headers.get("authorization");
+  if (!authHeader?.toLowerCase().startsWith("bearer ")) {
+    return null;
+  }
+  return authHeader.slice(7).trim();
+}
+
+function getCookieToken(headers: Headers) {
   const cookies = cookie.parse(headers.get("cookie") || "");
-  const token = cookies[Session.cookieName];
+  return cookies[Session.cookieName] ?? null;
+}
+
+export async function authenticateRequest(
+  headers: Headers,
+  platform: AuthPlatform = "web",
+) {
+  const token =
+    platform === "telegram" ? getBearerToken(headers) : getCookieToken(headers);
   if (!token) {
     throw Errors.forbidden("Invalid authentication token.");
   }

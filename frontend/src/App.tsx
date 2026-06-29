@@ -12,21 +12,31 @@ import { HouseManagementPage } from "@/features/house/HouseManagementPage";
 import { InviteJoinPage } from "@/features/auth/InviteJoinPage";
 import Login from "@/features/auth/LoginPage";
 import DemoLogin from "@/features/auth/DemoLoginPage";
+import RegisterPage from "@/features/auth/RegisterPage";
+import AdminRegistrationsPage from "@/features/auth/AdminRegistrationsPage";
 import NotFound from "@/features/not-found/NotFoundPage";
+import { useTelegramAuth } from "@/features/auth/useTelegramAuth";
+import { getPlatform } from "@/lib/platform";
 import { trpc } from "@/providers/trpc";
 import { LOGIN_PATH } from "@/const";
 
 function MainApp() {
   const { activeTab, managementPanel, toast, clearToast } = useAppStore();
-
-  // Detect whether the authenticated user belongs to a house
-  const houseQuery = trpc.house.get.useQuery(undefined, {
+  const userQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     staleTime: 60_000,
   });
 
+  // Detect whether the authenticated user belongs to a house
+  const houseQuery = trpc.house.get.useQuery(undefined, {
+    enabled: !!userQuery.data,
+    retry: false,
+    staleTime: 60_000,
+  });
+  const isRootAdmin = userQuery.data?.role === "admin";
+
   // While loading, show a minimal spinner so there's no layout flash
-  if (houseQuery.isLoading) {
+  if (userQuery.isLoading || houseQuery.isLoading) {
     return (
       <div className="min-h-screen bg-[#0D0D11] flex items-center justify-center">
         <div className="w-8 h-8 rounded-full border-2 border-[#FF2A85]/40 border-t-[#FF2A85] animate-spin" />
@@ -34,8 +44,15 @@ function MainApp() {
     );
   }
 
-  if (houseQuery.error?.data?.code === "UNAUTHORIZED") {
+  if (
+    userQuery.error?.data?.code === "UNAUTHORIZED" ||
+    houseQuery.error?.data?.code === "UNAUTHORIZED"
+  ) {
     return <Navigate to={LOGIN_PATH} replace />;
+  }
+
+  if (isRootAdmin) {
+    return <AdminRegistrationsPage />;
   }
 
   // User authenticated but not a member of any house → invite join flow
@@ -109,13 +126,48 @@ function MainApp() {
   );
 }
 
+function TelegramAuthBootstrap() {
+  useTelegramAuth();
+  return null;
+}
+
+function AdminRoute() {
+  const userQuery = trpc.auth.me.useQuery(undefined, {
+    retry: false,
+    staleTime: 60_000,
+  });
+
+  if (userQuery.isLoading) {
+    return (
+      <div className="min-h-screen bg-[#0D0D11] flex items-center justify-center">
+        <div className="w-8 h-8 rounded-full border-2 border-[#FF2A85]/40 border-t-[#FF2A85] animate-spin" />
+      </div>
+    );
+  }
+
+  if (userQuery.error?.data?.code === "UNAUTHORIZED") {
+    return <Navigate to={LOGIN_PATH} replace />;
+  }
+
+  if (userQuery.data?.role !== "admin") {
+    return <Navigate to="/" replace />;
+  }
+
+  return <AdminRegistrationsPage />;
+}
+
 export default function App() {
   return (
-    <Routes>
-      <Route path="/" element={<MainApp />} />
-      <Route path="/login" element={<Login />} />
-      <Route path="/demo-login" element={<DemoLogin />} />
-      <Route path="*" element={<NotFound />} />
-    </Routes>
+    <>
+      {getPlatform() === "telegram" ? <TelegramAuthBootstrap /> : null}
+      <Routes>
+        <Route path="/" element={<MainApp />} />
+        <Route path="/login" element={<Login />} />
+        <Route path="/register" element={<RegisterPage />} />
+        <Route path="/demo-login" element={<DemoLogin />} />
+        <Route path="/admin" element={<AdminRoute />} />
+        <Route path="*" element={<NotFound />} />
+      </Routes>
+    </>
   );
 }

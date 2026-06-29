@@ -16,6 +16,7 @@ export function useCurrentUser() {
   const isDom =
     currentMember?.lifestyleRole === "dominant" ||
     currentMember?.lifestyleRole === "switch";
+  const isRootAdmin = userQuery.data?.role === "admin";
   const isSub = currentMember?.lifestyleRole === "submissive";
   const isSwitch = currentMember?.lifestyleRole === "switch";
 
@@ -25,7 +26,7 @@ export function useCurrentUser() {
     isDom,
     isSub,
     isSwitch,
-    isAdmin: isDom,
+    isAdmin: isRootAdmin || isDom,
     isLoading: userQuery.isLoading || houseQuery.isLoading,
   };
 }

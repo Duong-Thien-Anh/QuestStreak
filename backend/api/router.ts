@@ -1,4 +1,5 @@
 import { authRouter } from "./auth-router";
+import { adminRouter } from "./admin-router";
 import { houseRouter } from "./house-router";
 import { walletRouter } from "./wallet-router";
 import { taskRouter } from "./task-router";
@@ -16,6 +17,7 @@ import { createRouter, publicQuery } from "./middleware";
 export const appRouter = createRouter({
   ping: publicQuery.query(() => ({ ok: true, ts: Date.now() })),
   auth: authRouter,
+  admin: adminRouter,
   house: houseRouter,
   wallet: walletRouter,
   task: taskRouter,

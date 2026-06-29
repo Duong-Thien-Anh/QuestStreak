@@ -5,6 +5,8 @@ import superjson from "superjson";
 import type { AppRouter } from "../../../backend/api/router";
 import type { ReactNode } from "react";
 import { apiUrl } from "@/lib/api";
+import { getPlatform } from "@/lib/platform";
+import { useAppStore } from "@/shared/store/useAppStore";
 
 /* eslint-disable react-refresh/only-export-components */
 
@@ -16,6 +18,16 @@ const trpcClient = trpc.createClient({
     httpBatchLink({
       url: apiUrl("/api/trpc"),
       transformer: superjson,
+      headers() {
+        const platform = getPlatform();
+        const token = useAppStore.getState().authToken;
+        return {
+          "X-Platform": platform,
+          ...(platform === "telegram" && token
+            ? { Authorization: `Bearer ${token}` }
+            : {}),
+        };
+      },
       fetch(input, init) {
         return globalThis.fetch(input, {
           ...(init ?? {}),

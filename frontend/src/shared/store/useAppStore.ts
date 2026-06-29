@@ -4,6 +4,10 @@ export type Tab = "tasks" | "shop" | "punishments" | "notebook";
 export type ManagementPanel = "account" | "room" | null;
 
 export interface AppState {
+  // Auth
+  authToken: string | null;
+  setAuthToken: (token: string | null) => void;
+
   // Navigation
   activeTab: Tab;
   setActiveTab: (tab: Tab) => void;
@@ -40,6 +44,10 @@ export interface AppState {
 }
 
 export const useAppStore = create<AppState>((set) => ({
+  // Auth
+  authToken: null,
+  setAuthToken: (token) => set({ authToken: token }),
+
   // Navigation
   activeTab: "tasks",
   setActiveTab: (tab) => set({ activeTab: tab }),

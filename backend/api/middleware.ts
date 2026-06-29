@@ -5,6 +5,7 @@ import superjson from "superjson";
 import type { TrpcContext } from "./context";
 import { houseMembers } from "@db/schema";
 import { getDb } from "./queries/connection";
+import { authenticateRequest } from "./lib/auth";
 
 const t = initTRPC.context<TrpcContext>().create({
   transformer: superjson,
@@ -15,15 +16,23 @@ export const publicQuery = t.procedure;
 
 const requireAuth = t.middleware(async (opts) => {
   const { ctx, next } = opts;
+  let user = ctx.user;
 
-  if (!ctx.user) {
-    throw new TRPCError({
-      code: "UNAUTHORIZED",
-      message: ErrorMessages.unauthenticated,
-    });
+  if (!user) {
+    try {
+      user = await authenticateRequest(ctx.req.headers, ctx.platform);
+    } catch {
+      user = undefined;
+    }
+    if (!user) {
+      throw new TRPCError({
+        code: "UNAUTHORIZED",
+        message: ErrorMessages.unauthenticated,
+      });
+    }
   }
 
-  return next({ ctx: { ...ctx, user: ctx.user } });
+  return next({ ctx: { ...ctx, user } });
 });
 
 function requireRole(role: string) {
@@ -59,10 +68,11 @@ const requireDom = t.middleware(async (opts) => {
     where: eq(houseMembers.userId, ctx.user.id),
   });
 
-  if (
-    !member ||
-    (member.lifestyleRole !== "dominant" && member.lifestyleRole !== "switch")
-  ) {
+  const isRootAdmin = ctx.user.role === "admin";
+  const canManageAsMember =
+    member?.lifestyleRole === "dominant" || member?.lifestyleRole === "switch";
+
+  if (!isRootAdmin && !canManageAsMember) {
     throw new TRPCError({
       code: "FORBIDDEN",
       message: ErrorMessages.insufficientRole,

@@ -15,6 +15,7 @@ import {
 // ─── Enums ──────────────────────────────────────────────────────────
 
 export const roleEnum = pgEnum("role", ["user", "admin"]);
+export const registrationStatusEnum = pgEnum("registrationStatus", ["pending", "approved", "rejected"]);
 export const lifestyleRoleEnum = pgEnum("lifestyleRole", ["dominant", "submissive", "switch"]);
 export const genderEnum = pgEnum("gender", ["male", "female", "other"]);
 export const languageEnum = pgEnum("language", ["en", "vi"]);
@@ -103,6 +104,8 @@ export const userCredentials = pgTable(
     id: serial("id").primaryKey(),
     userId: bigint("userId", { mode: "number" }).notNull(),
     email: varchar("email", { length: 320 }).notNull(),
+    username: varchar("username", { length: 100 }),
+    phone: varchar("phone", { length: 30 }),
     passwordHash: text("passwordHash").notNull(),
     createdAt: timestamp("createdAt").defaultNow().notNull(),
     updatedAt: timestamp("updatedAt")
@@ -117,6 +120,37 @@ export const userCredentials = pgTable(
 );
 
 export type UserCredential = typeof userCredentials.$inferSelect;
+
+// ─── Registration Requests ────────────────────────────────────────
+
+export const registrationRequests = pgTable(
+  "registrationRequests",
+  {
+    id: serial("id").primaryKey(),
+    name: varchar("name", { length: 255 }).notNull(),
+    email: varchar("email", { length: 320 }).notNull(),
+    username: varchar("username", { length: 100 }),
+    phone: varchar("phone", { length: 30 }),
+    lifestyleRole: lifestyleRoleEnum("lifestyleRole").default("submissive").notNull(),
+    gender: genderEnum("gender").default("other").notNull(),
+    passwordHash: text("passwordHash").notNull(),
+    status: registrationStatusEnum("status").default("pending").notNull(),
+    rejectionReason: text("rejectionReason"),
+    reviewedBy: bigint("reviewedBy", { mode: "number" }),
+    reviewedAt: timestamp("reviewedAt"),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+    updatedAt: timestamp("updatedAt")
+      .defaultNow()
+      .notNull()
+      .$onUpdate(() => new Date()),
+  },
+  (table) => [
+    uniqueIndex("reg_requests_email_idx").on(table.email),
+    index("reg_requests_status_idx").on(table.status),
+  ]
+);
+
+export type RegistrationRequest = typeof registrationRequests.$inferSelect;
 
 // ─── Houses ────────────────────────────────────────────────────────
 

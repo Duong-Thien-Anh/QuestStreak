@@ -7,12 +7,32 @@ import { getDb } from "./queries/connection";
 import {
   houses,
   houseMembers,
+  agreements,
+  journalEntries,
+  journals,
+  limits,
+  logs,
   memberProgress,
+  memberAchievements,
+  notes,
+  notifications,
+  privileges,
+  privilegeAssignments,
+  punishmentAssignments,
+  punishments,
   registrationRequests,
+  rewardGiftDetails,
+  rewardPurchases,
+  rewards,
   roomCodes,
+  streaks,
+  taskSubmissions,
+  tasks,
   userCredentials,
   users,
   wallets,
+  wheelSpins,
+  wheels,
 } from "@db/schema";
 import { sendMail, buildApprovalEmail, buildRejectionEmail } from "./lib/mailer";
 
@@ -163,6 +183,145 @@ export const adminRouter = createRouter({
         .where(eq(users.id, input.userId))
         .returning();
       return user;
+    }),
+
+  updateUserAccount: adminQuery
+    .input(
+      z.object({
+        userId: z.number(),
+        name: z.string().min(1).max(255),
+        email: z.string().email().max(320),
+        username: z.string().min(3).max(100).optional(),
+        phone: z.string().max(30).optional(),
+        role: z.enum(["user", "admin"]),
+        password: z.string().min(8).optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const email = input.email.trim().toLowerCase();
+      const username = input.username?.trim() || null;
+      const phone = input.phone?.trim() || null;
+
+      const existingCredential = await db.query.userCredentials.findFirst({
+        where: eq(userCredentials.email, email),
+      });
+      if (existingCredential && existingCredential.userId !== input.userId) {
+        throw new Error("Email đã tồn tại");
+      }
+
+      const [user] = await db
+        .update(users)
+        .set({
+          name: input.name.trim(),
+          email,
+          role: input.role,
+        })
+        .where(eq(users.id, input.userId))
+        .returning();
+      if (!user) throw new Error("User not found");
+
+      const currentCredential = await db.query.userCredentials.findFirst({
+        where: eq(userCredentials.userId, input.userId),
+      });
+      const credentialData: {
+        userId: number;
+        email: string;
+        username: string | null;
+        phone: string | null;
+        passwordHash?: string;
+      } = {
+        userId: input.userId,
+        email,
+        username,
+        phone,
+      };
+      if (input.password) {
+        credentialData.passwordHash = await hashPassword(input.password);
+      }
+
+      if (currentCredential) {
+        await db
+          .update(userCredentials)
+          .set(credentialData)
+          .where(eq(userCredentials.id, currentCredential.id));
+      } else {
+        await db.insert(userCredentials).values({
+          ...credentialData,
+          passwordHash: credentialData.passwordHash ?? (await hashPassword("Password123!")),
+        });
+      }
+
+      return user;
+    }),
+
+  deleteUserAccount: adminQuery
+    .input(z.object({ userId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      if (input.userId === ctx.user.id) {
+        throw new Error("Không thể tự xóa tài khoản admin đang đăng nhập");
+      }
+
+      await db
+        .update(houses)
+        .set({ ownerId: ctx.user.id })
+        .where(eq(houses.ownerId, input.userId));
+
+      const memberships = await db.query.houseMembers.findMany({
+        where: eq(houseMembers.userId, input.userId),
+      });
+      const memberIds = memberships.map((member) => member.id);
+
+      if (memberIds.length > 0) {
+        await db.delete(wallets).where(inArray(wallets.memberId, memberIds));
+        await db
+          .delete(memberProgress)
+          .where(inArray(memberProgress.memberId, memberIds));
+        await db.delete(streaks).where(inArray(streaks.memberId, memberIds));
+        await db
+          .delete(memberAchievements)
+          .where(inArray(memberAchievements.memberId, memberIds));
+        await db.delete(notes).where(inArray(notes.memberId, memberIds));
+        await db.delete(journals).where(inArray(journals.memberId, memberIds));
+        await db
+          .delete(journalEntries)
+          .where(inArray(journalEntries.memberId, memberIds));
+        await db
+          .delete(taskSubmissions)
+          .where(inArray(taskSubmissions.memberId, memberIds));
+        await db
+          .delete(rewardPurchases)
+          .where(inArray(rewardPurchases.memberId, memberIds));
+        await db
+          .delete(privilegeAssignments)
+          .where(inArray(privilegeAssignments.memberId, memberIds));
+        await db
+          .delete(punishmentAssignments)
+          .where(inArray(punishmentAssignments.memberId, memberIds));
+        await db.delete(wheelSpins).where(inArray(wheelSpins.memberId, memberIds));
+        await db
+          .update(tasks)
+          .set({ assignedTo: null })
+          .where(inArray(tasks.assignedTo, memberIds));
+        await db
+          .update(wheels)
+          .set({ assignedTo: null })
+          .where(inArray(wheels.assignedTo, memberIds));
+      }
+
+      await db
+        .delete(houseMembers)
+        .where(eq(houseMembers.userId, input.userId));
+      await db
+        .delete(userCredentials)
+        .where(eq(userCredentials.userId, input.userId));
+      await db
+        .delete(userCredentials)
+        .where(eq(userCredentials.email, `deleted-user-${input.userId}@local.invalid`));
+      await db.delete(users).where(eq(users.id, input.userId));
+
+      return { success: true };
     }),
 
   listRooms: adminQuery.query(async () => {
@@ -363,6 +522,931 @@ export const adminRouter = createRouter({
         .delete(memberProgress)
         .where(eq(memberProgress.memberId, input.memberId));
       await db.delete(houseMembers).where(eq(houseMembers.id, input.memberId));
+      return { success: true };
+    }),
+
+  listOperations: adminQuery.query(async () => {
+    const db = getDb();
+    const [
+      roomRows,
+      memberRows,
+      userRows,
+      walletRows,
+      progressRows,
+      streakRows,
+      achievementRows,
+      memberAchievementRows,
+      taskRows,
+      submissionRows,
+      rewardRows,
+      rewardPurchaseRows,
+      rewardGiftRows,
+      privilegeRows,
+      privilegeAssignmentRows,
+      punishmentRows,
+      punishmentAssignmentRows,
+      limitRows,
+      agreementRows,
+      journalRows,
+      journalEntryRows,
+      noteRows,
+      notificationRows,
+      logRows,
+      wheelRows,
+      wheelSpinRows,
+    ] = await Promise.all([
+      db.query.houses.findMany({ orderBy: [desc(houses.createdAt)] }),
+      db.query.houseMembers.findMany(),
+      db.query.users.findMany(),
+      db.query.wallets.findMany(),
+      db.query.memberProgress.findMany(),
+      db.query.streaks.findMany({ orderBy: [desc(streaks.updatedAt)] }),
+      db.query.achievements.findMany(),
+      db.query.memberAchievements.findMany({
+        orderBy: [desc(memberAchievements.unlockedAt)],
+      }),
+      db.query.tasks.findMany({ orderBy: [desc(tasks.createdAt)] }),
+      db.query.taskSubmissions.findMany({
+        orderBy: [desc(taskSubmissions.submittedAt)],
+      }),
+      db.query.rewards.findMany({ orderBy: [desc(rewards.createdAt)] }),
+      db.query.rewardPurchases.findMany({
+        orderBy: [desc(rewardPurchases.purchasedAt)],
+      }),
+      db.query.rewardGiftDetails.findMany({
+        orderBy: [desc(rewardGiftDetails.createdAt)],
+      }),
+      db.query.privileges.findMany({ orderBy: [desc(privileges.createdAt)] }),
+      db.query.privilegeAssignments.findMany({
+        orderBy: [desc(privilegeAssignments.assignedAt)],
+      }),
+      db.query.punishments.findMany({ orderBy: [desc(punishments.createdAt)] }),
+      db.query.punishmentAssignments.findMany({
+        orderBy: [desc(punishmentAssignments.assignedAt)],
+      }),
+      db.query.limits.findMany({ orderBy: [desc(limits.createdAt)] }),
+      db.query.agreements.findMany({ orderBy: [desc(agreements.createdAt)] }),
+      db.query.journals.findMany({ orderBy: [desc(journals.createdAt)] }),
+      db.query.journalEntries.findMany({
+        orderBy: [desc(journalEntries.createdAt)],
+      }),
+      db.query.notes.findMany({ orderBy: [desc(notes.createdAt)] }),
+      db.query.notifications.findMany({
+        orderBy: [desc(notifications.createdAt)],
+      }),
+      db.query.logs.findMany({ orderBy: [desc(logs.createdAt)] }),
+      db.query.wheels.findMany({ orderBy: [desc(wheels.createdAt)] }),
+      db.query.wheelSpins.findMany({ orderBy: [desc(wheelSpins.spunAt)] }),
+    ]);
+
+    const userById = new Map(userRows.map((user) => [user.id, user]));
+    const roomById = new Map(roomRows.map((room) => [room.id, room]));
+    const memberById = new Map(memberRows.map((member) => [member.id, member]));
+    const taskById = new Map(taskRows.map((task) => [task.id, task]));
+    const rewardById = new Map(rewardRows.map((reward) => [reward.id, reward]));
+    const privilegeById = new Map(
+      privilegeRows.map((privilege) => [privilege.id, privilege]),
+    );
+    const punishmentById = new Map(
+      punishmentRows.map((punishment) => [punishment.id, punishment]),
+    );
+    const wheelById = new Map(wheelRows.map((wheel) => [wheel.id, wheel]));
+    const achievementById = new Map(
+      achievementRows.map((achievement) => [achievement.id, achievement]),
+    );
+
+    const memberLabel = (memberId: number | null | undefined) => {
+      if (!memberId) return null;
+      const member = memberById.get(memberId);
+      if (!member) return `Member #${memberId}`;
+      const user = userById.get(member.userId);
+      return member.nickname || user?.name || user?.email || `Member #${memberId}`;
+    };
+    const roomName = (houseId: number | null | undefined) =>
+      houseId ? roomById.get(houseId)?.name ?? `Room #${houseId}` : null;
+
+    const walletsWithMember = walletRows.map((wallet) => {
+      const progress = progressRows.find((item) => item.memberId === wallet.memberId);
+      const member = memberById.get(wallet.memberId);
+      return {
+        ...wallet,
+        memberName: memberLabel(wallet.memberId),
+        roomName: roomName(member?.houseId),
+        xp: progress?.xp ?? 0,
+        level: progress?.level ?? 1,
+      };
+    });
+
+    return {
+      summary: {
+        tasks: taskRows.length,
+        submissions: submissionRows.length,
+        rewards: rewardRows.length,
+        gifts: rewardGiftRows.length,
+        rewardPurchases: rewardPurchaseRows.length,
+        privileges: privilegeRows.length,
+        privilegeAssignments: privilegeAssignmentRows.length,
+        punishments: punishmentRows.length,
+        punishmentAssignments: punishmentAssignmentRows.length,
+        wallets: walletRows.length,
+        streaks: streakRows.length,
+        achievements: achievementRows.length,
+        wheels: wheelRows.length,
+        wheelSpins: wheelSpinRows.length,
+        notes: noteRows.length,
+        journals: journalRows.length,
+        agreements: agreementRows.length,
+        notifications: notificationRows.length,
+        logs: logRows.length,
+      },
+      tasks: taskRows.map((task) => ({
+        ...task,
+        roomName: roomName(task.houseId),
+        assignedMemberName: memberLabel(task.assignedTo),
+        createdByName: memberLabel(task.createdBy),
+      })),
+      taskSubmissions: submissionRows.map((submission) => ({
+        ...submission,
+        taskTitle: taskById.get(submission.taskId)?.title ?? `Task #${submission.taskId}`,
+        memberName: memberLabel(submission.memberId),
+        reviewedByName: memberLabel(submission.reviewedBy),
+      })),
+      rewards: rewardRows.map((reward) => ({
+        ...reward,
+        roomName: roomName(reward.houseId),
+        createdByName: memberLabel(reward.createdBy),
+      })),
+      rewardPurchases: rewardPurchaseRows.map((purchase) => ({
+        ...purchase,
+        rewardTitle: rewardById.get(purchase.rewardId)?.title ?? `Reward #${purchase.rewardId}`,
+        memberName: memberLabel(purchase.memberId),
+        giftedByName: memberLabel(purchase.giftedBy),
+        gift: rewardGiftRows.find((gift) => gift.purchaseId === purchase.id) ?? null,
+      })),
+      privileges: privilegeRows.map((privilege) => ({
+        ...privilege,
+        roomName: roomName(privilege.houseId),
+        createdByName: memberLabel(privilege.createdBy),
+      })),
+      privilegeAssignments: privilegeAssignmentRows.map((assignment) => ({
+        ...assignment,
+        privilegeTitle:
+          privilegeById.get(assignment.privilegeId)?.title ??
+          `Privilege #${assignment.privilegeId}`,
+        memberName: memberLabel(assignment.memberId),
+        assignedByName: memberLabel(assignment.assignedBy),
+      })),
+      punishments: punishmentRows.map((punishment) => ({
+        ...punishment,
+        roomName: roomName(punishment.houseId),
+        createdByName: memberLabel(punishment.createdBy),
+      })),
+      punishmentAssignments: punishmentAssignmentRows.map((assignment) => ({
+        ...assignment,
+        punishmentTitle:
+          punishmentById.get(assignment.punishmentId)?.title ??
+          `Punishment #${assignment.punishmentId}`,
+        memberName: memberLabel(assignment.memberId),
+        assignedByName: memberLabel(assignment.assignedBy),
+      })),
+      wallets: walletsWithMember,
+      streaks: streakRows.map((streak) => ({
+        ...streak,
+        memberName: memberLabel(streak.memberId),
+        sourceTitle:
+          streak.sourceType === "task"
+            ? taskById.get(streak.sourceId)?.title ?? `Task #${streak.sourceId}`
+            : `Source #${streak.sourceId}`,
+      })),
+      achievements: achievementRows,
+      memberAchievements: memberAchievementRows.map((item) => ({
+        ...item,
+        memberName: memberLabel(item.memberId),
+        achievementTitle:
+          achievementById.get(item.achievementId)?.title ??
+          `Achievement #${item.achievementId}`,
+      })),
+      wheels: wheelRows.map((wheel) => ({
+        ...wheel,
+        roomName: roomName(wheel.houseId),
+        assignedMemberName: memberLabel(wheel.assignedTo),
+        createdByName: memberLabel(wheel.createdBy),
+      })),
+      wheelSpins: wheelSpinRows.map((spin) => ({
+        ...spin,
+        wheelTitle: wheelById.get(spin.wheelId)?.title ?? `Wheel #${spin.wheelId}`,
+        memberName: memberLabel(spin.memberId),
+      })),
+      notes: noteRows.map((note) => ({
+        ...note,
+        roomName: roomName(note.houseId),
+        memberName: memberLabel(note.memberId),
+      })),
+      limits: limitRows.map((limit) => ({
+        ...limit,
+        roomName: roomName(limit.houseId),
+        createdByName: memberLabel(limit.createdBy),
+      })),
+      agreements: agreementRows.map((agreement) => ({
+        ...agreement,
+        roomName: roomName(agreement.houseId),
+        createdByName: memberLabel(agreement.createdBy),
+      })),
+      journals: journalRows.map((journal) => ({
+        ...journal,
+        roomName: roomName(journal.houseId),
+        memberName: memberLabel(journal.memberId),
+      })),
+      journalEntries: journalEntryRows.map((entry) => ({
+        ...entry,
+        memberName: memberLabel(entry.memberId),
+      })),
+      notifications: notificationRows.map((notification) => ({
+        ...notification,
+        roomName: roomName(notification.houseId),
+        recipientName: memberLabel(notification.recipientId),
+        actorName: memberLabel(notification.actorId),
+      })),
+      logs: logRows.map((log) => ({
+        ...log,
+        roomName: roomName(log.houseId),
+        actorName: memberLabel(log.actorId),
+        targetName: memberLabel(log.targetId),
+      })),
+    };
+  }),
+
+  updateWalletProgress: adminQuery
+    .input(
+      z.object({
+        memberId: z.number(),
+        chymBalance: z.number().int().min(0),
+        chayBalance: z.number().int().min(0),
+        xp: z.number().int().min(0),
+        level: z.number().int().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await ensureMemberResources(input.memberId);
+      const [wallet] = await db
+        .update(wallets)
+        .set({
+          chymBalance: input.chymBalance,
+          chayBalance: input.chayBalance,
+        })
+        .where(eq(wallets.memberId, input.memberId))
+        .returning();
+      const [progress] = await db
+        .update(memberProgress)
+        .set({ xp: input.xp, level: input.level })
+        .where(eq(memberProgress.memberId, input.memberId))
+        .returning();
+      return { wallet, progress };
+    }),
+
+  updateStreak: adminQuery
+    .input(
+      z.object({
+        streakId: z.number(),
+        currentStreak: z.number().int().min(0),
+        longestStreak: z.number().int().min(0),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [streak] = await db
+        .update(streaks)
+        .set({
+          currentStreak: input.currentStreak,
+          longestStreak: input.longestStreak,
+        })
+        .where(eq(streaks.id, input.streakId))
+        .returning();
+      return streak;
+    }),
+
+  updateTaskStatus: adminQuery
+    .input(
+      z.object({
+        taskId: z.number(),
+        status: z.enum(["pending", "active", "submitted", "completed", "failed"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [task] = await db
+        .update(tasks)
+        .set({
+          status: input.status,
+          completedAt: input.status === "completed" ? new Date() : null,
+        })
+        .where(eq(tasks.id, input.taskId))
+        .returning();
+      return task;
+    }),
+
+  createTask: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        category: z
+          .enum(["daily", "weekly", "monthly", "special", "superSpecial"])
+          .default("daily"),
+        chymReward: z.number().int().min(0).default(0),
+        chayPenalty: z.number().int().min(0).default(0),
+        assignedTo: z.number().optional(),
+        createdBy: z.number(),
+        status: z
+          .enum(["pending", "active", "submitted", "completed", "failed"])
+          .default("pending"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [task] = await db
+        .insert(tasks)
+        .values({
+          houseId: input.houseId,
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          category: input.category,
+          chymReward: input.chymReward,
+          chayPenalty: input.chayPenalty,
+          assignedTo: input.assignedTo ?? null,
+          createdBy: input.createdBy,
+          status: input.status,
+          completedAt: input.status === "completed" ? new Date() : null,
+        })
+        .returning();
+      return task;
+    }),
+
+  updateTask: adminQuery
+    .input(
+      z.object({
+        taskId: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial"]),
+        chymReward: z.number().int().min(0),
+        chayPenalty: z.number().int().min(0),
+        assignedTo: z.number().optional(),
+        status: z.enum(["pending", "active", "submitted", "completed", "failed"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [task] = await db
+        .update(tasks)
+        .set({
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          category: input.category,
+          chymReward: input.chymReward,
+          chayPenalty: input.chayPenalty,
+          assignedTo: input.assignedTo ?? null,
+          status: input.status,
+          completedAt: input.status === "completed" ? new Date() : null,
+        })
+        .where(eq(tasks.id, input.taskId))
+        .returning();
+      return task;
+    }),
+
+  deleteTask: adminQuery
+    .input(z.object({ taskId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.delete(taskSubmissions).where(eq(taskSubmissions.taskId, input.taskId));
+      await db.delete(streaks).where(eq(streaks.sourceId, input.taskId));
+      await db.delete(tasks).where(eq(tasks.id, input.taskId));
+      return { success: true };
+    }),
+
+  updateTaskSubmissionStatus: adminQuery
+    .input(
+      z.object({
+        submissionId: z.number(),
+        status: z.enum(["submitted", "approved", "rejected"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const [submission] = await db
+        .update(taskSubmissions)
+        .set({
+          status: input.status,
+          reviewedBy: ctx.user.id,
+          reviewedAt: new Date(),
+        })
+        .where(eq(taskSubmissions.id, input.submissionId))
+        .returning();
+      return submission;
+    }),
+
+  updateCatalogActive: adminQuery
+    .input(
+      z.object({
+        type: z.enum(["reward", "privilege", "punishment", "wheel"]),
+        id: z.number(),
+        isActive: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      switch (input.type) {
+        case "reward":
+          return (
+            await db
+              .update(rewards)
+              .set({ isActive: input.isActive })
+              .where(eq(rewards.id, input.id))
+              .returning()
+          )[0];
+        case "privilege":
+          return (
+            await db
+              .update(privileges)
+              .set({ isActive: input.isActive })
+              .where(eq(privileges.id, input.id))
+              .returning()
+          )[0];
+        case "punishment":
+          return (
+            await db
+              .update(punishments)
+              .set({ isActive: input.isActive })
+              .where(eq(punishments.id, input.id))
+              .returning()
+          )[0];
+        case "wheel":
+          return (
+            await db
+              .update(wheels)
+              .set({ isActive: input.isActive })
+              .where(eq(wheels.id, input.id))
+              .returning()
+          )[0];
+      }
+    }),
+
+  createCatalogItem: adminQuery
+    .input(
+      z.object({
+        type: z.enum(["reward", "privilege", "punishment", "wheel"]),
+        houseId: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        createdBy: z.number(),
+        cost: z.number().int().min(0).optional(),
+        chayCost: z.number().int().min(0).optional(),
+        rarity: z.enum(["common", "rare", "epic", "legendary"]).optional(),
+        assignedTo: z.number().optional(),
+        options: z.string().optional(),
+        isActive: z.boolean().default(true),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      switch (input.type) {
+        case "reward":
+          return (
+            await db
+              .insert(rewards)
+              .values({
+                houseId: input.houseId,
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                cost: input.cost ?? 0,
+                rarity: input.rarity ?? "common",
+                isActive: input.isActive,
+                createdBy: input.createdBy,
+              })
+              .returning()
+          )[0];
+        case "privilege":
+          return (
+            await db
+              .insert(privileges)
+              .values({
+                houseId: input.houseId,
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                rarity: input.rarity ?? "common",
+                isActive: input.isActive,
+                createdBy: input.createdBy,
+              })
+              .returning()
+          )[0];
+        case "punishment":
+          return (
+            await db
+              .insert(punishments)
+              .values({
+                houseId: input.houseId,
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                chayCost: input.chayCost ?? 0,
+                isActive: input.isActive,
+                createdBy: input.createdBy,
+              })
+              .returning()
+          )[0];
+        case "wheel":
+          return (
+            await db
+              .insert(wheels)
+              .values({
+                houseId: input.houseId,
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                options:
+                  input.options?.trim() ||
+                  JSON.stringify([
+                    { label: "Option 1", weight: 1 },
+                    { label: "Option 2", weight: 1 },
+                  ]),
+                assignedTo: input.assignedTo ?? null,
+                isActive: input.isActive,
+                createdBy: input.createdBy,
+              })
+              .returning()
+          )[0];
+      }
+    }),
+
+  updateCatalogItem: adminQuery
+    .input(
+      z.object({
+        type: z.enum(["reward", "privilege", "punishment", "wheel"]),
+        id: z.number(),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        cost: z.number().int().min(0).optional(),
+        chayCost: z.number().int().min(0).optional(),
+        rarity: z.enum(["common", "rare", "epic", "legendary"]).optional(),
+        assignedTo: z.number().optional(),
+        options: z.string().optional(),
+        isActive: z.boolean(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      switch (input.type) {
+        case "reward":
+          return (
+            await db
+              .update(rewards)
+              .set({
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                cost: input.cost ?? 0,
+                rarity: input.rarity ?? "common",
+                isActive: input.isActive,
+              })
+              .where(eq(rewards.id, input.id))
+              .returning()
+          )[0];
+        case "privilege":
+          return (
+            await db
+              .update(privileges)
+              .set({
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                rarity: input.rarity ?? "common",
+                isActive: input.isActive,
+              })
+              .where(eq(privileges.id, input.id))
+              .returning()
+          )[0];
+        case "punishment":
+          return (
+            await db
+              .update(punishments)
+              .set({
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                chayCost: input.chayCost ?? 0,
+                isActive: input.isActive,
+              })
+              .where(eq(punishments.id, input.id))
+              .returning()
+          )[0];
+        case "wheel":
+          return (
+            await db
+              .update(wheels)
+              .set({
+                title: input.title.trim(),
+                description: input.description?.trim() || null,
+                options: input.options?.trim() || "[]",
+                assignedTo: input.assignedTo ?? null,
+                isActive: input.isActive,
+              })
+              .where(eq(wheels.id, input.id))
+              .returning()
+          )[0];
+      }
+    }),
+
+  deleteCatalogItem: adminQuery
+    .input(
+      z.object({
+        type: z.enum(["reward", "privilege", "punishment", "wheel"]),
+        id: z.number(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      switch (input.type) {
+        case "reward": {
+          const purchases = await db.query.rewardPurchases.findMany({
+            where: eq(rewardPurchases.rewardId, input.id),
+          });
+          const purchaseIds = purchases.map((purchase) => purchase.id);
+          if (purchaseIds.length > 0) {
+            await db
+              .delete(rewardGiftDetails)
+              .where(inArray(rewardGiftDetails.purchaseId, purchaseIds));
+            await db
+              .delete(rewardPurchases)
+              .where(inArray(rewardPurchases.id, purchaseIds));
+          }
+          await db.delete(rewards).where(eq(rewards.id, input.id));
+          break;
+        }
+        case "privilege":
+          await db
+            .delete(privilegeAssignments)
+            .where(eq(privilegeAssignments.privilegeId, input.id));
+          await db.delete(privileges).where(eq(privileges.id, input.id));
+          break;
+        case "punishment":
+          await db
+            .delete(punishmentAssignments)
+            .where(eq(punishmentAssignments.punishmentId, input.id));
+          await db.delete(punishments).where(eq(punishments.id, input.id));
+          break;
+        case "wheel":
+          await db.delete(wheelSpins).where(eq(wheelSpins.wheelId, input.id));
+          await db.delete(wheels).where(eq(wheels.id, input.id));
+          break;
+      }
+      return { success: true };
+    }),
+
+  createRewardPurchase: adminQuery
+    .input(
+      z.object({
+        rewardId: z.number(),
+        memberId: z.number(),
+        giftedBy: z.number().optional(),
+        status: z.enum(["active", "used", "expired"]).default("active"),
+        giftMessage: z.string().optional(),
+        giftReason: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [purchase] = await db
+        .insert(rewardPurchases)
+        .values({
+          rewardId: input.rewardId,
+          memberId: input.memberId,
+          giftedBy: input.giftedBy ?? null,
+          status: input.status,
+        })
+        .returning();
+      if (input.giftMessage || input.giftReason) {
+        await db.insert(rewardGiftDetails).values({
+          purchaseId: purchase.id,
+          giftMessage: input.giftMessage?.trim() || null,
+          giftReason: input.giftReason?.trim() || null,
+        });
+      }
+      return purchase;
+    }),
+
+  createPrivilegeAssignment: adminQuery
+    .input(
+      z.object({
+        privilegeId: z.number(),
+        memberId: z.number(),
+        assignedBy: z.number(),
+        status: z.enum(["active", "used", "expired"]).default("active"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [assignment] = await db
+        .insert(privilegeAssignments)
+        .values(input)
+        .returning();
+      return assignment;
+    }),
+
+  createPunishmentAssignment: adminQuery
+    .input(
+      z.object({
+        punishmentId: z.number(),
+        memberId: z.number(),
+        assignedBy: z.number(),
+        status: z.enum(["active", "redeemed", "forgiven"]).default("active"),
+        checklist: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [assignment] = await db
+        .insert(punishmentAssignments)
+        .values({
+          punishmentId: input.punishmentId,
+          memberId: input.memberId,
+          assignedBy: input.assignedBy,
+          status: input.status,
+          checklist: input.checklist?.trim() || null,
+          redeemedAt: input.status === "redeemed" ? new Date() : null,
+        })
+        .returning();
+      return assignment;
+    }),
+
+  updateRewardPurchaseStatus: adminQuery
+    .input(
+      z.object({
+        purchaseId: z.number(),
+        status: z.enum(["active", "used", "expired"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [purchase] = await db
+        .update(rewardPurchases)
+        .set({ status: input.status })
+        .where(eq(rewardPurchases.id, input.purchaseId))
+        .returning();
+      return purchase;
+    }),
+
+  updatePrivilegeAssignmentStatus: adminQuery
+    .input(
+      z.object({
+        assignmentId: z.number(),
+        status: z.enum(["active", "used", "expired"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [assignment] = await db
+        .update(privilegeAssignments)
+        .set({ status: input.status })
+        .where(eq(privilegeAssignments.id, input.assignmentId))
+        .returning();
+      return assignment;
+    }),
+
+  updatePunishmentAssignmentStatus: adminQuery
+    .input(
+      z.object({
+        assignmentId: z.number(),
+        status: z.enum(["active", "redeemed", "forgiven"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [assignment] = await db
+        .update(punishmentAssignments)
+        .set({
+          status: input.status,
+          redeemedAt: input.status === "redeemed" ? new Date() : null,
+        })
+        .where(eq(punishmentAssignments.id, input.assignmentId))
+        .returning();
+      return assignment;
+    }),
+
+  updateAgreementStatus: adminQuery
+    .input(
+      z.object({
+        agreementId: z.number(),
+        status: z.enum(["pending", "active", "void"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [agreement] = await db
+        .update(agreements)
+        .set({ status: input.status })
+        .where(eq(agreements.id, input.agreementId))
+        .returning();
+      return agreement;
+    }),
+
+  createNote: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        memberId: z.number(),
+        title: z.string().min(1).max(255),
+        content: z.string().optional(),
+        visibility: z.enum(["public", "private"]).default("private"),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [note] = await db
+        .insert(notes)
+        .values({
+          houseId: input.houseId,
+          memberId: input.memberId,
+          title: input.title.trim(),
+          content: input.content?.trim() || null,
+          visibility: input.visibility,
+        })
+        .returning();
+      return note;
+    }),
+
+  updateNote: adminQuery
+    .input(
+      z.object({
+        noteId: z.number(),
+        title: z.string().min(1).max(255),
+        content: z.string().optional(),
+        visibility: z.enum(["public", "private"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [note] = await db
+        .update(notes)
+        .set({
+          title: input.title.trim(),
+          content: input.content?.trim() || null,
+          visibility: input.visibility,
+        })
+        .where(eq(notes.id, input.noteId))
+        .returning();
+      return note;
+    }),
+
+  deleteOperationRecord: adminQuery
+    .input(
+      z.object({
+        type: z.enum([
+          "taskSubmission",
+          "rewardPurchase",
+          "privilegeAssignment",
+          "punishmentAssignment",
+          "wheelSpin",
+          "note",
+          "notification",
+          "log",
+        ]),
+        id: z.number(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      switch (input.type) {
+        case "taskSubmission":
+          await db.delete(taskSubmissions).where(eq(taskSubmissions.id, input.id));
+          break;
+        case "rewardPurchase":
+          await db
+            .delete(rewardGiftDetails)
+            .where(eq(rewardGiftDetails.purchaseId, input.id));
+          await db
+            .delete(rewardPurchases)
+            .where(eq(rewardPurchases.id, input.id));
+          break;
+        case "privilegeAssignment":
+          await db
+            .delete(privilegeAssignments)
+            .where(eq(privilegeAssignments.id, input.id));
+          break;
+        case "punishmentAssignment":
+          await db
+            .delete(punishmentAssignments)
+            .where(eq(punishmentAssignments.id, input.id));
+          break;
+        case "wheelSpin":
+          await db.delete(wheelSpins).where(eq(wheelSpins.id, input.id));
+          break;
+        case "note":
+          await db.delete(notes).where(eq(notes.id, input.id));
+          break;
+        case "notification":
+          await db.delete(notifications).where(eq(notifications.id, input.id));
+          break;
+        case "log":
+          await db.delete(logs).where(eq(logs.id, input.id));
+          break;
+      }
       return { success: true };
     }),
 

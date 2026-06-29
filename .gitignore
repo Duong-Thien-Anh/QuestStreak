@@ -53,6 +53,8 @@ structure.md
 checkpoint-template.md
 Require2.md
 render-log.md
-
+checkpoint.md
+auth-audit.md
+auth-design.md
 
 

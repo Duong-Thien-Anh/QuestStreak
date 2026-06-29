@@ -16,19 +16,26 @@ import * as schema from "./schema";
 
 type Schema = typeof schema;
 
-const DATABASE_URL = process.env.DATABASE_URL;
-if (!DATABASE_URL) {
-  throw new Error("DATABASE_URL environment variable is required");
+function resolveDatabaseUrl(): string {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+  if (process.env.NODE_ENV === "production" && process.env.DATABASE_URL_PROD) {
+    return process.env.DATABASE_URL_PROD;
+  }
+  if (process.env.DATABASE_URL_LOCAL) return process.env.DATABASE_URL_LOCAL;
+  if (process.env.DATABASE_URL_PROD) return process.env.DATABASE_URL_PROD;
+  throw new Error("DATABASE_URL, DATABASE_URL_LOCAL, or DATABASE_URL_PROD environment variable is required");
 }
+
+const DATABASE_URL = resolveDatabaseUrl();
 
 function createDb(): PostgresJsDatabase<Schema> {
   if (process.env.NODE_ENV === "production") {
     // Production: Neon serverless (HTTP-based, no persistent connection)
-    const sql = neon(DATABASE_URL!);
+    const sql = neon(DATABASE_URL);
     return drizzleNeon(sql, { schema }) as unknown as PostgresJsDatabase<Schema>;
   } else {
     // Development: standard postgres driver → local PostgreSQL via Docker
-    const client = postgresJs(DATABASE_URL!);
+    const client = postgresJs(DATABASE_URL);
     return drizzlePostgres(client, { schema });
   }
 }

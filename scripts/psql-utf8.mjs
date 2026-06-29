@@ -1,13 +1,7 @@
-import "dotenv/config";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 import { spawn } from "node:child_process";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not configured.");
-}
-
-const child = spawn("psql", [databaseUrl], {
+const child = spawn("psql", [resolveDatabaseUrl()], {
   stdio: "inherit",
   shell: true,
   env: {

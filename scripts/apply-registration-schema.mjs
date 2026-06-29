@@ -1,7 +1,8 @@
 // Run: node --env-file=.env scripts/apply-registration-schema.mjs
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 import postgres from "postgres";
 
-const sql = postgres(process.env.DATABASE_URL);
+const sql = postgres(resolveDatabaseUrl());
 
 await sql.begin(async (tx) => {
   // Add username/phone to userCredentials

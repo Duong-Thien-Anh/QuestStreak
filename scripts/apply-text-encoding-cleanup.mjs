@@ -1,13 +1,7 @@
-import "dotenv/config";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 import postgres from "postgres";
 
-const databaseUrl = process.env.DATABASE_URL;
-
-if (!databaseUrl) {
-  throw new Error("DATABASE_URL is not configured.");
-}
-
-const sql = postgres(databaseUrl, { max: 1 });
+const sql = postgres(resolveDatabaseUrl(), { max: 1 });
 
 const replacements = [
   ["Thoa thuan co ban", "Thỏa thuận cơ bản"],

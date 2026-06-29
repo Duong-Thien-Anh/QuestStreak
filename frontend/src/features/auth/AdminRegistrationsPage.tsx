@@ -6,6 +6,7 @@ import {
   Flame,
   Gift,
   Home,
+  LogOut,
   Plus,
   Settings,
   ShieldCheck,
@@ -366,6 +367,12 @@ export default function AdminRegistrationsPage() {
       await utils.admin.listOperations.invalidate();
     },
   });
+  const logoutMutation = trpc.auth.logout.useMutation({
+    onSuccess: () => {
+      utils.auth.me.invalidate();
+      window.location.assign("/login");
+    },
+  });
 
   function resetMemberForm() {
     setMemberRoomId("");
@@ -681,21 +688,34 @@ export default function AdminRegistrationsPage() {
               diện này tách riêng khỏi member dashboard và chỉ mở cho role admin.
             </p>
           </div>
-          <Button
-            type="button"
-            variant="outline"
-            className="border-white/15 bg-white/5 text-white hover:bg-white/10"
-            onClick={() => window.location.assign("/")}
-          >
-            Về app dashboard
-          </Button>
+          <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              className="border-white/15 bg-white/5 text-white hover:bg-white/10"
+              onClick={() => window.location.assign("/")}
+            >
+              Về app dashboard
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
+              disabled={logoutMutation.isPending}
+              onClick={() => logoutMutation.mutate()}
+            >
+              <LogOut className="h-4 w-4" />
+              Logout
+            </Button>
+          </div>
         </header>
 
         <Tabs
           value={activeSection}
           onValueChange={(value) => setActiveSection(value as AdminSection)}
         >
-          <TabsList className="grid h-auto w-full grid-cols-2 bg-white/10 text-white/60 md:w-fit md:grid-cols-5">
+          <div className="overflow-x-auto">
+          <TabsList className="inline-flex h-auto min-w-max bg-white/10 text-white/60">
             {sectionTabs.map((tab) => {
               const Icon = tab.icon;
               return (
@@ -710,6 +730,7 @@ export default function AdminRegistrationsPage() {
               );
             })}
           </TabsList>
+          </div>
         </Tabs>
 
         {isLoading ? (
@@ -969,7 +990,7 @@ export default function AdminRegistrationsPage() {
                     </div>
 
                     {isEditing ? (
-                      <div className="mt-4 grid gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 md:grid-cols-[1fr_1fr_auto_auto]">
+                      <div className="mt-4 grid gap-2 rounded-lg border border-white/10 bg-white/[0.03] p-3 lg:grid-cols-[1fr_1fr_auto_auto]">
                         <Input
                           value={roomEditName}
                           onChange={(event) => setRoomEditName(event.target.value)}
@@ -1136,8 +1157,8 @@ export default function AdminRegistrationsPage() {
               </div>
             </aside>
 
-            <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
-              <Table>
+            <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+              <Table className="min-w-[1100px]">
                 <TableHeader>
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead className="text-white/60">Account</TableHead>
@@ -1264,7 +1285,8 @@ export default function AdminRegistrationsPage() {
                   setActiveOperationSection(value as OperationSection)
                 }
               >
-                <TabsList className="mt-4 grid h-auto w-full grid-cols-2 bg-white/10 text-white/60 lg:grid-cols-6">
+                <div className="mt-4 overflow-x-auto">
+                <TabsList className="inline-flex h-auto min-w-max bg-white/10 text-white/60">
                   {operationTabs.map((tab) => {
                     const Icon = tab.icon;
                     return (
@@ -1279,6 +1301,7 @@ export default function AdminRegistrationsPage() {
                     );
                   })}
                 </TabsList>
+                </div>
               </Tabs>
             </div>
 
@@ -1332,8 +1355,8 @@ export default function AdminRegistrationsPage() {
                     </Button>
                   </div>
                 </div>
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                  <Table className="min-w-[1000px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Task</TableHead>
@@ -1433,36 +1456,7 @@ export default function AdminRegistrationsPage() {
                   </Table>
                 </div>
 
-                <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
-                  <h3 className="font-semibold text-white">Assign privilege</h3>
-                  <div className="mt-4 grid gap-3 md:grid-cols-5">
-                    <select id="admin-privilege-assignment-privilege" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
-                      {operations.privileges.map((privilege) => (
-                        <option key={privilege.id} value={privilege.id}>{privilege.title}</option>
-                      ))}
-                    </select>
-                    <select id="admin-privilege-assignment-member" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
-                      {memberOptions.map((member) => (
-                        <option key={member.id} value={member.id}>{member.label}</option>
-                      ))}
-                    </select>
-                    <select id="admin-privilege-assignment-by" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
-                      {memberOptions.map((member) => (
-                        <option key={member.id} value={member.id}>{member.label}</option>
-                      ))}
-                    </select>
-                    <select id="admin-privilege-assignment-status" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
-                      <option value="active">active</option>
-                      <option value="used">used</option>
-                      <option value="expired">expired</option>
-                    </select>
-                    <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreatePrivilegeAssignment}>
-                      Assign
-                    </Button>
-                  </div>
-                </div>
-
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -1505,80 +1499,13 @@ export default function AdminRegistrationsPage() {
                               <option value="rejected">rejected</option>
                             </select>
                           </TableCell>
-                          <TableCell className="text-right">
+                          <TableCell className="text-right whitespace-nowrap">
                             <Button
                               type="button"
                               size="sm"
                               variant="destructive"
                               onClick={() =>
-                                deleteOperationRecord(
-                                  "taskSubmission",
-                                  submission.id,
-                                )
-                              }
-                            >
-                              Xóa
-                            </Button>
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                    </TableBody>
-                  </Table>
-                </div>
-
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
-                    <TableHeader>
-                      <TableRow className="border-white/10 hover:bg-transparent">
-                        <TableHead className="text-white/60">Privilege</TableHead>
-                        <TableHead className="text-white/60">Member</TableHead>
-                        <TableHead className="text-white/60">Status</TableHead>
-                        <TableHead className="text-right text-white/60">Actions</TableHead>
-                      </TableRow>
-                    </TableHeader>
-                    <TableBody>
-                      {operations.privilegeAssignments.map((assignment) => (
-                        <TableRow key={assignment.id} className="border-white/10">
-                          <TableCell>
-                            <p className="font-medium text-white">
-                              {assignment.privilegeTitle}
-                            </p>
-                            <p className="mt-1 text-xs text-white/45">
-                              Assigned by {assignment.assignedByName ?? "-"}
-                            </p>
-                          </TableCell>
-                          <TableCell className="text-white/65">
-                            {assignment.memberName}
-                          </TableCell>
-                          <TableCell>
-                            <select
-                              value={assignment.status}
-                              onChange={(event) =>
-                                updatePrivilegeAssignmentStatusMutation.mutate({
-                                  assignmentId: assignment.id,
-                                  status: event.target.value as
-                                    | "active"
-                                    | "used"
-                                    | "expired",
-                                })
-                              }
-                              className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
-                            >
-                              <option value="active">active</option>
-                              <option value="used">used</option>
-                              <option value="expired">expired</option>
-                            </select>
-                          </TableCell>
-                          <TableCell className="text-right">
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="destructive"
-                              onClick={() =>
-                                deleteOperationRecord(
-                                  "privilegeAssignment",
-                                  assignment.id,
-                                )
+                                deleteOperationRecord("taskSubmission", submission.id)
                               }
                             >
                               Xóa
@@ -1742,7 +1669,7 @@ export default function AdminRegistrationsPage() {
                   ))}
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -1803,13 +1730,103 @@ export default function AdminRegistrationsPage() {
                     </TableBody>
                   </Table>
                 </div>
+
+                <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                  <h3 className="font-semibold text-white">Assign privilege</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-5">
+                    <select id="admin-privilege-assignment-privilege" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                      {operations.privileges.map((privilege) => (
+                        <option key={privilege.id} value={privilege.id}>{privilege.title}</option>
+                      ))}
+                    </select>
+                    <select id="admin-privilege-assignment-member" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                      {memberOptions.map((member) => (
+                        <option key={member.id} value={member.id}>{member.label}</option>
+                      ))}
+                    </select>
+                    <select id="admin-privilege-assignment-by" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                      {memberOptions.map((member) => (
+                        <option key={member.id} value={member.id}>{member.label}</option>
+                      ))}
+                    </select>
+                    <select id="admin-privilege-assignment-status" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                      <option value="active">active</option>
+                      <option value="used">used</option>
+                      <option value="expired">expired</option>
+                    </select>
+                    <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreatePrivilegeAssignment}>
+                      Assign
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                  <Table>
+                    <TableHeader>
+                      <TableRow className="border-white/10 hover:bg-transparent">
+                        <TableHead className="text-white/60">Privilege</TableHead>
+                        <TableHead className="text-white/60">Member</TableHead>
+                        <TableHead className="text-white/60">Status</TableHead>
+                        <TableHead className="text-right text-white/60">Actions</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {operations.privilegeAssignments.map((assignment) => (
+                        <TableRow key={assignment.id} className="border-white/10">
+                          <TableCell>
+                            <p className="font-medium text-white">
+                              {assignment.privilegeTitle}
+                            </p>
+                            <p className="mt-1 text-xs text-white/45">
+                              Assigned by {assignment.assignedByName ?? "-"}
+                            </p>
+                          </TableCell>
+                          <TableCell className="text-white/65">
+                            {assignment.memberName}
+                          </TableCell>
+                          <TableCell>
+                            <select
+                              value={assignment.status}
+                              onChange={(event) =>
+                                updatePrivilegeAssignmentStatusMutation.mutate({
+                                  assignmentId: assignment.id,
+                                  status: event.target.value as
+                                    | "active"
+                                    | "used"
+                                    | "expired",
+                                })
+                              }
+                              className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
+                            >
+                              <option value="active">active</option>
+                              <option value="used">used</option>
+                              <option value="expired">expired</option>
+                            </select>
+                          </TableCell>
+                          <TableCell className="text-right whitespace-nowrap">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              onClick={() =>
+                                deleteOperationRecord("privilegeAssignment", assignment.id)
+                              }
+                            >
+                              Xóa
+                            </Button>
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
+                </div>
               </div>
             ) : null}
 
             {operations && activeOperationSection === "wallet" ? (
               <div className="grid gap-4 xl:grid-cols-2">
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                  <Table className="min-w-[850px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Member</TableHead>
@@ -1874,7 +1891,7 @@ export default function AdminRegistrationsPage() {
                   </Table>
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -2059,8 +2076,8 @@ export default function AdminRegistrationsPage() {
                     </div>
                   ))}
                 </div>
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                  <Table className="min-w-[850px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Assignment</TableHead>
@@ -2142,7 +2159,7 @@ export default function AdminRegistrationsPage() {
                   </div>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -2203,7 +2220,7 @@ export default function AdminRegistrationsPage() {
                   </Table>
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -2338,7 +2355,7 @@ export default function AdminRegistrationsPage() {
                   ))}
                 </div>
 
-                <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+                <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table>
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
@@ -2419,7 +2436,7 @@ export default function AdminRegistrationsPage() {
             ) : null}
 
             {!registrationsQuery.isLoading && registrations.length > 0 ? (
-              <div className="overflow-hidden rounded-lg border border-white/10 bg-[#11141D]">
+              <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                 <Table>
                   <TableHeader>
                     <TableRow className="border-white/10 hover:bg-transparent">

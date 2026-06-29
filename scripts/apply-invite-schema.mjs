@@ -1,12 +1,7 @@
-import "dotenv/config";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 import postgres from "postgres";
 
-const connectionString = process.env.DATABASE_URL;
-if (!connectionString) {
-  throw new Error("DATABASE_URL is required");
-}
-
-const sql = postgres(connectionString);
+const sql = postgres(resolveDatabaseUrl());
 
 try {
   await sql`

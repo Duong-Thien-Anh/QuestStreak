@@ -2,15 +2,10 @@ import "dotenv/config";
 import { randomBytes, scrypt as scryptCallback } from "node:crypto";
 import { promisify } from "node:util";
 import postgres from "postgres";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_HASH_PREFIX = "scrypt";
-
-function required(name) {
-  const value = process.env[name];
-  if (!value) throw new Error(`${name} is required`);
-  return value;
-}
 
 async function hashPassword(password) {
   const salt = randomBytes(16).toString("hex");
@@ -18,7 +13,7 @@ async function hashPassword(password) {
   return `${PASSWORD_HASH_PREFIX}$${salt}$${Buffer.from(key).toString("hex")}`;
 }
 
-const databaseUrl = required("DATABASE_URL");
+const databaseUrl = resolveDatabaseUrl();
 const adminEmail = (process.env.ADMIN_EMAIL || "admin@example.com").trim().toLowerCase();
 const adminPassword = process.env.ADMIN_PASSWORD || "Admin@123456";
 const adminName = process.env.ADMIN_NAME || "Root Admin";

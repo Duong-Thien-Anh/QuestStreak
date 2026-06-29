@@ -1,7 +1,8 @@
 import "dotenv/config";
 import postgres from "postgres";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 
-const sql = postgres(process.env.DATABASE_URL, { max: 1 });
+const sql = postgres(resolveDatabaseUrl(), { max: 1 });
 
 try {
   await sql.begin(async (tx) => {

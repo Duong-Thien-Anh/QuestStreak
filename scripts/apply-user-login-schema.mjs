@@ -2,6 +2,7 @@ import "dotenv/config";
 import { randomBytes, scrypt as scryptCallback } from "node:crypto";
 import { promisify } from "node:util";
 import postgres from "postgres";
+import { resolveDatabaseUrl } from "./_db-url.mjs";
 
 const scrypt = promisify(scryptCallback);
 
@@ -17,7 +18,7 @@ async function hashPassword(password) {
   return `scrypt$${salt}$${Buffer.from(key).toString("hex")}`;
 }
 
-const databaseUrl = required("DATABASE_URL");
+const databaseUrl = resolveDatabaseUrl();
 const adminEmail = (process.env.LOGIN_ADMIN_EMAIL || "local@example.test").trim().toLowerCase();
 const adminPassword = process.env.LOGIN_ADMIN_PASSWORD || "Password123!";
 const adminName = process.env.LOGIN_ADMIN_NAME || "Local Admin";

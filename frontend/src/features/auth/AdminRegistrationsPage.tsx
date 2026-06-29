@@ -1457,7 +1457,7 @@ export default function AdminRegistrationsPage() {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                  <Table className="min-w-[900px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Submission</TableHead>
@@ -1670,7 +1670,7 @@ export default function AdminRegistrationsPage() {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                  <Table className="min-w-[900px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Purchase/Gift</TableHead>
@@ -1761,7 +1761,7 @@ export default function AdminRegistrationsPage() {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                  <Table className="min-w-[700px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Privilege</TableHead>
@@ -2160,7 +2160,7 @@ export default function AdminRegistrationsPage() {
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                  <Table className="min-w-[900px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Note</TableHead>
@@ -2221,7 +2221,7 @@ export default function AdminRegistrationsPage() {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table>
+                  <Table className="min-w-[700px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Agreement</TableHead>

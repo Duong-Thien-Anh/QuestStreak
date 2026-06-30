@@ -59,6 +59,7 @@ export const taskRouter = createRouter({
         chayPenalty: z.number().min(0).default(0),
         bonusXp: z.number().min(0).default(0),
         startDate: z.string().optional(),
+        recurringDays: z.array(z.number().min(0).max(31)).optional(),
         dueDate: z.string().optional(),
         assignedTo: z.number().optional(),
         linkedRewardId: z.number().optional(),
@@ -83,6 +84,7 @@ export const taskRouter = createRouter({
           chayPenalty: input.chayPenalty,
           bonusXp: input.bonusXp,
           startDate: input.startDate ? new Date(input.startDate) : null,
+          recurringDays: input.recurringDays ? JSON.stringify(input.recurringDays) : null,
           dueDate: input.dueDate ? new Date(input.dueDate) : null,
           assignedTo: input.assignedTo || null,
           status: input.assignedTo ? "active" : "pending",
@@ -129,6 +131,7 @@ export const taskRouter = createRouter({
         linkedAchievementId: z.number().nullable().optional(),
         linkedPunishmentId: z.number().nullable().optional(),
         startDate: z.string().optional(),
+        recurringDays: z.array(z.number().min(0).max(31)).nullable().optional(),
         dueDate: z.string().optional(),
         isActive: z.boolean().optional(),
       })
@@ -145,6 +148,8 @@ export const taskRouter = createRouter({
       if (input.linkedAchievementId !== undefined) updateData.linkedAchievementId = input.linkedAchievementId;
       if (input.linkedPunishmentId !== undefined) updateData.linkedPunishmentId = input.linkedPunishmentId;
       if (input.startDate !== undefined) updateData.startDate = input.startDate ? new Date(input.startDate) : null;
+      if (input.recurringDays !== undefined)
+        updateData.recurringDays = input.recurringDays ? JSON.stringify(input.recurringDays) : null;
       if (input.dueDate !== undefined) updateData.dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
       await db.update(tasks).set(updateData).where(eq(tasks.id, input.taskId));

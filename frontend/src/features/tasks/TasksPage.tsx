@@ -42,6 +42,7 @@ export function TasksPage() {
   const [dueDate, setDueDate] = useState("");
   const [startDate, setStartDate] = useState("");
   const [scheduleMode, setScheduleMode] = useState<"frequency" | "custom">("frequency");
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [chymReward, setChymReward] = useState(0);
   const [chayPenalty, setChayPenalty] = useState(0);
   const [bonusXp, setBonusXp] = useState(0);
@@ -68,6 +69,7 @@ export function TasksPage() {
     title: string;
     description: string;
     category: string;
+    recurringDays?: string | null;
     dueDate: Date | string | null;
     chymReward: number;
     chayPenalty: number;
@@ -244,7 +246,11 @@ export function TasksPage() {
                 title,
                 description: description || "",
                 category: taskType === "regular" ? frequency : taskType,
-                dueDate: dueDate || null,
+                recurringDays:
+                  scheduleMode === "frequency" && recurringDays.length > 0
+                    ? JSON.stringify(recurringDays)
+                    : null,
+                dueDate: taskType !== "regular" || scheduleMode === "custom" ? dueDate || null : null,
                 chymReward,
                 chayPenalty,
                 bonusXp,
@@ -266,8 +272,15 @@ export function TasksPage() {
         title,
         description: description || undefined,
         category: taskType === "regular" ? (scheduleMode === "custom" ? "special" : frequency) : taskType,
-        dueDate: dueDate || undefined,
+        dueDate:
+          scheduleMode === "custom" || taskType !== "regular"
+            ? dueDate || undefined
+            : undefined,
         startDate: (scheduleMode === "custom" || taskType !== "regular") ? (startDate || undefined) : undefined,
+        recurringDays:
+          scheduleMode === "frequency" && recurringDays.length > 0
+            ? recurringDays
+            : undefined,
         chymReward,
         chayPenalty,
         bonusXp,
@@ -287,7 +300,11 @@ export function TasksPage() {
       title,
       description: description || "",
       category: frequency as "daily" | "weekly" | "monthly" | "special" | "superSpecial",
-      dueDate: dueDate || null,
+      recurringDays:
+        scheduleMode === "frequency" && recurringDays.length > 0
+          ? JSON.stringify(recurringDays)
+          : null,
+      dueDate: taskType !== "regular" || scheduleMode === "custom" ? dueDate || null : null,
       chymReward,
       chayPenalty,
       bonusXp,
@@ -310,6 +327,7 @@ export function TasksPage() {
     setDueDate("");
     setStartDate("");
     setScheduleMode("frequency");
+    setRecurringDays([]);
     setChymReward(0);
     setChayPenalty(0);
     setBonusXp(0);
@@ -329,6 +347,7 @@ export function TasksPage() {
     setStartDate((task as TaskItem & { startDate?: Date | string | null }).startDate
       ? new Date((task as TaskItem & { startDate?: Date | string | null }).startDate!).toISOString().slice(0, 10)
       : "");
+    setRecurringDays(task.recurringDays ? (JSON.parse(task.recurringDays) as number[]) : []);
     setScheduleMode("frequency");
     setChymReward(task.chymReward);
     setChayPenalty(task.chayPenalty);
@@ -1229,20 +1248,83 @@ export function TasksPage() {
                 ))}
               </div>
               {scheduleMode === "frequency" ? (
-                <div className="flex gap-2">
-                  {(["daily", "weekly", "monthly"] as const).map((f) => (
-                    <button
-                      key={f}
-                      onClick={() => setFrequency(f)}
-                      className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
-                        frequency === f
-                          ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
-                          : "border-white/10 text-white/40"
-                      }`}
-                    >
-                      {f === "daily" ? "Hàng ngày" : f === "weekly" ? "Hàng tuần" : "Hàng tháng"}
-                    </button>
-                  ))}
+                <div className="space-y-3">
+                  <div className="flex gap-2">
+                    {(["daily", "weekly", "monthly"] as const).map((f) => (
+                      <button
+                        key={f}
+                        onClick={() => {
+                          setFrequency(f);
+                          setRecurringDays([]);
+                        }}
+                        className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                          frequency === f
+                            ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
+                            : "border-white/10 text-white/40"
+                        }`}
+                      >
+                        {f === "daily" ? "Hàng ngày" : f === "weekly" ? "Hàng tuần" : "Hàng tháng"}
+                      </button>
+                    ))}
+                  </div>
+                  {frequency === "monthly" ? (
+                    <div>
+                      <label className="text-xs text-white/50 mb-2 block">Ngày trong tháng</label>
+                      <input
+                        type="number"
+                        min={1}
+                        max={31}
+                        placeholder="Ngày trong tháng (1-31)"
+                        value={recurringDays[0] ?? ""}
+                        onChange={(e) =>
+                          setRecurringDays(e.target.value ? [Number(e.target.value)] : [])
+                        }
+                        className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="text-xs text-white/50 mb-2 block">Ngày lặp trong tuần</label>
+                      <div className="flex gap-2 flex-wrap">
+                        {[
+                          { label: "T2", value: 1 },
+                          { label: "T3", value: 2 },
+                          { label: "T4", value: 3 },
+                          { label: "T5", value: 4 },
+                          { label: "T6", value: 5 },
+                          { label: "T7", value: 6 },
+                          { label: "CN", value: 0 },
+                        ].map((day) => {
+                          const selected = recurringDays.includes(day.value);
+                          return (
+                            <button
+                              key={day.value}
+                              type="button"
+                              onClick={() =>
+                                setRecurringDays((prev) =>
+                                  selected
+                                    ? prev.filter((d) => d !== day.value)
+                                    : frequency === "weekly"
+                                    ? [day.value]
+                                    : [...prev, day.value]
+                                )
+                              }
+                              className={`w-10 h-10 rounded-xl border text-xs font-semibold transition-all ${
+                                selected
+                                  ? "border-[#FF2A85] bg-[#FF2A85]/15 text-[#FF2A85]"
+                                  : "border-white/10 text-white/40 hover:border-white/20"
+                              }`}
+                            >
+                              {day.label}
+                            </button>
+                          );
+                        })}
+                      </div>
+                      {frequency === "weekly" && (
+                        <p className="mt-2 text-xs text-white/35">Chọn 1 ngày trong tuần</p>
+                      )}
+                    </div>
+                  )}
                 </div>
               ) : (
                 <div className="grid grid-cols-2 gap-3">
@@ -1300,51 +1382,39 @@ export function TasksPage() {
             />
           </div>
 
-          {/* Due date chỉ cho special/superSpecial hoặc frequency mode */}
-          {(taskType !== "regular" || scheduleMode === "frequency") && (
+          {/* Due date chỉ cho special/superSpecial */}
+          {taskType !== "regular" && (
             <div>
               <label className="text-xs text-white/50 mb-2 block">
-                {taskType !== "regular" ? "Thời gian thực hiện" : "Ngày thực hiện"}
+                Thời gian thực hiện
               </label>
-              {taskType !== "regular" ? (
-                <div className="grid grid-cols-2 gap-3">
-                  <div>
-                    <label className="text-xs text-white/40 mb-1 block">Ngày bắt đầu</label>
-                    <div className="relative">
-                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
-                      <input
-                        type="date"
-                        value={startDate}
-                        onChange={(e) => setStartDate(e.target.value)}
-                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
-                      />
-                    </div>
-                  </div>
-                  <div>
-                    <label className="text-xs text-white/40 mb-1 block">Ngày kết thúc</label>
-                    <div className="relative">
-                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
-                      <input
-                        type="date"
-                        value={dueDate}
-                        onChange={(e) => setDueDate(e.target.value)}
-                        min={startDate || undefined}
-                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
-                      />
-                    </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Ngày bắt đầu</label>
+                  <div className="relative">
+                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                    <input
+                      type="date"
+                      value={startDate}
+                      onChange={(e) => setStartDate(e.target.value)}
+                      className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                    />
                   </div>
                 </div>
-              ) : (
-                <div className="relative">
-                  <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-                  <input
-                    type="date"
-                    value={dueDate}
-                    onChange={(e) => setDueDate(e.target.value)}
-                    className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
-                  />
+                <div>
+                  <label className="text-xs text-white/40 mb-1 block">Ngày kết thúc</label>
+                  <div className="relative">
+                    <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                    <input
+                      type="date"
+                      value={dueDate}
+                      onChange={(e) => setDueDate(e.target.value)}
+                      min={startDate || undefined}
+                      className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
           )}
 

@@ -368,6 +368,7 @@ export const tasks = pgTable("tasks", {
   assignedTo: bigint("assignedTo", { mode: "number" }),
   status: taskStatusEnum("status").default("pending").notNull(),
   startDate: timestamp("startDate"),
+  recurringDays: text("recurringDays"),
   dueDate: timestamp("dueDate"),
   completedAt: timestamp("completedAt"),
   createdBy: bigint("createdBy", { mode: "number" }).notNull(),

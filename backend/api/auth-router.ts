@@ -214,7 +214,8 @@ export const authRouter = createRouter({
       try {
         credential = await findCredential();
       } catch (error) {
-        if (!hasPostgresCode(error, "42P01")) throw error;
+        // 42P01 = table does not exist, 42703 = column does not exist (missing username/phone)
+        if (!hasPostgresCode(error, "42P01") && !hasPostgresCode(error, "42703")) throw error;
         await ensureUserCredentialsSchema();
         try {
           credential = await findCredential();

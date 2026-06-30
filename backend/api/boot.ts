@@ -12,6 +12,17 @@ import { createDemoAuthHandler } from "./demo-auth";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
+function getPublicOrigin(req: Request) {
+  const forwardedProto = req.headers.get("x-forwarded-proto");
+  const forwardedHost = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
+
+  if (forwardedProto && forwardedHost) {
+    return `${forwardedProto.split(",")[0]}://${forwardedHost.split(",")[0]}`;
+  }
+
+  return new URL(req.url).origin;
+}
+
 app.get("/", (c) =>
   c.json({
     ok: true,
@@ -35,7 +46,7 @@ if (!env.isProduction) {
 }
 app.post("/api/auth/demo", createDemoAuthHandler());
 app.get("/api/panel", (c) => {
-  const trpcUrl = new URL("/api/trpc", c.req.url).toString();
+  const trpcUrl = new URL("/api/trpc", getPublicOrigin(c.req.raw)).toString();
   return c.html(
     renderTrpcPanel(appRouter, {
       url: trpcUrl,

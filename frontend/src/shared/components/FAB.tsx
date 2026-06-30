@@ -21,7 +21,7 @@ export function FAB({ actions }: FABProps) {
   if (!isAdmin) return null;
 
   return (
-    <div className="fixed bottom-20 right-4 z-40">
+    <div className="fixed bottom-[calc(5rem+env(safe-area-inset-bottom))] right-[max(1rem,env(safe-area-inset-right))] z-40 flex flex-col items-end">
       <AnimatePresence>
         {fabOpen && (
           <>
@@ -78,13 +78,14 @@ export function FAB({ actions }: FABProps) {
       <motion.button
         whileTap={{ scale: 0.9 }}
         onClick={() => setFabOpen(!fabOpen)}
-        className="w-14 h-14 rounded-full bg-[#FF2A85] flex items-center justify-center shadow-neon-pink"
+        className="relative flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-[#FF2A85] leading-none shadow-neon-pink"
       >
         <motion.div
           animate={{ rotate: fabOpen ? 45 : 0 }}
           transition={{ duration: 0.2 }}
+          className="flex items-center justify-center"
         >
-          <Plus className="w-6 h-6 text-white" />
+          <Plus className="block h-6 w-6 text-white" />
         </motion.div>
       </motion.button>
     </div>

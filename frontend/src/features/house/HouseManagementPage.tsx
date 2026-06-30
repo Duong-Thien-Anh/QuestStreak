@@ -588,10 +588,10 @@ export function HouseManagementPage() {
                 aria-label="Toggle room member approval"
               >
                 <span
-                  className={`absolute top-1 h-5 w-5 rounded-full bg-white transition-transform ${
+                  className={`absolute left-1 top-1 h-5 w-5 rounded-full bg-white transition-transform duration-200 ease-out will-change-transform ${
                     house.roomApprovalRequired
                       ? "translate-x-5"
-                      : "translate-x-1"
+                      : "translate-x-0"
                   }`}
                 />
               </button>

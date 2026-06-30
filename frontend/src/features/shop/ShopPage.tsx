@@ -48,6 +48,7 @@ export function ShopPage() {
   const [wallet, setWallet] = useState(mockMembers[1].wallet);
   const [actionSheet, setActionSheet] = useState<string | null>(null);
   const [selectedPrivilegeId, setSelectedPrivilegeId] = useState<number | null>(null);
+  const [selectedPrivilegeMemberId, setSelectedPrivilegeMemberId] = useState<number | null>(null);
   const [pointsInput, setPointsInput] = useState("10");
   const [reasonInput, setReasonInput] = useState("");
   const [editingRewardId, setEditingRewardId] = useState<number | null>(null);
@@ -142,6 +143,7 @@ export function ShopPage() {
   const visibleWallet = walletQuery.data ?? wallet;
   const purchasedCount = purchasesQuery.data?.length ?? 0;
   const selectedGiftMember = members.find((member) => member.id === selectedGiftMemberId);
+  const selectedPrivilegeMember = members.find((member) => member.id === selectedPrivilegeMemberId);
 
   const handlePurchase = (rewardId: number, cost: number) => {
     if (visibleWallet.chymBalance < cost) {
@@ -167,6 +169,35 @@ export function ShopPage() {
     setSelectedGiftMemberId(subMember?.id ?? members[0]?.id ?? null);
     setGiftMessage("");
     setGiftReason("");
+  };
+
+  const openPrivilegeAssignSheet = (privilegeId: number) => {
+    setSelectedPrivilegeId(privilegeId);
+    setSelectedPrivilegeMemberId(subMember?.id ?? members[0]?.id ?? null);
+    setActionSheet("privilege-assign");
+  };
+
+  const handleAssignPrivilege = () => {
+    if (!selectedPrivilegeId || !selectedPrivilegeMemberId) return;
+    if (!houseQuery.data) {
+      showToast("Gán privilege cần backend để lưu", "info");
+      return;
+    }
+    assignPrivilegeMutation.mutate(
+      {
+        privilegeId: selectedPrivilegeId,
+        memberId: selectedPrivilegeMemberId,
+      },
+      {
+        onSuccess: () => {
+          setSelectedPrivilegeId(null);
+          setSelectedPrivilegeMemberId(null);
+          setActionSheet(null);
+          showToast("Đã gán privilege!", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      },
+    );
   };
 
   const confirmGift = () => {
@@ -639,17 +670,11 @@ export function ShopPage() {
                 </p>
                 <button
                   onClick={() => {
-                    if (isAdmin && houseQuery.data && subMember?.id) {
-                      assignPrivilegeMutation.mutate({
-                        privilegeId: priv.id,
-                        memberId: subMember.id,
-                      });
-                      showToast("Đã gán privilege!", "success");
-                    } else if (!isAdmin) {
+                    if (isAdmin) {
+                      openPrivilegeAssignSheet(priv.id);
+                    } else {
                       setSelectedPrivilegeId(priv.id);
                       setActionSheet("privilege-view");
-                    } else {
-                      showToast("Gán privilege cần backend để lưu", "info");
                     }
                   }}
                   className={`mt-3 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -973,6 +998,55 @@ export function ShopPage() {
             >
               {rarityLabel[selectedPrivilege.rarity]}
             </span>
+          </div>
+        ) : null}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={actionSheet === "privilege-assign"}
+        onClose={() => {
+          setSelectedPrivilegeId(null);
+          setSelectedPrivilegeMemberId(null);
+          setActionSheet(null);
+        }}
+        title="Gán đặc quyền"
+      >
+        {selectedPrivilege ? (
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 rounded-xl border border-[#00F2FE]/20 bg-[#00F2FE]/5 p-3">
+              <img
+                src={selectedPrivilege.image || "/privileges/vip_pass.jpg"}
+                alt={selectedPrivilege.title}
+                className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
+              />
+              <div className="min-w-0">
+                <p className="truncate text-sm font-semibold text-white">{selectedPrivilege.title}</p>
+                <p className="text-xs text-white/40">
+                  Gán cho {selectedPrivilegeMember?.nickname ?? "thành viên"}
+                </p>
+              </div>
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Người nhận</label>
+              <select
+                value={selectedPrivilegeMemberId ?? ""}
+                onChange={(event) => setSelectedPrivilegeMemberId(Number(event.target.value))}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
+              >
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={handleAssignPrivilege}
+              disabled={assignPrivilegeMutation.isPending || !selectedPrivilegeMemberId}
+              className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 disabled:opacity-50 transition-colors"
+            >
+              {assignPrivilegeMutation.isPending ? "Đang gán..." : "Gán đặc quyền"}
+            </button>
           </div>
         ) : null}
       </BottomSheet>

@@ -72,6 +72,7 @@ export function PunishmentsPage() {
     chayCost: 1,
   });
   const [assignSheet, setAssignSheet] = useState<{ punishmentId: number; title: string } | null>(null);
+  const [selectedAssignMemberId, setSelectedAssignMemberId] = useState<number | null>(null);
   const [assignChecklist, setAssignChecklist] = useState("");
   const [punishments, setPunishments] = useState(mockPunishments);
   const utils = trpc.useUtils();
@@ -138,7 +139,7 @@ export function PunishmentsPage() {
       .map((label) => ({ label, completed: false }));
 
   const handleAssign = () => {
-    if (!assignSheet || !subMember?.id) return;
+    if (!assignSheet || !selectedAssignMemberId) return;
     const checklist =
       assignChecklist.trim()
         ? checklistFromText(assignChecklist)
@@ -148,10 +149,11 @@ export function PunishmentsPage() {
           ];
     if (houseQuery.data) {
       assignPunishmentMutation.mutate(
-        { punishmentId: assignSheet.punishmentId, memberId: subMember.id, checklist },
+        { punishmentId: assignSheet.punishmentId, memberId: selectedAssignMemberId, checklist },
         {
           onSuccess: () => {
             setAssignSheet(null);
+            setSelectedAssignMemberId(null);
             setAssignChecklist("");
             showToast("Đã gán hình phạt!", "success");
           },
@@ -165,7 +167,7 @@ export function PunishmentsPage() {
       {
         id: Date.now(),
         punishmentId: assignSheet.punishmentId,
-        memberId: subMember.id ?? 2,
+        memberId: selectedAssignMemberId,
         assignedBy: 1,
         status: "active",
         assignedAt: new Date(),
@@ -174,6 +176,7 @@ export function PunishmentsPage() {
       },
     ]);
     setAssignSheet(null);
+    setSelectedAssignMemberId(null);
     setAssignChecklist("");
     showToast("Đã gán hình phạt tạm thời!", "success");
   };
@@ -530,6 +533,7 @@ export function PunishmentsPage() {
                 <button
                   onClick={() => {
                     setAssignSheet({ punishmentId: p.id, title: p.title });
+                    setSelectedAssignMemberId(subMember?.id ?? members[0]?.id ?? null);
                     setAssignChecklist("");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
@@ -700,13 +704,31 @@ export function PunishmentsPage() {
       {/* Assign punishment sheet */}
       <BottomSheet
         isOpen={assignSheet !== null}
-        onClose={() => { setAssignSheet(null); setAssignChecklist(""); }}
+        onClose={() => {
+          setAssignSheet(null);
+          setSelectedAssignMemberId(null);
+          setAssignChecklist("");
+        }}
         title={`Gán hình phạt: ${assignSheet?.title ?? ""}`}
       >
         <div className="space-y-4">
           <p className="text-xs text-white/40">
             Nhập danh sách việc cần làm (mỗi dòng một việc). Để trống sẽ dùng mặc định.
           </p>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận</label>
+            <select
+              value={selectedAssignMemberId ?? ""}
+              onChange={(event) => setSelectedAssignMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
+          </div>
           <div>
             <label className="text-xs text-white/50 mb-2 block">Checklist (mỗi dòng 1 việc)</label>
             <textarea
@@ -719,7 +741,7 @@ export function PunishmentsPage() {
           </div>
           <button
             onClick={handleAssign}
-            disabled={assignPunishmentMutation.isPending}
+            disabled={assignPunishmentMutation.isPending || !selectedAssignMemberId}
             className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
           >
             {assignPunishmentMutation.isPending ? "Đang gán..." : "Gán hình phạt"}

@@ -32,10 +32,18 @@ try {
       "id" serial PRIMARY KEY,
       "userId" bigint NOT NULL,
       "email" varchar(320) NOT NULL,
+      "username" varchar(100),
+      "phone" varchar(30),
       "passwordHash" text NOT NULL,
       "createdAt" timestamp NOT NULL DEFAULT now(),
       "updatedAt" timestamp NOT NULL DEFAULT now()
     )
+  `;
+
+  await sql`
+    ALTER TABLE "userCredentials"
+      ADD COLUMN IF NOT EXISTS "username" varchar(100),
+      ADD COLUMN IF NOT EXISTS "phone" varchar(30)
   `;
 
   await sql`
@@ -79,10 +87,11 @@ try {
 
   const passwordHash = await hashPassword(adminPassword);
   await sql`
-    INSERT INTO "userCredentials" ("userId", "email", "passwordHash")
-    VALUES (${userId}, ${adminEmail}, ${passwordHash})
+    INSERT INTO "userCredentials" ("userId", "email", "username", "passwordHash")
+    VALUES (${userId}, ${adminEmail}, ${adminEmail.split("@")[0] || null}, ${passwordHash})
     ON CONFLICT ("email") DO UPDATE SET
       "userId" = excluded."userId",
+      "username" = excluded."username",
       "passwordHash" = excluded."passwordHash",
       "updatedAt" = now()
   `;

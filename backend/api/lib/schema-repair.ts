@@ -1,17 +1,20 @@
 import postgres from "postgres";
 import { env } from "./env";
 
+function withPublicSearchPath(databaseUrl: string): string {
+  const url = new URL(databaseUrl);
+  if (!url.searchParams.has("options")) {
+    url.searchParams.set("options", "-c search_path=public");
+  }
+  return url.toString();
+}
+
 export async function ensureUserCredentialsSchema() {
   if (!env.databaseUrl) {
     return;
   }
 
-  const sql = postgres(env.databaseUrl, {
-    max: 1,
-    connection: {
-      search_path: "public",
-    },
-  });
+  const sql = postgres(withPublicSearchPath(env.databaseUrl), { max: 1 });
   try {
     await sql`
       CREATE TABLE IF NOT EXISTS public."userCredentials" (

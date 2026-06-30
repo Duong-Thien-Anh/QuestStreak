@@ -216,7 +216,12 @@ export const authRouter = createRouter({
       } catch (error) {
         if (!hasPostgresCode(error, "42P01")) throw error;
         await ensureUserCredentialsSchema();
-        credential = await findCredential();
+        try {
+          credential = await findCredential();
+        } catch (retryError) {
+          console.error("auth.login failed after userCredentials schema repair", retryError);
+          throw retryError;
+        }
       }
 
       if (!credential) {

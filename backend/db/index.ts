@@ -24,12 +24,16 @@ function resolveDatabaseUrl(): string {
 
 const DATABASE_URL = resolveDatabaseUrl();
 
+function withPublicSearchPath(databaseUrl: string): string {
+  const url = new URL(databaseUrl);
+  if (!url.searchParams.has("options")) {
+    url.searchParams.set("options", "-c search_path=public");
+  }
+  return url.toString();
+}
+
 function createDb(): PostgresJsDatabase<Schema> {
-  const client = postgresJs(DATABASE_URL, {
-    connection: {
-      search_path: "public",
-    },
-  });
+  const client = postgresJs(withPublicSearchPath(DATABASE_URL));
   return drizzle(client, { schema });
 }
 

@@ -11,6 +11,7 @@ export default function Login() {
   const setAuthToken = useAppStore((state) => state.setAuthToken);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
+  const [rememberMe, setRememberMe] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [telegramLoginAttempted, setTelegramLoginAttempted] = useState(false);
 
@@ -34,7 +35,7 @@ export default function Login() {
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
-    loginMutation.mutate({ identifier: identifier.trim(), password });
+    loginMutation.mutate({ identifier: identifier.trim(), password, rememberMe });
   };
 
   useEffect(() => {
@@ -103,6 +104,16 @@ export default function Login() {
                 placeholder="••••••••"
               />
             </div>
+
+            <label className="flex items-center gap-2 text-sm text-white/70">
+              <input
+                type="checkbox"
+                checked={rememberMe}
+                onChange={(event) => setRememberMe(event.target.checked)}
+                className="h-4 w-4 rounded border-white/20 bg-[#252532] accent-[#FF2A85]"
+              />
+              Ghi nhớ đăng nhập
+            </label>
 
             {error && (
               <p className="rounded-lg border border-[#FF3B30]/20 bg-[#FF3B30]/10 px-3 py-2 text-xs text-[#FF6B6B]">

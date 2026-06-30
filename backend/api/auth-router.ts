@@ -183,6 +183,7 @@ export const authRouter = createRouter({
       z.object({
         identifier: z.string().min(1),
         password: z.string().min(1),
+        rememberMe: z.boolean().optional().default(true),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -232,7 +233,7 @@ export const authRouter = createRouter({
           path: opts.path,
           sameSite: opts.sameSite?.toLowerCase() as "lax" | "none",
           secure: opts.secure,
-          maxAge: Session.maxAgeMs / 1000,
+          ...(input.rememberMe ? { maxAge: Session.maxAgeMs / 1000 } : {}),
         })
       );
 

@@ -50,9 +50,9 @@ export function TasksPage() {
   const [linkedPunishmentId, setLinkedPunishmentId] = useState("");
   const [wheelTitle, setWheelTitle] = useState("");
   const [wheelDescription, setWheelDescription] = useState("");
-  const [wheelOptions, setWheelOptions] = useState(
-    "Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chày"
-  );
+  const [wheelSelectedOptions, setWheelSelectedOptions] = useState<
+    Array<{ type: "reward" | "punishment"; id: number; label: string }>
+  >([]);
   const [spinningWheelId, setSpinningWheelId] = useState<number | null>(null);
   const [wheelRotations, setWheelRotations] = useState<Record<number, number>>({});
   // ─ Submit proof sheet ─
@@ -91,6 +91,11 @@ export function TasksPage() {
     reviewNote: string | null;
     submittedAt: Date;
   }
+  type WheelSelectedOption = {
+    type: "reward" | "punishment";
+    id: number;
+    label: string;
+  };
   const [tasksState, setTasksState] = useState<TaskItem[]>(mockTasks as TaskItem[]);
 
   const utils = trpc.useUtils();
@@ -181,6 +186,8 @@ export function TasksPage() {
   const visibleWheels = wheelsQuery.data ?? [];
   const availableRewards = rewardsQuery.data ?? [];
   const availablePunishments = punishmentsQuery.data ?? [];
+  const activeWheelRewards = availableRewards.filter((reward) => reward.isActive);
+  const activeWheelPunishments = availablePunishments.filter((punishment) => punishment.isActive);
   const availableAchievements = gamificationSummaryQuery.data?.achievements ?? [];
   const rewardById = useMemo(
     () => new Map(availableRewards.map((reward) => [reward.id, reward])),
@@ -197,16 +204,10 @@ export function TasksPage() {
   const wheelPalette = ["#FF2A85", "#A155FF", "#00F2FE", "#FFD700", "#FF7A59", "#35D07F"];
   const wheelPreviewOptions = useMemo(
     () =>
-      wheelOptions
-        .split("\n")
-        .map((line) => line.trim())
-        .filter(Boolean)
-        .map((label) => ({ label, weight: 1 })),
-    [wheelOptions]
+      wheelSelectedOptions.map((option) => ({ label: option.label, weight: 1 })),
+    [wheelSelectedOptions]
   );
 
-  const avatarForGender = (gender: string | null | undefined) =>
-    gender === "male" ? "/avatars/admin.jpg" : "/avatars/sub.jpg";
 
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => {
@@ -232,7 +233,7 @@ export function TasksPage() {
     if (!title.trim()) return;
     if (editingTaskId) {
       if (houseQuery.data) {
-        showToast("Chỉnh sửa task cần bổ sung API update ở backend", "info");
+        showToast("Chỉnh sửa nhiệm vụ cần bổ sung API update ở backend", "info");
         return;
       }
       setTasksState((prev) =>
@@ -266,7 +267,7 @@ export function TasksPage() {
         description: description || undefined,
         category: taskType === "regular" ? (scheduleMode === "custom" ? "special" : frequency) : taskType,
         dueDate: dueDate || undefined,
-        startDate: scheduleMode === "custom" ? (startDate || undefined) : undefined,
+        startDate: (scheduleMode === "custom" || taskType !== "regular") ? (startDate || undefined) : undefined,
         chymReward,
         chayPenalty,
         bonusXp,
@@ -350,7 +351,7 @@ export function TasksPage() {
     setEditingWheelId(null);
     setWheelTitle("");
     setWheelDescription("");
-    setWheelOptions("Thêm 5 Chym\nMột nhiệm vụ nhẹ\nMột lời khen ngay lập tức\nThêm 3 Chày");
+    setWheelSelectedOptions([]);
   };
 
   const openWheelEditor = (wheel: (typeof visibleWheels)[number]) => {
@@ -359,7 +360,15 @@ export function TasksPage() {
     setCreateType("wheel");
     setWheelTitle(wheel.title);
     setWheelDescription(wheel.description ?? "");
-    setWheelOptions(options.map((option) => option.label).join("\n"));
+    setWheelSelectedOptions(
+      options.map((option, index) => {
+        const reward = availableRewards.find((item) => item.title === option.label);
+        if (reward) return { type: "reward", id: reward.id, label: reward.title };
+        const punishment = availablePunishments.find((item) => item.title === option.label);
+        if (punishment) return { type: "punishment", id: punishment.id, label: punishment.title };
+        return { type: "reward", id: -1 - index, label: option.label };
+      })
+    );
     setCreateSheet(true);
   };
 
@@ -381,6 +390,38 @@ export function TasksPage() {
     return cat?.color || "#FF2A85";
   };
 
+  const getCategoryLabel = (key: string) => {
+    switch (key) {
+      case "daily":
+        return "Hàng ngày";
+      case "weekly":
+        return "Hàng tuần";
+      case "monthly":
+        return "Hàng tháng";
+      case "special":
+        return "Đặc biệt";
+      case "superSpecial":
+        return "Siêu đặc biệt";
+      case "completed":
+        return "Đã hoàn thành";
+      default:
+        return key;
+    }
+  };
+
+  const toggleWheelOption = (option: WheelSelectedOption) => {
+    setWheelSelectedOptions((current) => {
+      const exists = current.some((item) => item.type === option.type && item.id === option.id);
+      if (exists) {
+        return current.filter((item) => item.type !== option.type || item.id !== option.id);
+      }
+      return [...current, option];
+    });
+  };
+
+  const isWheelOptionSelected = (type: "reward" | "punishment", id: number) =>
+    wheelSelectedOptions.some((option) => option.type === type && option.id === id);
+
   const assignTask = (taskId: number) => {
     if (!houseQuery.data || !subMember?.id) return;
     assignTaskMutation.mutate({ taskId, memberId: subMember.id });
@@ -390,7 +431,7 @@ export function TasksPage() {
   const acceptTask = (taskId: number) => {
     if (!houseQuery.data) return;
     acceptTaskMutation.mutate({ taskId });
-    showToast("Đã nhận task!", "success");
+    showToast("Đã nhận nhiệm vụ!", "success");
   };
 
   const submitTask = (taskId: number) => {
@@ -432,7 +473,7 @@ export function TasksPage() {
         },
       }
     );
-    showToast(decision === "approve" ? "Đã duyệt task!" : "Đã trả task về active!", "success");
+    showToast(decision === "approve" ? "Đã duyệt nhiệm vụ!" : "Đã trả nhiệm vụ về trạng thái đang làm!", "success");
   };
 
   const openReviewSheet = (taskId: number) => {
@@ -443,18 +484,14 @@ export function TasksPage() {
   const saveWheel = () => {
     if (!wheelTitle.trim()) return;
     if (!houseQuery.data) {
-      showToast("Wheel cần backend để lưu", "error");
+      showToast("Vòng quay cần backend để lưu", "error");
       return;
     }
 
-    const options = wheelOptions
-      .split("\n")
-      .map((line) => line.trim())
-      .filter(Boolean)
-      .map((label) => ({ label, weight: 1 }));
+    const options = wheelSelectedOptions.map((option) => ({ label: option.label, weight: 1 }));
 
     if (options.length < 2) {
-      showToast("Wheel cần ít nhất 2 lựa chọn", "error");
+      showToast("Vòng quay cần ít nhất 2 lựa chọn từ rewards hoặc hình phạt", "error");
       return;
     }
 
@@ -485,7 +522,7 @@ export function TasksPage() {
         },
         {
           onSuccess: () => {
-            showToast("Đã tạo wheel!", "success");
+            showToast("Đã tạo vòng quay!", "success");
           },
           onError: (err) => showToast(err.message, "error"),
         }
@@ -504,7 +541,7 @@ export function TasksPage() {
       { wheelId },
       {
         onSuccess: (data) => {
-          showToast(`Wheel result: ${data.result}`, "success");
+          showToast(`Kết quả vòng quay: ${data.result}`, "success");
         },
         onSettled: () => {
           setTimeout(() => setSpinningWheelId(null), 500);
@@ -526,7 +563,7 @@ export function TasksPage() {
     rotation = 0,
     size: "sm" | "lg" = "sm"
   ) => {
-    const normalized = options.length > 0 ? options : [{ label: "Option 1" }, { label: "Option 2" }];
+    const normalized = options.length > 0 ? options : [{ label: "Lựa chọn 1" }, { label: "Lựa chọn 2" }];
     const segment = 100 / normalized.length;
     const gradient = normalized
       .map((_, index) => {
@@ -567,7 +604,7 @@ export function TasksPage() {
             );
           })}
           <div className="absolute left-1/2 top-1/2 flex h-12 w-12 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-white/20 bg-[#0D0D11] text-xs font-bold text-white shadow-lg">
-            SPIN
+            QUAY
           </div>
         </motion.div>
       </div>
@@ -647,7 +684,7 @@ export function TasksPage() {
           {task.linkedPunishmentId && (
             <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#FF3B30]/10 text-[#FF7A59]">
               <Trash2 className="w-3 h-3" />
-              {punishmentById.get(task.linkedPunishmentId)?.title ?? "Punishment"}
+              {punishmentById.get(task.linkedPunishmentId)?.title ?? "Hình phạt"}
             </span>
           )}
           <span
@@ -657,9 +694,7 @@ export function TasksPage() {
               color: getCategoryColor(task.category),
             }}
           >
-            {task.category === "superSpecial"
-              ? "Super Special"
-              : task.category.charAt(0).toUpperCase() + task.category.slice(1)}
+            {getCategoryLabel(task.category)}
           </span>
         </div>
         {/* Admin/Sub actions */}
@@ -698,7 +733,7 @@ export function TasksPage() {
                         onClick={() => acceptTask(task.id)}
                         className="flex-1 py-2 rounded-lg bg-[#FF2A85] text-white text-xs font-medium hover:bg-[#FF2A85]/90 transition-colors"
                       >
-                        Nhận Task
+                        Nhận nhiệm vụ
                       </button>
                     ) : (
                       <button
@@ -736,7 +771,7 @@ export function TasksPage() {
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <img
-            src={avatarForGender(subMember?.gender)}
+            src={subMember?.telegramAvatar || (subMember?.gender === "male" ? "/avatars/admin.jpg" : "/avatars/sub.jpg")}
             alt="Avatar"
             className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
@@ -842,7 +877,7 @@ export function TasksPage() {
           className="space-y-3"
         >
           <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
-            Wheels
+            Vòng quay
           </h2>
           {visibleWheels.map((wheel) => {
             const options = parseWheelOptions(wheel.options);
@@ -892,7 +927,7 @@ export function TasksPage() {
                       disabled={isSpinning || spinWheelMutation.isPending}
                       className="mt-3 rounded-lg bg-[#A155FF] px-4 py-2 text-xs font-semibold text-white transition-colors hover:bg-[#A155FF]/90 disabled:opacity-60"
                     >
-                      {isSpinning ? "Spinning..." : "Spin"}
+                      {isSpinning ? "Đang quay..." : "Quay"}
                     </button>
                   </div>
                 </div>
@@ -920,7 +955,7 @@ export function TasksPage() {
                   className="w-4 h-4"
                   style={{ color: cat.color }}
                 />
-                <span className="text-sm font-semibold text-white">{cat.label}</span>
+                <span className="text-sm font-semibold text-white">{getCategoryLabel(cat.key)}</span>
                 <span className="text-xs text-white/30">
                   {
                     (cat.key === "completed"
@@ -961,7 +996,7 @@ export function TasksPage() {
       <FAB
         actions={[
           {
-            label: "Send a Wheel",
+            label: "Gửi vòng quay",
             icon: <Send className="w-5 h-5 text-white" />,
             onClick: () => {
               resetWheelForm();
@@ -971,7 +1006,7 @@ export function TasksPage() {
             color: "#A155FF",
           },
           {
-            label: "Create Task",
+            label: "Tạo nhiệm vụ",
             icon: <Zap className="w-5 h-5 text-white" />,
             onClick: () => {
               setCreateType("task");
@@ -992,12 +1027,12 @@ export function TasksPage() {
         }}
         title={
           editingTaskId
-            ? "Edit Task"
+            ? "Sửa nhiệm vụ"
             : createType === "task"
-            ? "Create New Task"
+            ? "Tạo nhiệm vụ mới"
             : editingWheelId
-            ? "Edit Wheel"
-            : "Create Wheel"
+            ? "Sửa vòng quay"
+            : "Tạo vòng quay"
         }
       >
         {createType === "wheel" ? (
@@ -1011,33 +1046,123 @@ export function TasksPage() {
               </p>
             </div>
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Wheel Title</label>
+              <label className="text-xs text-white/50 mb-2 block">Tên vòng quay</label>
               <input
                 type="text"
                 value={wheelTitle}
                 onChange={(event) => setWheelTitle(event.target.value)}
-                placeholder="Surprise Wheel..."
+                placeholder="Vòng quay bất ngờ..."
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
               />
             </div>
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Description</label>
+              <label className="text-xs text-white/50 mb-2 block">Mô tả</label>
               <textarea
                 value={wheelDescription}
                 onChange={(event) => setWheelDescription(event.target.value)}
-                placeholder="What is this wheel for?"
+                placeholder="Vòng quay này dùng để làm gì?"
                 rows={2}
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
               />
             </div>
-            <div>
-              <label className="text-xs text-white/50 mb-2 block">Options, one per line</label>
-              <textarea
-                value={wheelOptions}
-                onChange={(event) => setWheelOptions(event.target.value)}
-                rows={5}
-                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
-              />
+            <div className="space-y-3">
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+                  Rewards
+                </p>
+                <div className="space-y-2">
+                  {activeWheelRewards.length === 0 ? (
+                    <p className="rounded-xl border border-white/5 bg-[#252532] px-4 py-3 text-xs text-white/35">
+                      Chưa có Reward đang bật.
+                    </p>
+                  ) : (
+                    activeWheelRewards.map((reward) => {
+                      const selected = isWheelOptionSelected("reward", reward.id);
+                      return (
+                        <button
+                          key={`reward-${reward.id}`}
+                          type="button"
+                          onClick={() =>
+                            toggleWheelOption({
+                              type: "reward",
+                              id: reward.id,
+                              label: reward.title,
+                            })
+                          }
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                            selected
+                              ? "border-[#35D07F]/50 bg-[#35D07F]/10"
+                              : "border-white/10 bg-[#252532] hover:border-white/20"
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <span
+                              className={`flex h-5 w-5 items-center justify-center rounded border text-[10px] ${
+                                selected
+                                  ? "border-[#35D07F] bg-[#35D07F] text-[#0D0D11]"
+                                  : "border-white/20 text-transparent"
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <span className="text-sm font-medium text-white">{reward.title}</span>
+                          </span>
+                          <span className="shrink-0 text-xs text-[#FFD700]">{reward.cost} Chym</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <p className="mb-2 text-xs font-semibold uppercase tracking-wider text-white/40">
+                  Hình phạt
+                </p>
+                <div className="space-y-2">
+                  {activeWheelPunishments.length === 0 ? (
+                    <p className="rounded-xl border border-white/5 bg-[#252532] px-4 py-3 text-xs text-white/35">
+                      Chưa có hình phạt đang bật.
+                    </p>
+                  ) : (
+                    activeWheelPunishments.map((punishment) => {
+                      const selected = isWheelOptionSelected("punishment", punishment.id);
+                      return (
+                        <button
+                          key={`punishment-${punishment.id}`}
+                          type="button"
+                          onClick={() =>
+                            toggleWheelOption({
+                              type: "punishment",
+                              id: punishment.id,
+                              label: punishment.title,
+                            })
+                          }
+                          className={`flex w-full items-center justify-between gap-3 rounded-xl border px-4 py-3 text-left transition-colors ${
+                            selected
+                              ? "border-[#FF3B30]/50 bg-[#FF3B30]/10"
+                              : "border-white/10 bg-[#252532] hover:border-white/20"
+                          }`}
+                        >
+                          <span className="flex items-center gap-3">
+                            <span
+                              className={`flex h-5 w-5 items-center justify-center rounded border text-[10px] ${
+                                selected
+                                  ? "border-[#FF3B30] bg-[#FF3B30] text-white"
+                                  : "border-white/20 text-transparent"
+                              }`}
+                            >
+                              ✓
+                            </span>
+                            <span className="text-sm font-medium text-white">{punishment.title}</span>
+                          </span>
+                          <span className="shrink-0 text-xs text-[#FF7A59]">{punishment.chayCost} Chày</span>
+                        </button>
+                      );
+                    })
+                  )}
+                </div>
+              </div>
             </div>
             <button
               onClick={saveWheel}
@@ -1050,11 +1175,11 @@ export function TasksPage() {
             >
               {editingWheelId
                 ? updateWheelMutation.isPending
-                  ? "Saving..."
-                  : "Save Wheel"
+                  ? "Đang lưu..."
+                  : "Lưu vòng quay"
                 : createWheelMutation.isPending
-                ? "Creating..."
-                : "Create Wheel"}
+                ? "Đang tạo..."
+                : "Tạo vòng quay"}
             </button>
           </div>
         ) : (
@@ -1062,9 +1187,9 @@ export function TasksPage() {
           {/* Type selector */}
           <div className="flex gap-2">
             {[
-              { key: "regular" as const, label: "Task", icon: <Zap className="w-4 h-4" /> },
-              { key: "special" as const, label: "Special", icon: <Trophy className="w-4 h-4" /> },
-              { key: "superSpecial" as const, label: "Super Special", icon: <Star className="w-4 h-4" /> },
+              { key: "regular" as const, label: "Nhiệm vụ", icon: <Zap className="w-4 h-4" /> },
+              { key: "special" as const, label: "Đặc biệt", icon: <Trophy className="w-4 h-4" /> },
+              { key: "superSpecial" as const, label: "Siêu đặc biệt", icon: <Star className="w-4 h-4" /> },
             ].map((t) => (
               <button
                 key={t.key}
@@ -1153,23 +1278,23 @@ export function TasksPage() {
 
           {/* Title */}
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
-              placeholder="Enter task title..."
+              placeholder="Nhập tiêu đề nhiệm vụ..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none transition-colors"
             />
           </div>
 
           {/* Description */}
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Description</label>
+            <label className="text-xs text-white/50 mb-2 block">Mô tả</label>
             <textarea
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Enter description..."
+              placeholder="Nhập mô tả..."
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none transition-colors resize-none"
             />
@@ -1178,23 +1303,55 @@ export function TasksPage() {
           {/* Due date chỉ cho special/superSpecial hoặc frequency mode */}
           {(taskType !== "regular" || scheduleMode === "frequency") && (
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Ngày thực hiện</label>
-              <div className="relative">
-                <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-                <input
-                  type="date"
-                  value={dueDate}
-                  onChange={(e) => setDueDate(e.target.value)}
-                  className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
-                />
-              </div>
+              <label className="text-xs text-white/50 mb-2 block">
+                {taskType !== "regular" ? "Thời gian thực hiện" : "Ngày thực hiện"}
+              </label>
+              {taskType !== "regular" ? (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Ngày bắt đầu</label>
+                    <div className="relative">
+                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Ngày kết thúc</label>
+                    <div className="relative">
+                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        min={startDate || undefined}
+                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              ) : (
+                <div className="relative">
+                  <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                  <input
+                    type="date"
+                    value={dueDate}
+                    onChange={(e) => setDueDate(e.target.value)}
+                    className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                  />
+                </div>
+              )}
             </div>
           )}
 
           {/* Rewards/Penalties */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Chym Reward</label>
+              <label className="text-xs text-white/50 mb-2 block">Thưởng Chym</label>
               <input
                 type="number"
                 value={chymReward}
@@ -1204,7 +1361,7 @@ export function TasksPage() {
               />
             </div>
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Chày Penalty</label>
+              <label className="text-xs text-white/50 mb-2 block">Phạt Chày</label>
               <input
                 type="number"
                 value={chayPenalty}
@@ -1216,7 +1373,7 @@ export function TasksPage() {
           </div>
 
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Bonus XP</label>
+            <label className="text-xs text-white/50 mb-2 block">XP thêm</label>
             <input
               type="number"
               value={bonusXp}
@@ -1228,7 +1385,7 @@ export function TasksPage() {
 
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Linked Reward</label>
+              <label className="text-xs text-white/50 mb-2 block">Reward kèm</label>
               <select
                 value={linkedRewardId}
                 onChange={(e) => setLinkedRewardId(e.target.value)}
@@ -1246,7 +1403,7 @@ export function TasksPage() {
             </div>
 
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Linked Achievement</label>
+              <label className="text-xs text-white/50 mb-2 block">Achievement kèm</label>
               <select
                 value={linkedAchievementId}
                 onChange={(e) => setLinkedAchievementId(e.target.value)}
@@ -1263,7 +1420,7 @@ export function TasksPage() {
           </div>
 
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Linked Punishment</label>
+            <label className="text-xs text-white/50 mb-2 block">Hình phạt kèm</label>
             <select
               value={linkedPunishmentId}
               onChange={(e) => setLinkedPunishmentId(e.target.value)}
@@ -1287,7 +1444,7 @@ export function TasksPage() {
             disabled={!title.trim()}
             className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
           >
-            {editingTaskId ? "Save Task" : "Create Task"}
+            {editingTaskId ? "Lưu nhiệm vụ" : "Tạo nhiệm vụ"}
           </button>
         </div>
         )}
@@ -1382,8 +1539,8 @@ export function TasksPage() {
           return (
             <div className="space-y-4">
               <div className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
-                <p className="text-xs text-white/30 mb-1">Task</p>
-                <h3 className="text-sm font-semibold text-white">{task?.title ?? "Task"}</h3>
+                <p className="text-xs text-white/30 mb-1">Nhiệm vụ</p>
+                <h3 className="text-sm font-semibold text-white">{task?.title ?? "Nhiệm vụ"}</h3>
                 {task?.description && (
                   <p className="mt-1 text-xs text-white/45 line-clamp-3">{task.description}</p>
                 )}
@@ -1439,16 +1596,16 @@ export function TasksPage() {
                 </div>
               ) : (
                 <div className="rounded-xl border border-[#FF3B30]/15 bg-[#FF3B30]/5 p-4 text-sm text-white/60">
-                  Chưa tìm thấy báo cáo cho task này.
+                  Chưa tìm thấy báo cáo cho nhiệm vụ này.
                 </div>
               )}
 
               <div>
-                <label className="mb-2 block text-xs text-white/50">Review note</label>
+                <label className="mb-2 block text-xs text-white/50">Ghi chú duyệt</label>
                 <textarea
                   value={reviewNote}
                   onChange={(event) => setReviewNote(event.target.value)}
-                  placeholder="Ghi feedback khi duyệt hoặc trả lại..."
+                  placeholder="Ghi phản hồi khi duyệt hoặc trả lại..."
                   rows={3}
                   className="w-full resize-none rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
                 />
@@ -1467,7 +1624,7 @@ export function TasksPage() {
                   disabled={reviewTaskMutation.isPending || !latestSubmission}
                   className="rounded-xl bg-[#00F2FE] py-3 text-sm font-semibold text-[#0D0D11] transition-colors hover:bg-[#00F2FE]/90 disabled:opacity-50"
                 >
-                  Duyệt task
+                  Duyệt nhiệm vụ
                 </button>
               </div>
             </div>

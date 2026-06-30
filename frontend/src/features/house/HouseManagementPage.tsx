@@ -94,66 +94,66 @@ const menuItems: Array<{
 
 const accountCopy = {
   en: {
-    accountMenu: "Account Menu",
-    profile: {
-      label: "Profile",
-      description: "Name, avatar, and personal display info",
-    },
-    settings: {
-      label: "Setting",
-      description: "Account preferences and defaults",
-    },
-    security: {
-      label: "Security",
-      description: "Session, login provider, and Telegram readiness",
-    },
-    support: {
-      label: "Support",
-      description: "Help, feedback, and issue reporting",
-    },
-    accountSettings: "Account Settings",
-    defaultRoom: "Default room",
-    currentRole: "Current role",
-    notifications: "Notifications",
-    enabled: "Enabled",
-    language: "Language",
-    languageDescription: "Choose the display language for this account.",
-    english: "English",
-    vietnamese: "Vietnamese",
-    preferences: "Preferences",
-    preferencesBody:
-      "Personal app preferences will live here. Room member management and room code controls are only in the room panel opened from the header room name.",
-    saved: "Language updated",
-    saving: "Saving...",
-  },
-  vi: {
     accountMenu: "Menu tài khoản",
     profile: {
-      label: "Profile",
+      label: "Hồ sơ",
       description: "Tên, avatar và thông tin hiển thị cá nhân",
     },
     settings: {
-      label: "Setting",
+      label: "Cài đặt",
       description: "Tùy chọn tài khoản và mặc định hệ thống",
     },
     security: {
-      label: "Security",
+      label: "Bảo mật",
       description: "Phiên đăng nhập, provider và Telegram",
     },
     support: {
-      label: "Support",
+      label: "Hỗ trợ",
       description: "Trợ giúp, phản hồi và báo lỗi",
     },
     accountSettings: "Cài đặt tài khoản",
     defaultRoom: "Phòng mặc định",
     currentRole: "Vai trò hiện tại",
     notifications: "Thông báo",
-    enabled: "Đang bật",
+    enabled: "Bật",
     language: "Ngôn ngữ",
     languageDescription: "Chọn ngôn ngữ hiển thị cho tài khoản này.",
     english: "Tiếng Anh",
     vietnamese: "Tiếng Việt",
-    preferences: "Tùy chọn",
+    preferences: "Tùy chỉnh",
+    preferencesBody:
+      "Tùy chọn cá nhân sẽ nằm ở đây. Quản lý thành viên và mã phòng chỉ nằm trong panel phòng mở từ tên phòng trên header.",
+    saved: "Đã cập nhật ngôn ngữ",
+    saving: "Đang lưu...",
+  },
+  vi: {
+    accountMenu: "Menu tài khoản",
+    profile: {
+      label: "Hồ sơ",
+      description: "Tên, avatar và thông tin hiển thị cá nhân",
+    },
+    settings: {
+      label: "Cài đặt",
+      description: "Tùy chọn tài khoản và mặc định hệ thống",
+    },
+    security: {
+      label: "Bảo mật",
+      description: "Phiên đăng nhập, provider và Telegram",
+    },
+    support: {
+      label: "Hỗ trợ",
+      description: "Trợ giúp, phản hồi và báo lỗi",
+    },
+    accountSettings: "Cài đặt tài khoản",
+    defaultRoom: "Phòng mặc định",
+    currentRole: "Vai trò hiện tại",
+    notifications: "Thông báo",
+    enabled: "Bật",
+    language: "Ngôn ngữ",
+    languageDescription: "Chọn ngôn ngữ hiển thị cho tài khoản này.",
+    english: "Tiếng Anh",
+    vietnamese: "Tiếng Việt",
+    preferences: "Tùy chỉnh",
     preferencesBody:
       "Tùy chọn cá nhân sẽ nằm ở đây. Quản lý thành viên và mã phòng chỉ nằm trong panel phòng mở từ tên phòng trên header.",
     saved: "Đã cập nhật ngôn ngữ",
@@ -451,21 +451,21 @@ export function HouseManagementPage() {
   const getRoleLabel = (role: string) => {
     switch (role) {
       case "dominant":
-        return "Task Creator";
+        return "Người giao task";
       case "submissive":
-        return "Task Receiver";
+        return "Người nhận task";
       case "switch":
-        return "Creator + Receiver";
+        return "Người giao + nhận task";
       default:
         return role;
     }
   };
 
   const currentRoleLabel = isRootAdmin
-    ? "Root Admin"
+    ? "Quản trị viên"
     : displayMember
     ? getRoleLabel(displayMember.lifestyleRole)
-    : "Guest";
+    : "Khách";
 
   const copyText = (text: string) => {
     void navigator.clipboard.writeText(text);
@@ -489,7 +489,7 @@ export function HouseManagementPage() {
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <p className="text-xs font-semibold uppercase tracking-wider text-white/35">
-            Room
+            Phòng
           </p>
           <h2 className="mt-1 truncate text-lg font-bold text-white">
             {house?.name ?? "Lunis House"}
@@ -506,7 +506,7 @@ export function HouseManagementPage() {
             <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-[#F59E0B]" />
             <div>
               <p className="text-sm font-semibold text-white">
-                Root admin dashboard
+                Bảng quản trị viên
               </p>
               <p className="mt-1 text-xs leading-5 text-white/50">
                 Tài khoản admin có toàn quyền tạo, sửa phòng, quản lý thành viên
@@ -521,11 +521,11 @@ export function HouseManagementPage() {
         <div className="rounded-xl border border-white/5 bg-[#252532] p-3">
           <div className="mb-2 flex items-center gap-2 text-xs text-white/40">
             <Hash className="h-3.5 w-3.5" />
-            Room code
+            Mã phòng
           </div>
           <div className="flex items-center gap-2">
             <p className="min-w-0 flex-1 truncate font-mono text-sm text-[#00F2FE]">
-              {house?.roomCode ?? "No room code"}
+              {house?.roomCode ?? "Chưa có mã phòng"}
             </p>
             {house?.roomCode && (
               <button
@@ -541,7 +541,7 @@ export function HouseManagementPage() {
         <div className="rounded-xl border border-white/5 bg-[#252532] p-3">
           <div className="mb-2 flex items-center gap-2 text-xs text-white/40">
             <Calendar className="h-3.5 w-3.5" />
-            Created
+            Ngày tạo
           </div>
           <p className="text-sm font-medium text-white/80">
             {formatDate(house?.createdAt)}
@@ -551,13 +551,13 @@ export function HouseManagementPage() {
 
       <div className="grid gap-2 text-xs text-white/50">
         <div className="flex justify-between gap-4 rounded-xl bg-[#252532] px-3 py-2">
-          <span>Room owner</span>
+          <span>Chủ phòng</span>
           <span className="text-right text-white/80">
-            {ownerMember?.nickname ?? "House Owner"}
+            {ownerMember?.nickname ?? "Chủ phòng"}
           </span>
         </div>
         <div className="flex justify-between gap-4 rounded-xl bg-[#252532] px-3 py-2">
-          <span>Members</span>
+          <span>Thành viên</span>
           <span className="text-white/80">{members.length}</span>
         </div>
       </div>
@@ -571,7 +571,7 @@ export function HouseManagementPage() {
                   Duyệt thành viên
                 </p>
                 <p className="mt-1 text-xs leading-5 text-white/45">
-                  Khi bật, Task Receiver nhập room code sẽ chờ Task Creator
+                  Khi bật, người nhận task nhập mã phòng sẽ chờ người giao task
                   duyệt trước khi vào phòng.
                 </p>
               </div>
@@ -597,14 +597,14 @@ export function HouseManagementPage() {
             </div>
           </div>
           <label className="block space-y-2">
-            <span className="text-xs text-white/45">Room name</span>
+            <span className="text-xs text-white/45">Tên phòng</span>
             <input
               type="text"
               value={roomNameDraft ?? house.name ?? "Lunis House"}
               onChange={(event) => setRoomNameDraft(event.target.value)}
               maxLength={255}
               className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
-              placeholder="Room name"
+              placeholder="Tên phòng"
             />
           </label>
           <div className="grid grid-cols-2 gap-2">
@@ -613,7 +613,7 @@ export function HouseManagementPage() {
               disabled={updateHouseMutation.isPending}
               className="rounded-xl bg-[#FF2A85] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#FF2A85]/90 disabled:opacity-50"
             >
-              {updateHouseMutation.isPending ? "Saving..." : "Save name"}
+              {updateHouseMutation.isPending ? "Đang lưu..." : "Lưu tên phòng"}
             </button>
             <button
               onClick={() => void regenerateRoomCode()}
@@ -621,7 +621,7 @@ export function HouseManagementPage() {
               className="flex items-center justify-center gap-2 rounded-xl border border-white/10 py-3 text-sm font-semibold text-white/75 transition-colors hover:bg-white/5 disabled:opacity-50"
             >
               <RefreshCw className="h-4 w-4" />
-              Change code
+              Đổi mã
             </button>
           </div>
         </div>
@@ -647,7 +647,7 @@ export function HouseManagementPage() {
               profileForm.nickname ??
               displayMember?.nickname ??
               user?.name ??
-              "Profile"
+              "Hồ sơ"
             }
             className="h-16 w-16 rounded-full border-2 border-white/10 object-cover"
           />
@@ -656,7 +656,7 @@ export function HouseManagementPage() {
               {profileForm.nickname ??
                 displayMember?.nickname ??
                 user?.name ??
-                "Your profile"}
+                "Hồ sơ của bạn"}
             </h2>
             <p className="mt-1 text-xs text-white/45">
               {currentRoleLabel}
@@ -666,9 +666,9 @@ export function HouseManagementPage() {
       </section>
 
       <section className="space-y-3 rounded-xl border border-white/5 bg-[#1A1A22] p-4">
-        <h3 className="text-sm font-semibold text-white">Profile Details</h3>
+        <h3 className="text-sm font-semibold text-white">Chi tiết hồ sơ</h3>
         <label className="block space-y-2">
-          <span className="text-xs text-white/45">Display name</span>
+          <span className="text-xs text-white/45">Tên hiển thị</span>
           <input
             type="text"
             value={profileForm.nickname ?? displayMember?.nickname ?? ""}
@@ -680,11 +680,11 @@ export function HouseManagementPage() {
             }
             maxLength={255}
             className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
-            placeholder="Your display name"
+            placeholder="Tên hiển thị của bạn"
           />
         </label>
         <label className="block space-y-2">
-          <span className="text-xs text-white/45">Gender</span>
+          <span className="text-xs text-white/45">Giới tính</span>
           <select
             value={normalizeGender(profileForm.gender ?? displayMember?.gender)}
             onChange={(event) =>
@@ -695,8 +695,8 @@ export function HouseManagementPage() {
             }
             className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white focus:border-[#FF2A85]/50 focus:outline-none"
           >
-            <option value="female">Female</option>
-            <option value="male">Male</option>
+            <option value="female">Nữ</option>
+            <option value="male">Nam</option>
           </select>
         </label>
         <button
@@ -704,7 +704,7 @@ export function HouseManagementPage() {
           disabled={selfUpdateMutation.isPending || !displayMember}
           className="w-full rounded-xl bg-[#FF2A85] py-3 text-sm font-semibold text-white transition-colors hover:bg-[#FF2A85]/90 disabled:cursor-not-allowed disabled:opacity-50"
         >
-          {selfUpdateMutation.isPending ? "Saving..." : "Save Profile"}
+          {selfUpdateMutation.isPending ? "Đang lưu..." : "Lưu hồ sơ"}
         </button>
       </section>
     </motion.div>
@@ -781,13 +781,13 @@ export function HouseManagementPage() {
           </div>
         )}
         <div className="mb-3 flex items-center justify-between gap-3">
-          <h3 className="text-sm font-semibold text-white">Room Members</h3>
+          <h3 className="text-sm font-semibold text-white">Thành viên trong phòng</h3>
           {isAdmin && (
             <button
               onClick={openAddMemberDialog}
               className="rounded-lg border border-white/10 px-3 py-2 text-xs font-semibold text-white/75 transition-colors hover:bg-white/5"
             >
-              Add Member
+              Thêm thành viên
             </button>
           )}
         </div>
@@ -810,7 +810,7 @@ export function HouseManagementPage() {
                     src={
                       `/avatars/${member.gender === "male" ? "admin" : "sub"}.jpg`
                     }
-                    alt={member.nickname || "Member"}
+                    alt={member.nickname || "Thành viên"}
                     className="h-12 w-12 rounded-full border-2 border-white/10 object-cover"
                   />
                   <div className="absolute -bottom-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full border border-white/10 bg-[#252532]">
@@ -820,7 +820,7 @@ export function HouseManagementPage() {
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
                     <h3 className="truncate text-sm font-semibold text-white">
-                      {member.nickname || "Member"}
+                      {member.nickname || "Thành viên"}
                     </h3>
                     {getGenderIcon(member.gender)}
                   </div>
@@ -828,7 +828,7 @@ export function HouseManagementPage() {
                     {getRoleLabel(member.lifestyleRole)}
                   </p>
                   {member.userId === house?.ownerId && (
-                    <p className="mt-0.5 text-[10px] text-white/30">Room Owner</p>
+                    <p className="mt-0.5 text-[10px] text-white/30">Chủ phòng</p>
                   )}
                 </div>
                 {isAdmin && (
@@ -863,10 +863,10 @@ export function HouseManagementPage() {
           <DialogContent className="border-white/10 bg-[#1A1A22] text-white sm:max-w-md">
             <DialogHeader>
               <DialogTitle>
-                {editingMemberId ? "Edit Member" : "Add Member"}
+                {editingMemberId ? "Sửa thành viên" : "Thêm thành viên"}
               </DialogTitle>
               <DialogDescription className="text-white/45">
-                Configure the member display name and room role.
+                Cấu hình tên hiển thị và vai trò trong phòng.
               </DialogDescription>
             </DialogHeader>
             <div className="space-y-3">
@@ -879,7 +879,7 @@ export function HouseManagementPage() {
                     nickname: event.target.value,
                   }))
                 }
-                placeholder="Nickname"
+                placeholder="Biệt danh"
                 className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
               />
               <div className="grid grid-cols-2 gap-2">
@@ -893,9 +893,9 @@ export function HouseManagementPage() {
                   }
                   className="rounded-xl border border-white/10 bg-[#252532] px-3 py-3 text-sm text-white focus:border-[#FF2A85]/50 focus:outline-none"
                 >
-                  <option value="dominant">Task Creator</option>
-                  <option value="submissive">Task Receiver</option>
-                  <option value="switch">Creator + Receiver</option>
+                  <option value="dominant">Người giao task</option>
+                  <option value="submissive">Người nhận task</option>
+                  <option value="switch">Người giao + nhận task</option>
                 </select>
                 <select
                   value={memberForm.gender}
@@ -907,8 +907,8 @@ export function HouseManagementPage() {
                   }
                   className="rounded-xl border border-white/10 bg-[#252532] px-3 py-3 text-sm text-white focus:border-[#FF2A85]/50 focus:outline-none"
                 >
-                  <option value="female">Female</option>
-                  <option value="male">Male</option>
+                  <option value="female">Nữ</option>
+                  <option value="male">Nam</option>
                 </select>
               </div>
             </div>
@@ -917,14 +917,14 @@ export function HouseManagementPage() {
                 onClick={resetMemberForm}
                 className="rounded-xl border border-white/10 px-4 py-3 text-sm text-white/70 transition-colors hover:bg-white/5"
               >
-                Cancel
+                Hủy
               </button>
               <button
                 onClick={submitMemberForm}
                 disabled={!memberForm.nickname.trim()}
                 className="rounded-xl bg-[#FF2A85] px-4 py-3 text-sm font-semibold text-white transition-colors hover:bg-[#FF2A85]/90 disabled:opacity-50"
               >
-                {editingMemberId ? "Save Member" : "Add Member"}
+                {editingMemberId ? "Lưu thành viên" : "Thêm thành viên"}
               </button>
             </DialogFooter>
           </DialogContent>
@@ -932,30 +932,30 @@ export function HouseManagementPage() {
       )}
 
       <section className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
-          <h3 className="mb-2 text-sm font-semibold text-white">Room Info</h3>
+          <h3 className="mb-2 text-sm font-semibold text-white">Thông tin phòng</h3>
         <div className="space-y-2 text-xs text-white/50">
           <div className="flex justify-between gap-4">
-            <span>Room Name</span>
+            <span>Tên phòng</span>
             <span className="text-right text-white/80">{house?.name ?? "Lunis House"}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span>Members</span>
+            <span>Thành viên</span>
             <span className="text-white/80">{members.length}</span>
           </div>
           <div className="flex justify-between gap-4">
-            <span>Member approval</span>
+            <span>Duyệt thành viên</span>
             <span className="text-right text-white/80">
-              {house?.roomApprovalRequired ? "On" : "Off"}
+              {house?.roomApprovalRequired ? "Bật" : "Tắt"}
             </span>
           </div>
           <div className="flex justify-between gap-4">
-            <span>Created</span>
+            <span>Ngày tạo</span>
             <span className="text-right text-white/80">
               {formatDate(house?.createdAt)}
             </span>
           </div>
           <div className="flex justify-between gap-4">
-            <span>Your role</span>
+            <span>Vai trò của bạn</span>
             <span className="text-right text-white/80">
               {currentRoleLabel}
             </span>
@@ -1045,16 +1045,16 @@ export function HouseManagementPage() {
         <div className="flex items-start gap-3">
           <ShieldCheck className="mt-0.5 h-5 w-5 text-[#00F2FE]" />
           <div>
-            <h3 className="text-sm font-semibold text-white">Current Session</h3>
+            <h3 className="text-sm font-semibold text-white">Phiên hiện tại</h3>
             <p className="mt-1 text-xs leading-5 text-white/45">
-              You are signed in with the current app session cookie. Telegram
-              login will replace this with a verified Telegram Mini App session.
+              Bạn đang đăng nhập bằng cookie phiên hiện tại của ứng dụng. Đăng nhập Telegram
+              sẽ thay thế bằng phiên Telegram Mini App đã xác minh.
             </p>
           </div>
         </div>
       </section>
       <section className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
-        <h3 className="text-sm font-semibold text-white">Login Identity</h3>
+        <h3 className="text-sm font-semibold text-white">Danh tính đăng nhập</h3>
         <div className="mt-3 space-y-2 text-xs text-white/50">
           <div className="flex justify-between gap-4">
             <span>User ID</span>
@@ -1091,10 +1091,10 @@ export function HouseManagementPage() {
         <div className="flex items-start gap-3">
           <MessageCircle className="mt-0.5 h-5 w-5 text-[#FF2A85]" />
           <div>
-            <h3 className="text-sm font-semibold text-white">Need Help?</h3>
+            <h3 className="text-sm font-semibold text-white">Cần hỗ trợ?</h3>
             <p className="mt-1 text-xs leading-5 text-white/45">
-              Use this area for support links, product notes, and Telegram bot
-              help once the Mini App login flow is connected.
+              Khu vực này dùng cho liên kết hỗ trợ, ghi chú sản phẩm và trợ giúp Telegram bot
+              sau khi luồng đăng nhập Mini App được kết nối.
             </p>
           </div>
         </div>
@@ -1103,15 +1103,15 @@ export function HouseManagementPage() {
         <button className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-left transition hover:border-white/20">
           <Mail className="h-4 w-4 text-white/55" />
           <span>
-            <span className="block text-sm font-medium text-white">Contact support</span>
-            <span className="block text-xs text-white/45">Prepare email or bot support link</span>
+            <span className="block text-sm font-medium text-white">Liên hệ hỗ trợ</span>
+            <span className="block text-xs text-white/45">Chuẩn bị email hoặc liên kết hỗ trợ bot</span>
           </span>
         </button>
         <button className="flex w-full items-center gap-3 rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-left transition hover:border-white/20">
           <HelpCircle className="h-4 w-4 text-white/55" />
           <span>
             <span className="block text-sm font-medium text-white">FAQ</span>
-            <span className="block text-xs text-white/45">Common account and house questions</span>
+            <span className="block text-xs text-white/45">Câu hỏi thường gặp về tài khoản và phòng</span>
           </span>
         </button>
       </section>
@@ -1149,7 +1149,7 @@ export function HouseManagementPage() {
             <ChevronLeft className="h-5 w-5 text-white" />
           </button>
           <div className="min-w-0">
-            <h1 className="truncate text-xl font-bold text-white">Room</h1>
+            <h1 className="truncate text-xl font-bold text-white">Phòng</h1>
             <p className="truncate text-xs text-white/40">
               {house?.name ?? "Lunis House"}
             </p>

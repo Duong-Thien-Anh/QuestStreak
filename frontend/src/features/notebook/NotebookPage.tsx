@@ -385,8 +385,8 @@ export function NotebookPage() {
                 <Heart className="w-5 h-5 text-[#FF2A85]" />
               </div>
               <div className="flex-1">
-                <h3 className="font-semibold text-white text-sm">Desires</h3>
-                <p className="text-xs text-white/50">What you&apos;re into</p>
+                <h3 className="font-semibold text-white text-sm">Mong muốn</h3>
+                <p className="text-xs text-white/50">Những điều bạn thích</p>
               </div>
               <ChevronRight className="w-4 h-4 text-white/30" />
             </button>
@@ -399,7 +399,7 @@ export function NotebookPage() {
           transition={{ delay: 0.05 }}
         >
           <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-            Agreements
+            Thỏa thuận
           </h2>
           <button
             onClick={() => setActiveSection("agreements")}
@@ -410,10 +410,10 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Agreements ({visibleAgreements.length})
+                Thỏa thuận ({visibleAgreements.length})
               </h3>
               <p className="text-xs text-white/50">
-                {visibleAgreements.filter((a) => a.status === "active").length} active
+                {visibleAgreements.filter((a) => a.status === "active").length} đang hiệu lực
               </p>
             </div>
             <ChevronRight className="w-4 h-4 text-white/30" />
@@ -426,7 +426,7 @@ export function NotebookPage() {
           transition={{ delay: 0.1 }}
         >
           <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-            Journal
+            Nhật ký
           </h2>
           <button
             onClick={() => setActiveSection("journals")}
@@ -437,9 +437,9 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Journals ({visibleJournals.length})
+                Nhật ký ({visibleJournals.length})
               </h3>
-              <p className="text-xs text-white/50">Track your feelings</p>
+              <p className="text-xs text-white/50">Theo dõi cảm xúc của bạn</p>
             </div>
             <ChevronRight className="w-4 h-4 text-white/30" />
           </button>
@@ -451,7 +451,7 @@ export function NotebookPage() {
           transition={{ delay: 0.15 }}
         >
           <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider mb-3">
-            Notes
+            Ghi chú
           </h2>
           <button
             onClick={() => setActiveSection("notes")}
@@ -462,9 +462,9 @@ export function NotebookPage() {
             </div>
             <div className="flex-1">
               <h3 className="font-semibold text-white text-sm">
-                Notes ({visibleNotes.length})
+                Ghi chú ({visibleNotes.length})
               </h3>
-              <p className="text-xs text-white/50">List · {visibleNotes.length} items</p>
+              <p className="text-xs text-white/50">Danh sách · {visibleNotes.length} mục</p>
             </div>
             <ChevronRight className="w-4 h-4 text-white/30" />
           </button>
@@ -473,19 +473,19 @@ export function NotebookPage() {
         <FAB
           actions={[
             {
-              label: "New Agreement",
+              label: "Thỏa thuận mới",
               icon: <FileSignature className="w-5 h-5 text-white" />,
               onClick: () => setActiveSection("newAgreement"),
               color: "#00F2FE",
             },
             {
-              label: "New Journal",
+              label: "Nhật ký mới",
               icon: <BookOpen className="w-5 h-5 text-white" />,
               onClick: () => setActiveSection("newJournal"),
               color: "#A155FF",
             },
             {
-              label: "New Note",
+              label: "Ghi chú mới",
               icon: <StickyNote className="w-5 h-5 text-white" />,
               onClick: () => setActiveSection("newNote"),
               color: "#FF2A85",
@@ -504,13 +504,13 @@ export function NotebookPage() {
         className="flex items-center gap-2 mb-4 text-sm text-white/60 hover:text-white transition-colors"
       >
         <ChevronRight className="w-4 h-4 rotate-180" />
-        Back
+        Quay lại
       </button>
 
       {/* Limits Section */}
       {activeSection === "limits" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Limits</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Giới hạn</h2>
           <div className="space-y-2">
             {visibleLimits.map((limit) => (
               <div
@@ -524,7 +524,7 @@ export function NotebookPage() {
                     onClick={() => handleDeleteLimit(limit.id)}
                     className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
                   >
-                    Delete
+                    Xóa
                   </button>
                 )}
               </div>
@@ -536,14 +536,14 @@ export function NotebookPage() {
                 type="text"
                 value={newLimit}
                 onChange={(e) => setNewLimit(e.target.value)}
-                placeholder="Add a new limit..."
+                placeholder="Thêm giới hạn mới..."
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
               />
               <button
                 onClick={handleAddLimit}
                 className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 transition-colors flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Add Limit
+                <Plus className="w-4 h-4" /> Thêm giới hạn
               </button>
             </div>
           )}
@@ -553,9 +553,9 @@ export function NotebookPage() {
       {/* Desires Section */}
       {activeSection === "desires" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Desires</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Mong muốn</h2>
           <p className="text-sm text-white/50 mb-4 italic">
-            Tell them what you&apos;re into, without having to say it out loud.
+            Ghi lại điều bạn thích mà không cần phải nói thành lời.
           </p>
           <div className="space-y-2">
             {visibleDesires.map((desire) => (
@@ -570,7 +570,7 @@ export function NotebookPage() {
                     onClick={() => handleDeleteLimit(desire.id)}
                     className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
                   >
-                    Delete
+                    Xóa
                   </button>
                 )}
               </div>
@@ -582,14 +582,14 @@ export function NotebookPage() {
                 type="text"
                 value={newDesire}
                 onChange={(e) => setNewDesire(e.target.value)}
-                placeholder="Add a desire..."
+                placeholder="Thêm mong muốn..."
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
               />
               <button
                 onClick={handleAddDesire}
                 className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 transition-colors flex items-center justify-center gap-2"
               >
-                <Plus className="w-4 h-4" /> Add Desire
+                <Plus className="w-4 h-4" /> Thêm mong muốn
               </button>
             </div>
           )}
@@ -599,7 +599,7 @@ export function NotebookPage() {
       {/* Agreements Section */}
       {activeSection === "agreements" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Agreements</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Thỏa thuận</h2>
           <div className="space-y-3">
             {visibleAgreements.map((agreement) => (
               <div
@@ -630,7 +630,7 @@ export function NotebookPage() {
                     {agreement.rules && (
                       <div>
                         <p className="mb-1 text-[10px] font-semibold uppercase text-white/30">
-                          Rules
+                          Quy tắc
                         </p>
                         {renderMultilineText(agreement.rules)}
                       </div>
@@ -638,7 +638,7 @@ export function NotebookPage() {
                     {agreement.consequences && (
                       <div>
                         <p className="mb-1 text-[10px] font-semibold uppercase text-white/30">
-                          Consequences
+                          Hệ quả
                         </p>
                         {renderMultilineText(agreement.consequences)}
                       </div>
@@ -686,7 +686,7 @@ export function NotebookPage() {
                         onClick={() => handleSignAgreement(agreement.id, "dom")}
                         className="flex-1 py-2 rounded-lg bg-[#A155FF]/10 text-[#A155FF] text-xs font-medium hover:bg-[#A155FF]/20 transition-colors"
                       >
-                        Sign as Dom
+                        Ký với vai trò Dom
                       </button>
                     )}
                     {!agreement.subSignature && (
@@ -694,7 +694,7 @@ export function NotebookPage() {
                         onClick={() => handleSignAgreement(agreement.id, "sub")}
                         className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors"
                       >
-                        Sign as Sub
+                        Ký với vai trò Sub
                       </button>
                     )}
                   </div>
@@ -708,7 +708,7 @@ export function NotebookPage() {
       {/* Journals Section */}
       {activeSection === "journals" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Journals</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Nhật ký</h2>
           <div className="space-y-3">
             {visibleJournals.map((journal) => (
               <button
@@ -721,7 +721,7 @@ export function NotebookPage() {
                   <p className="text-xs text-white/50 mt-1">{journal.prompt}</p>
                 )}
                 <p className="text-xs text-white/30 mt-1">
-                  {selectedJournal === journal.id ? selectedJournalEntries.length : "View"} entries
+                  {selectedJournal === journal.id ? selectedJournalEntries.length : "Xem"} mục
                 </p>
                 {/* Show entries if expanded */}
                 {selectedJournal === journal.id && (
@@ -771,7 +771,7 @@ export function NotebookPage() {
                         onChange={(e) =>
                           setNewJournalEntry((prev) => ({ ...prev, content: e.target.value }))
                         }
-                        placeholder="Write your thoughts..."
+                        placeholder="Viết suy nghĩ của bạn..."
                         rows={3}
                         className="w-full px-3 py-2 rounded-lg bg-[#252532] border border-white/10 text-white text-xs placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
                       />
@@ -779,7 +779,7 @@ export function NotebookPage() {
                         onClick={handleAddJournalEntry}
                         className="w-full py-2 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 transition-colors"
                       >
-                        Add Entry
+                        Thêm mục
                       </button>
                     </div>
                   </div>
@@ -793,7 +793,7 @@ export function NotebookPage() {
       {/* Notes Section */}
       {activeSection === "notes" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}>
-          <h2 className="text-lg font-semibold text-white mb-4">Notes</h2>
+          <h2 className="text-lg font-semibold text-white mb-4">Ghi chú</h2>
           <div className="space-y-3">
             {visibleNotes.map((note) => (
               <div
@@ -817,7 +817,7 @@ export function NotebookPage() {
                         onClick={() => handleDeleteNote(note.id)}
                         className="px-2 py-1 rounded-md text-xs text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
                       >
-                        Delete
+                        Xóa
                       </button>
                     )}
                   </div>
@@ -832,33 +832,33 @@ export function NotebookPage() {
       {/* New Agreement Form */}
       {activeSection === "newAgreement" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">New Agreement</h2>
+          <h2 className="text-lg font-semibold text-white">Thỏa thuận mới</h2>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={newAgreement.title}
               onChange={(e) => setNewAgreement((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="e.g., Protocol Agreement"
+              placeholder="Ví dụ: Thỏa thuận giao tiếp"
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Purpose</label>
+            <label className="text-xs text-white/50 mb-2 block">Mục đích</label>
             <textarea
               value={newAgreement.purpose}
               onChange={(e) => setNewAgreement((prev) => ({ ...prev, purpose: e.target.value }))}
-              placeholder="What are you choosing together?"
+              placeholder="Hai bạn đang cùng thống nhất điều gì?"
               rows={2}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none resize-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Rules (one per line)</label>
+            <label className="text-xs text-white/50 mb-2 block">Quy tắc (mỗi dòng một quy tắc)</label>
             <textarea
               value={newAgreement.rules}
               onChange={(e) => setNewAgreement((prev) => ({ ...prev, rules: e.target.value }))}
-              placeholder="e.g., No orgasm without permission..."
+              placeholder="Ví dụ: Luôn xin phép trước..."
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none resize-none"
             />
@@ -867,7 +867,7 @@ export function NotebookPage() {
             onClick={handleCreateAgreement}
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
           >
-            Create Agreement
+            Tạo thỏa thuận
           </button>
         </motion.div>
       )}
@@ -875,23 +875,23 @@ export function NotebookPage() {
       {/* New Journal Form */}
       {activeSection === "newJournal" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">New Journal</h2>
+          <h2 className="text-lg font-semibold text-white">Nhật ký mới</h2>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Name</label>
+            <label className="text-xs text-white/50 mb-2 block">Tên</label>
             <input
               type="text"
               value={newJournal.name}
               onChange={(e) => setNewJournal((prev) => ({ ...prev, name: e.target.value }))}
-              placeholder="My Journal"
+              placeholder="Nhật ký của tôi"
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Prompt</label>
+            <label className="text-xs text-white/50 mb-2 block">Gợi ý viết</label>
             <textarea
               value={newJournal.prompt}
               onChange={(e) => setNewJournal((prev) => ({ ...prev, prompt: e.target.value }))}
-              placeholder="What should your taskee write about?"
+              placeholder="Người nhận task nên viết về điều gì?"
               rows={2}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
             />
@@ -900,7 +900,7 @@ export function NotebookPage() {
             onClick={handleAddJournal}
             className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 transition-colors"
           >
-            Create Journal
+            Tạo nhật ký
           </button>
         </motion.div>
       )}
@@ -908,29 +908,29 @@ export function NotebookPage() {
       {/* New Note Form */}
       {activeSection === "newNote" && (
         <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-4">
-          <h2 className="text-lg font-semibold text-white">New Note</h2>
+          <h2 className="text-lg font-semibold text-white">Ghi chú mới</h2>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={newNote.title}
               onChange={(e) => setNewNote((prev) => ({ ...prev, title: e.target.value }))}
-              placeholder="Note title..."
+              placeholder="Tiêu đề ghi chú..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Content</label>
+            <label className="text-xs text-white/50 mb-2 block">Nội dung</label>
             <textarea
               value={newNote.content}
               onChange={(e) => setNewNote((prev) => ({ ...prev, content: e.target.value }))}
-              placeholder="Write your note..."
+              placeholder="Viết ghi chú của bạn..."
               rows={4}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none resize-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Visibility</label>
+            <label className="text-xs text-white/50 mb-2 block">Quyền hiển thị</label>
             <div className="flex gap-2">
               {(["public", "private"] as const).map((v) => (
                 <button
@@ -944,7 +944,7 @@ export function NotebookPage() {
                       : "border-white/10 text-white/40"
                   }`}
                 >
-                  {v.charAt(0).toUpperCase() + v.slice(1)}
+                  {v === "public" ? "Công khai" : "Riêng tư"}
                 </button>
               ))}
             </div>
@@ -953,7 +953,7 @@ export function NotebookPage() {
             onClick={handleAddNote}
             className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 transition-colors"
           >
-            Create Note
+            Tạo ghi chú
           </button>
         </motion.div>
       )}

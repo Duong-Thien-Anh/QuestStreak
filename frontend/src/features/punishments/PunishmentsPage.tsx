@@ -371,7 +371,7 @@ export function PunishmentsPage() {
               <p className="text-2xl font-bold text-white">
                 {visibleAssignments.filter((a) => a.status === "redeemed").length}
               </p>
-              <p className="text-xs text-white/50">Redeemed</p>
+              <p className="text-xs text-white/50">Đã chuộc lỗi</p>
             </div>
             <Crown className="w-6 h-6 text-[#FFD700]" />
           </div>
@@ -381,12 +381,12 @@ export function PunishmentsPage() {
       {/* Active Punishments */}
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
-          Active Punishments
+          Hình phạt đang chịu
         </h2>
 
         {activeAssignments.length === 0 ? (
           <div className="text-center py-8 text-white/30 text-sm">
-            No active punishments
+            Không có hình phạt đang chịu
           </div>
         ) : (
           activeAssignments.map((assignment) => (
@@ -421,7 +421,7 @@ export function PunishmentsPage() {
                       onClick={() => handleForgive(assignment.id)}
                       className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
                     >
-                      Forgive
+                      Tha thứ
                     </button>
                   ) : (
                     <button
@@ -432,7 +432,7 @@ export function PunishmentsPage() {
                       }
                       className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
                     >
-                      {expandedId === assignment.id ? "Close" : "Redeem"}
+                      {expandedId === assignment.id ? "Đóng" : "Chuộc lỗi"}
                     </button>
                   )}
                 </div>
@@ -506,7 +506,7 @@ export function PunishmentsPage() {
       {/* All Punishments Catalog */}
       <div className="space-y-3">
         <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
-          Punishment Catalog
+          Danh sách hình phạt
         </h2>
         {visiblePunishments.map((p, i) => (
           <motion.div
@@ -534,7 +534,7 @@ export function PunishmentsPage() {
                   }}
                   className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
                 >
-                  Assign
+                  Gán
                 </button>
               )}
             </div>
@@ -546,19 +546,19 @@ export function PunishmentsPage() {
       <FAB
         actions={[
           {
-            label: "New Punishment",
+            label: "Hình phạt mới",
             icon: <Plus className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("new"),
             color: "#FF3B30",
           },
           {
-            label: "Forgive Demerit",
+            label: "Tha Chày",
             icon: <Heart className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("forgive"),
             color: "#00F2FE",
           },
           {
-            label: "Add Demerit",
+            label: "Thêm Chày",
             icon: <AlertOctagon className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("add"),
             color: "#FF3B30",
@@ -570,11 +570,11 @@ export function PunishmentsPage() {
       <BottomSheet
         isOpen={actionSheet === "new"}
         onClose={() => setActionSheet(null)}
-        title="New Punishment"
+        title="Hình phạt mới"
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={newPunishment.title}
@@ -584,12 +584,12 @@ export function PunishmentsPage() {
                   title: event.target.value,
                 }))
               }
-              placeholder="Punishment title..."
+              placeholder="Nhập tên hình phạt..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Description</label>
+            <label className="text-xs text-white/50 mb-2 block">Mô tả</label>
             <textarea
               value={newPunishment.description}
               onChange={(event) =>
@@ -598,13 +598,13 @@ export function PunishmentsPage() {
                   description: event.target.value,
                 }))
               }
-              placeholder="Describe what must be done..."
+              placeholder="Mô tả việc cần thực hiện..."
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none resize-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Chày Cost</label>
+            <label className="text-xs text-white/50 mb-2 block">Chi phí Chày</label>
             <input
               type="number"
               min={0}
@@ -623,7 +623,7 @@ export function PunishmentsPage() {
             disabled={!newPunishment.title.trim()}
             className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
           >
-            Create Punishment
+            Tạo hình phạt
           </button>
         </div>
       </BottomSheet>
@@ -631,11 +631,11 @@ export function PunishmentsPage() {
       <BottomSheet
         isOpen={actionSheet === "add"}
         onClose={() => setActionSheet(null)}
-        title="Add Demerits"
+        title="Thêm Chày"
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Amount</label>
+            <label className="text-xs text-white/50 mb-2 block">Số lượng</label>
             <input
               type="number"
               value={pointsInput}
@@ -644,12 +644,12 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Reason</label>
+            <label className="text-xs text-white/50 mb-2 block">Lý do</label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Enter reason..."
+              placeholder="Nhập lý do..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
             />
           </div>
@@ -665,11 +665,11 @@ export function PunishmentsPage() {
       <BottomSheet
         isOpen={actionSheet === "forgive"}
         onClose={() => setActionSheet(null)}
-        title="Forgive Demerits"
+        title="Tha Chày"
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Amount to Forgive</label>
+            <label className="text-xs text-white/50 mb-2 block">Số Chày muốn tha</label>
             <input
               type="number"
               value={pointsInput}
@@ -678,12 +678,12 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Mercy Note</label>
+            <label className="text-xs text-white/50 mb-2 block">Lời tha thứ</label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Write a kind note..."
+              placeholder="Viết lời nhắn dịu dàng..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
@@ -692,7 +692,7 @@ export function PunishmentsPage() {
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
           >
             <Heart className="w-4 h-4 inline mr-2" />
-            Forgive
+            Tha thứ
           </button>
         </div>
       </BottomSheet>

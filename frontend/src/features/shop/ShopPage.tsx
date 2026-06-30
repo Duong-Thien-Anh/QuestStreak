@@ -160,7 +160,7 @@ export function ShopPage() {
   const handleGift = (rewardId?: number) => {
     if (!rewardId) return;
     if (!houseQuery.data) {
-      showToast("Gift reward cần backend để lưu", "info");
+      showToast("Tặng reward cần backend để lưu", "info");
       return;
     }
     setGiftSheetRewardId(rewardId);
@@ -237,7 +237,7 @@ export function ShopPage() {
       createRewardMutation.mutate({
         houseId,
         title: reasonInput,
-        description: "Quick grant from admin",
+        description: "Tặng nhanh từ admin",
         cost: 0,
         image: "/shop/reward_gift.jpg",
         rarity: "common",
@@ -251,7 +251,7 @@ export function ShopPage() {
       id: rewards.length + 1,
       houseId: 1,
       title: reasonInput,
-      description: "Quick grant from admin",
+      description: "Tặng nhanh từ admin",
       cost: 0,
       image: "/shop/reward_gift.jpg",
       rarity: "common" as const,
@@ -466,6 +466,13 @@ export function ShopPage() {
     legendary: "#FFD700",
   };
 
+  const rarityLabel: Record<Rarity, string> = {
+    common: "Thường",
+    rare: "Hiếm",
+    epic: "Sử thi",
+    legendary: "Huyền thoại",
+  };
+
   return (
     <div className="px-4 pt-4 space-y-4">
       {/* Profile Card */}
@@ -495,7 +502,7 @@ export function ShopPage() {
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{purchasedCount}</p>
-              <p className="text-xs text-white/50">Purchased</p>
+              <p className="text-xs text-white/50">Đã mua</p>
             </div>
             <Gift className="w-6 h-6 text-[#A155FF]" />
           </div>
@@ -514,7 +521,7 @@ export function ShopPage() {
                 : "text-white/40 hover:text-white/60"
             }`}
           >
-            {tab}
+            {tab === "rewards" ? "Reward" : "Privilege"}
           </button>
         ))}
       </div>
@@ -555,7 +562,7 @@ export function ShopPage() {
                           backgroundColor: `${rarityColors[reward.rarity]}15`,
                         }}
                       >
-                        {reward.rarity}
+                        {rarityLabel[reward.rarity]}
                       </span>
                     </div>
                     <p className="text-xs text-white/50 mt-1 line-clamp-2">
@@ -570,7 +577,7 @@ export function ShopPage() {
                           onClick={() => handleGift(reward.id)}
                           className="px-4 py-1.5 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 transition-colors"
                         >
-                          Gift
+                          Tặng
                         </button>
                       ) : (
                         <button
@@ -578,7 +585,7 @@ export function ShopPage() {
                           disabled={visibleWallet.chymBalance < reward.cost}
                           className="px-4 py-1.5 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
-                          Purchase
+                          Mua
                         </button>
                       )}
                     </div>
@@ -589,13 +596,13 @@ export function ShopPage() {
                         onClick={() => openRewardForm(reward)}
                         className="px-2 py-1 rounded-lg border border-white/10 text-[10px] text-white/60 hover:text-white hover:bg-white/5 transition-colors"
                       >
-                        Edit
+                        Sửa
                       </button>
                       <button
                         onClick={() => deleteReward(reward.id)}
                         className="px-2 py-1 rounded-lg border border-[#FF3B30]/20 text-[10px] text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
                       >
-                        Delete
+                        Xóa
                       </button>
                     </div>
                   )}
@@ -642,7 +649,7 @@ export function ShopPage() {
                       setSelectedPrivilegeId(priv.id);
                       setActionSheet("privilege-view");
                     } else {
-                      showToast("Assign privilege cần backend để lưu", "info");
+                      showToast("Gán privilege cần backend để lưu", "info");
                     }
                   }}
                   className={`mt-3 py-2 rounded-lg text-xs font-medium transition-colors ${
@@ -651,7 +658,7 @@ export function ShopPage() {
                       : "border border-white/10 text-white/50 hover:bg-white/5"
                   }`}
                 >
-                  {isAdmin ? "Assign" : "View"}
+                  {isAdmin ? "Gán" : "Xem"}
                 </button>
                 {isAdmin && (
                   <div className="mt-2 grid grid-cols-2 gap-2">
@@ -659,13 +666,13 @@ export function ShopPage() {
                       onClick={() => openPrivilegeForm(priv)}
                       className="py-1.5 rounded-lg border border-white/10 text-[10px] text-white/60 hover:bg-white/5 transition-colors"
                     >
-                      Edit
+                      Sửa
                     </button>
                     <button
                       onClick={() => deletePrivilege(priv.id)}
                       className="py-1.5 rounded-lg border border-[#FF3B30]/20 text-[10px] text-[#FF3B30] hover:bg-[#FF3B30]/10 transition-colors"
                     >
-                      Delete
+                      Xóa
                     </button>
                   </div>
                 )}
@@ -679,13 +686,13 @@ export function ShopPage() {
       <FAB
         actions={[
           {
-            label: "Quick Grant",
+            label: "Tặng nhanh",
             icon: <Gift className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("quickgrant"),
             color: "#FFD700",
           },
           {
-            label: shopSubTab === "rewards" ? "New Reward" : "New Privilege",
+            label: shopSubTab === "rewards" ? "Reward mới" : "Đặc quyền mới",
             icon: <Zap className="w-5 h-5 text-white" />,
             onClick: () => {
               if (shopSubTab === "rewards") openRewardForm();
@@ -694,13 +701,13 @@ export function ShopPage() {
             color: "#A155FF",
           },
           {
-            label: "Remove Points",
+            label: "Trừ Chym",
             icon: <Minus className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("remove"),
             color: "#FF3B30",
           },
           {
-            label: "Add Points",
+            label: "Thêm Chym",
             icon: <Plus className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("add"),
             color: "#00F2FE",
@@ -715,11 +722,11 @@ export function ShopPage() {
           resetRewardForm();
           setActionSheet(null);
         }}
-        title={editingRewardId ? "Edit Reward" : "New Reward"}
+        title={editingRewardId ? "Sửa Reward" : "Reward mới"}
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={rewardForm.title}
@@ -729,12 +736,12 @@ export function ShopPage() {
                   title: event.target.value,
                 }))
               }
-              placeholder="Reward title..."
+              placeholder="Nhập tên Reward..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Description</label>
+            <label className="text-xs text-white/50 mb-2 block">Mô tả</label>
             <textarea
               value={rewardForm.description}
               onChange={(event) =>
@@ -743,52 +750,32 @@ export function ShopPage() {
                   description: event.target.value,
                 }))
               }
-              placeholder="Reward description..."
+              placeholder="Nhập mô tả Reward..."
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none resize-none"
             />
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="text-xs text-white/50 mb-2 block">Cost</label>
-              <input
-                type="number"
-                min={0}
-                value={rewardForm.cost}
-                onChange={(event) =>
-                  setRewardForm((current) => ({
-                    ...current,
-                    cost: Number(event.target.value),
-                  }))
-                }
-                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-white/50 mb-2 block">Rarity</label>
-              <select
-                value={rewardForm.rarity}
-                onChange={(event) =>
-                  setRewardForm((current) => ({
-                    ...current,
-                    rarity: event.target.value as typeof rewardForm.rarity,
-                  }))
-                }
-                className="w-full px-3 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none"
-              >
-                <option value="common">Common</option>
-                <option value="rare">Rare</option>
-                <option value="epic">Epic</option>
-                <option value="legendary">Legendary</option>
-              </select>
-            </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Giá</label>
+            <input
+              type="number"
+              min={0}
+              value={rewardForm.cost}
+              onChange={(event) =>
+                setRewardForm((current) => ({
+                  ...current,
+                  cost: Number(event.target.value),
+                }))
+              }
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none"
+            />
           </div>
           <button
             onClick={submitRewardForm}
             disabled={!rewardForm.title.trim()}
             className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 disabled:opacity-50 transition-colors"
           >
-            {editingRewardId ? "Save Reward" : "Create Reward"}
+            {editingRewardId ? "Lưu Reward" : "Tạo Reward"}
           </button>
         </div>
       </BottomSheet>
@@ -799,11 +786,11 @@ export function ShopPage() {
           resetPrivilegeForm();
           setActionSheet(null);
         }}
-        title={editingPrivilegeId ? "Edit Privilege" : "New Privilege"}
+        title={editingPrivilegeId ? "Sửa đặc quyền" : "Đặc quyền mới"}
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Title</label>
+            <label className="text-xs text-white/50 mb-2 block">Tiêu đề</label>
             <input
               type="text"
               value={privilegeForm.title}
@@ -813,12 +800,12 @@ export function ShopPage() {
                   title: event.target.value,
                 }))
               }
-              placeholder="Privilege title..."
+              placeholder="Nhập tên đặc quyền..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Description</label>
+            <label className="text-xs text-white/50 mb-2 block">Mô tả</label>
             <textarea
               value={privilegeForm.description}
               onChange={(event) =>
@@ -827,13 +814,13 @@ export function ShopPage() {
                   description: event.target.value,
                 }))
               }
-              placeholder="Privilege description..."
+              placeholder="Nhập mô tả đặc quyền..."
               rows={3}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none resize-none"
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Rarity</label>
+            <label className="text-xs text-white/50 mb-2 block">Độ hiếm</label>
             <select
               value={privilegeForm.rarity}
               onChange={(event) =>
@@ -844,10 +831,10 @@ export function ShopPage() {
               }
               className="w-full px-3 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
             >
-              <option value="common">Common</option>
-              <option value="rare">Rare</option>
-              <option value="epic">Epic</option>
-              <option value="legendary">Legendary</option>
+              <option value="common">Thường</option>
+              <option value="rare">Hiếm</option>
+              <option value="epic">Sử thi</option>
+              <option value="legendary">Huyền thoại</option>
             </select>
           </div>
           <button
@@ -855,7 +842,7 @@ export function ShopPage() {
             disabled={!privilegeForm.title.trim()}
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 disabled:opacity-50 transition-colors"
           >
-            {editingPrivilegeId ? "Save Privilege" : "Create Privilege"}
+            {editingPrivilegeId ? "Lưu đặc quyền" : "Tạo đặc quyền"}
           </button>
         </div>
       </BottomSheet>
@@ -863,11 +850,11 @@ export function ShopPage() {
       <BottomSheet
         isOpen={actionSheet === "add"}
         onClose={() => setActionSheet(null)}
-        title="Add Points"
+        title="Thêm Chym"
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Amount</label>
+            <label className="text-xs text-white/50 mb-2 block">Số lượng</label>
             <input
               type="number"
               value={pointsInput}
@@ -876,12 +863,12 @@ export function ShopPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Reason</label>
+            <label className="text-xs text-white/50 mb-2 block">Lý do</label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Enter reason..."
+              placeholder="Nhập lý do..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
@@ -889,7 +876,7 @@ export function ShopPage() {
             onClick={handleAddPoints}
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
           >
-            Add Chym
+            Thêm Chym
           </button>
         </div>
       </BottomSheet>
@@ -897,11 +884,11 @@ export function ShopPage() {
       <BottomSheet
         isOpen={actionSheet === "remove"}
         onClose={() => setActionSheet(null)}
-        title="Remove Points"
+        title="Trừ Chym"
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Amount</label>
+            <label className="text-xs text-white/50 mb-2 block">Số lượng</label>
             <input
               type="number"
               value={pointsInput}
@@ -910,12 +897,12 @@ export function ShopPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Reason</label>
+            <label className="text-xs text-white/50 mb-2 block">Lý do</label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Enter reason..."
+              placeholder="Nhập lý do..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none"
             />
           </div>
@@ -923,7 +910,7 @@ export function ShopPage() {
             onClick={handleRemovePoints}
             className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 transition-colors"
           >
-            Remove Chym
+            Trừ Chym
           </button>
         </div>
       </BottomSheet>
@@ -931,18 +918,18 @@ export function ShopPage() {
       <BottomSheet
         isOpen={actionSheet === "quickgrant"}
         onClose={() => setActionSheet(null)}
-        title="Quick Grant"
+        title="Tặng nhanh"
       >
         <div className="space-y-4">
           <div>
             <label className="text-xs text-white/50 mb-2 block">
-              Reward Title
+              Tên Reward
             </label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Enter custom reward..."
+              placeholder="Nhập Reward tùy chỉnh..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
             />
           </div>
@@ -951,7 +938,7 @@ export function ShopPage() {
             disabled={!reasonInput.trim()}
             className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 disabled:opacity-50 transition-colors"
           >
-            Grant Reward
+            Tặng Reward
           </button>
         </div>
       </BottomSheet>
@@ -962,7 +949,7 @@ export function ShopPage() {
           setSelectedPrivilegeId(null);
           setActionSheet(null);
         }}
-        title="Privilege Detail"
+        title="Chi tiết đặc quyền"
       >
         {selectedPrivilege ? (
           <div className="space-y-4">
@@ -984,7 +971,7 @@ export function ShopPage() {
                 backgroundColor: `${rarityColors[selectedPrivilege.rarity]}15`,
               }}
             >
-              {selectedPrivilege.rarity}
+              {rarityLabel[selectedPrivilege.rarity]}
             </span>
           </div>
         ) : null}
@@ -1031,7 +1018,7 @@ export function ShopPage() {
             >
               {members.map((member) => (
                 <option key={member.id} value={member.id}>
-                  {member.nickname || "Member"} - {member.lifestyleRole}
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
                 </option>
               ))}
             </select>

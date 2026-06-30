@@ -1,15 +1,11 @@
 /**
- * Database client — switches driver automatically based on NODE_ENV:
- *   - development: `postgres` npm package → local PostgreSQL (Docker)
- *   - production:  `@neondatabase/serverless` → Neon
+ * Database client.
  *
- * The return type is cast to PostgresJsDatabase so all callers get
- * a single, consistent Drizzle interface regardless of the underlying driver.
+ * Use the same postgres-js driver in every environment. The schema scripts also
+ * use this driver, so production queries behave like the migration/repair tools.
  */
 
-import { drizzle as drizzleNeon } from "drizzle-orm/neon-http";
-import { neon } from "@neondatabase/serverless";
-import { drizzle as drizzlePostgres, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
+import { drizzle, type PostgresJsDatabase } from "drizzle-orm/postgres-js";
 import postgresJs from "postgres";
 import "dotenv/config";
 import * as schema from "./schema";
@@ -29,15 +25,8 @@ function resolveDatabaseUrl(): string {
 const DATABASE_URL = resolveDatabaseUrl();
 
 function createDb(): PostgresJsDatabase<Schema> {
-  if (process.env.NODE_ENV === "production") {
-    // Production: Neon serverless (HTTP-based, no persistent connection)
-    const sql = neon(DATABASE_URL);
-    return drizzleNeon(sql, { schema }) as unknown as PostgresJsDatabase<Schema>;
-  } else {
-    // Development: standard postgres driver → local PostgreSQL via Docker
-    const client = postgresJs(DATABASE_URL);
-    return drizzlePostgres(client, { schema });
-  }
+  const client = postgresJs(DATABASE_URL);
+  return drizzle(client, { schema });
 }
 
 export const db = createDb();

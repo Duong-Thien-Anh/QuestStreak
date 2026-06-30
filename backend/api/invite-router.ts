@@ -14,6 +14,7 @@ import {
   wallets,
 } from "@db/schema";
 import { createNotification } from "./lib/notifications";
+import { avatarForGender, supportedGenders } from "./lib/gender";
 
 function createInviteCode() {
   return nanoid(12);
@@ -60,7 +61,7 @@ export const inviteRouter = createRouter({
         houseId: z.number(),
         intendedNickname: z.string().min(1).max(255).optional(),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]).default("submissive"),
-        gender: z.enum(["male", "female", "other"]).default("other"),
+        gender: z.enum(supportedGenders).default("female"),
         expiresInDays: z.number().int().min(1).max(90).default(7),
       })
     )
@@ -152,7 +153,7 @@ export const inviteRouter = createRouter({
           houseName: room?.name ?? "Lunis House",
           intendedNickname: null,
           lifestyleRole: "submissive" as const,
-          gender: "other" as const,
+          gender: "female" as const,
           status: "active" as const,
           expiresAt: null,
           requiresApproval: roomCode.approvalRequired,
@@ -166,7 +167,7 @@ export const inviteRouter = createRouter({
       z.object({
         code: z.string().min(1).max(32),
         nickname: z.string().min(1).max(255).optional(),
-        gender: z.enum(["male", "female", "other"]).optional(),
+        gender: z.enum(supportedGenders).optional(),
       })
     )
     .mutation(async ({ ctx, input }) => {
@@ -198,7 +199,7 @@ export const inviteRouter = createRouter({
             houseId: room.id,
             userId: ctx.user.id,
             nickname: input.nickname ?? ctx.user.name ?? "Thành viên mới",
-            gender: input.gender ?? "other",
+            gender: input.gender ?? "female",
             status: "pending" as const,
             reviewedBy: null,
             reviewedAt: null,
@@ -235,6 +236,7 @@ export const inviteRouter = createRouter({
           return { ...request, joinStatus: "pending" as const };
         }
 
+        const gender = input.gender ?? "female";
         const [member] = await db
           .insert(houseMembers)
           .values({
@@ -242,7 +244,8 @@ export const inviteRouter = createRouter({
             userId: ctx.user.id,
             nickname: input.nickname ?? ctx.user.name ?? "Thành viên mới",
             lifestyleRole: "submissive",
-            gender: input.gender ?? "other",
+            gender,
+            telegramAvatar: avatarForGender(gender),
           })
           .returning();
 

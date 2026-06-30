@@ -11,6 +11,7 @@ import {
   roomJoinRequests,
 } from "@db/schema";
 import { desc, eq } from "drizzle-orm";
+import { avatarForGender, supportedGenders } from "./lib/gender";
 
 function createRoomCode() {
   return nanoid(10);
@@ -55,6 +56,8 @@ async function createOwnedHouseForUser(input: {
       userId: input.userId,
       nickname: input.userName || "Chủ nhà",
       lifestyleRole: "dominant",
+      gender: "male",
+      telegramAvatar: avatarForGender("male"),
     })
     .returning({ id: houseMembers.id });
 
@@ -87,6 +90,8 @@ export const houseRouter = createRouter({
             userId,
             nickname: ctx.user.name || "Root Admin",
             lifestyleRole: "dominant",
+            gender: "male",
+            telegramAvatar: avatarForGender("male"),
           })
           .returning({ id: houseMembers.id });
 
@@ -341,6 +346,7 @@ export const houseRouter = createRouter({
             nickname: request.nickname ?? "Thành viên mới",
             lifestyleRole: "submissive",
             gender: request.gender,
+            telegramAvatar: avatarForGender(request.gender === "male" ? "male" : "female"),
           })
           .returning({ id: houseMembers.id });
 
@@ -366,7 +372,7 @@ export const houseRouter = createRouter({
         memberId: z.number(),
         nickname: z.string().max(255).optional(),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]).optional(),
-        gender: z.enum(["male", "female", "other"]).optional(),
+        gender: z.enum(supportedGenders).optional(),
       })
     )
     .mutation(async ({ input }) => {
@@ -374,7 +380,10 @@ export const houseRouter = createRouter({
       const updateData: Record<string, unknown> = {};
       if (input.nickname !== undefined) updateData.nickname = input.nickname;
       if (input.lifestyleRole !== undefined) updateData.lifestyleRole = input.lifestyleRole;
-      if (input.gender !== undefined) updateData.gender = input.gender;
+      if (input.gender !== undefined) {
+        updateData.gender = input.gender;
+        updateData.telegramAvatar = avatarForGender(input.gender);
+      }
 
       await db
         .update(houseMembers)
@@ -422,7 +431,7 @@ export const houseRouter = createRouter({
     .input(
       z.object({
         nickname: z.string().max(255).optional(),
-        gender: z.enum(["male", "female", "other"]).optional(),
+        gender: z.enum(supportedGenders).optional(),
         telegramAvatar: z.string().max(2048).optional(),
       })
     )
@@ -430,8 +439,11 @@ export const houseRouter = createRouter({
       const db = getDb();
       const updateData: Record<string, unknown> = {};
       if (input.nickname !== undefined) updateData.nickname = input.nickname;
-      if (input.gender !== undefined) updateData.gender = input.gender;
-      if (input.telegramAvatar !== undefined) {
+      if (input.gender !== undefined) {
+        updateData.gender = input.gender;
+        updateData.telegramAvatar = avatarForGender(input.gender);
+      }
+      if (input.telegramAvatar !== undefined && input.gender === undefined) {
         updateData.telegramAvatar = input.telegramAvatar;
       }
 
@@ -449,13 +461,14 @@ export const houseRouter = createRouter({
         houseId: z.number(),
         nickname: z.string().min(1).max(255),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]),
-        gender: z.enum(["male", "female", "other"]).optional(),
+        gender: z.enum(supportedGenders).optional(),
       })
     )
     .mutation(async ({ input }) => {
       const db = getDb();
 
       // Create a placeholder member (no real user linked)
+      const gender = input.gender ?? "female";
       const [member] = await db
         .insert(houseMembers)
         .values({
@@ -463,7 +476,8 @@ export const houseRouter = createRouter({
           userId: 0, // placeholder - will be linked when user joins
           nickname: input.nickname,
           lifestyleRole: input.lifestyleRole,
-          gender: input.gender || "other",
+          gender,
+          telegramAvatar: avatarForGender(gender),
         })
         .returning({ id: houseMembers.id });
 

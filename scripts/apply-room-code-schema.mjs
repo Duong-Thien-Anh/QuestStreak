@@ -56,7 +56,7 @@ try {
       "houseId" bigint NOT NULL,
       "userId" bigint NOT NULL,
       "nickname" varchar(255),
-      "gender" "gender" DEFAULT 'other' NOT NULL,
+      "gender" "gender" DEFAULT 'female' NOT NULL,
       "status" "joinRequestStatus" DEFAULT 'pending' NOT NULL,
       "reviewedBy" bigint,
       "reviewedAt" timestamp,

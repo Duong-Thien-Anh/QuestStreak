@@ -12,7 +12,6 @@ const LIFESTYLE_ROLES = [
 const GENDERS = [
   { value: "male", label: "Nam" },
   { value: "female", label: "Nữ" },
-  { value: "other", label: "Khác" },
 ] as const;
 
 export default function RegisterPage() {
@@ -25,7 +24,7 @@ export default function RegisterPage() {
     password: "",
     confirmPassword: "",
     lifestyleRole: "submissive" as "dominant" | "submissive" | "switch",
-    gender: "other" as "male" | "female" | "other",
+    gender: "female" as "male" | "female",
   });
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);

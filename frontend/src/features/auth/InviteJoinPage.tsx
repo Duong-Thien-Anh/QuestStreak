@@ -8,7 +8,7 @@ type PreviewData = {
   houseName: string;
   intendedNickname: string | null;
   lifestyleRole: "dominant" | "submissive" | "switch";
-  gender: "male" | "female" | "other";
+  gender: "male" | "female";
   status: "active" | "accepted" | "expired" | "revoked";
   expiresAt: Date | null;
   requiresApproval?: boolean;
@@ -33,7 +33,7 @@ export function InviteJoinPage() {
   const [preview, setPreview] = useState<PreviewData | null>(null);
   const [previewLoading, setPreviewLoading] = useState(false);
   const [nickname, setNickname] = useState("");
-  const [gender, setGender] = useState<"male" | "female" | "other">("other");
+  const [gender, setGender] = useState<"male" | "female">("female");
   const [joinStatus, setJoinStatus] = useState<"joined" | "pending" | null>(null);
   const [autoPreviewRequested, setAutoPreviewRequested] = useState(false);
   const [houseName, setHouseName] = useState("Lunis House");
@@ -82,7 +82,7 @@ export function InviteJoinPage() {
       const result = await previewQuery.refetch();
       setPreview(result.data as PreviewData | null);
       if (result.data) {
-        setGender((result.data as PreviewData).gender);
+        setGender((result.data as PreviewData).gender === "male" ? "male" : "female");
       }
       if (!result.data) {
         showToast("Không tìm thấy mã phòng này", "error");
@@ -312,7 +312,6 @@ export function InviteJoinPage() {
                     onChange={(e) => setGender(e.target.value as typeof gender)}
                     className="w-full px-4 py-3 rounded-xl bg-[#1A1A22] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
                   >
-                    <option value="other">Other</option>
                     <option value="female">Female</option>
                     <option value="male">Male</option>
                   </select>

@@ -20,7 +20,7 @@ try {
       "invitedBy" bigint NOT NULL,
       "intendedNickname" varchar(255),
       "lifestyleRole" "lifestyleRole" DEFAULT 'submissive' NOT NULL,
-      "gender" "gender" DEFAULT 'other' NOT NULL,
+      "gender" "gender" DEFAULT 'female' NOT NULL,
       "status" "inviteStatus" DEFAULT 'active' NOT NULL,
       "expiresAt" timestamp,
       "acceptedBy" bigint,

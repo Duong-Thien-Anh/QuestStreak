@@ -138,6 +138,7 @@ export async function awardCompletionProgress(input: {
   sourceType: CompletionSource;
   sourceId: number;
   chymReward: number;
+  bonusXp?: number;
 }) {
   const db = getDb();
   const now = new Date();
@@ -183,7 +184,7 @@ export async function awardCompletionProgress(input: {
   const progress = await ensureMemberProgress(db, input.memberId);
   const completionXp = alreadyCompletedToday
     ? 0
-    : getCompletionXp(input.chymReward);
+    : getCompletionXp(input.chymReward) + Math.max(0, input.bonusXp ?? 0);
   let xp = progress.xp + completionXp;
   let level = calculateLevel(xp);
 

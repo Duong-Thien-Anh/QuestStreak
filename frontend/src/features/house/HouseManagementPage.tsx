@@ -37,10 +37,14 @@ import { trpc } from "@/providers/trpc";
 import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 type MemberRole = "dominant" | "submissive" | "switch";
-type Gender = "male" | "female" | "other";
+type Gender = "male" | "female";
 type AppLanguage = "en" | "vi";
 type MenuSection = "profile" | "settings" | "security" | "support";
 type JoinRequestStatus = "pending" | "approved" | "rejected";
+
+function normalizeGender(gender: string | null | undefined): Gender {
+  return gender === "male" ? "male" : "female";
+}
 
 type LocalMember = {
   id: number;
@@ -190,14 +194,13 @@ export function HouseManagementPage() {
   const [profileForm, setProfileForm] = useState({
     nickname: undefined as string | undefined,
     gender: undefined as Gender | undefined,
-    telegramAvatar: undefined as string | undefined,
   });
   const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
   const [memberForm, setMemberForm] = useState({
     nickname: "",
     lifestyleRole: "submissive" as MemberRole,
-    gender: "other" as Gender,
+    gender: "female" as Gender,
   });
   const [roomNameDraft, setRoomNameDraft] = useState<string | undefined>();
 
@@ -207,7 +210,6 @@ export function HouseManagementPage() {
       setProfileForm({
         nickname: undefined,
         gender: undefined,
-        telegramAvatar: undefined,
       });
       showToast("Đã cập nhật profile", "success");
     },
@@ -278,7 +280,7 @@ export function HouseManagementPage() {
     setMemberForm({
       nickname: "",
       lifestyleRole: "submissive",
-      gender: "other",
+      gender: "female",
     });
   };
 
@@ -287,7 +289,7 @@ export function HouseManagementPage() {
     setMemberForm({
       nickname: "",
       lifestyleRole: "submissive",
-      gender: "other",
+      gender: "female",
     });
     setMemberDialogOpen(true);
   };
@@ -297,7 +299,7 @@ export function HouseManagementPage() {
     setMemberForm({
       nickname: member.nickname ?? "",
       lifestyleRole: member.lifestyleRole,
-      gender: member.gender,
+      gender: normalizeGender(member.gender),
     });
     setMemberDialogOpen(true);
   };
@@ -317,14 +319,11 @@ export function HouseManagementPage() {
 
   const submitProfileForm = () => {
     const nickname = profileForm.nickname ?? displayMember?.nickname ?? "";
-    const gender = profileForm.gender ?? displayMember?.gender ?? "other";
-    const telegramAvatar =
-      profileForm.telegramAvatar ?? displayMember?.telegramAvatar ?? "";
+    const gender = normalizeGender(profileForm.gender ?? displayMember?.gender);
 
     selfUpdateMutation.mutate({
       nickname: nickname.trim() || undefined,
       gender,
-      telegramAvatar: telegramAvatar.trim() || undefined,
     });
   };
 
@@ -639,15 +638,11 @@ export function HouseManagementPage() {
       <section className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
         <div className="flex items-center gap-4">
           <img
-            src={
-              profileForm.telegramAvatar ??
-              displayMember?.telegramAvatar ??
-              `/avatars/${
-                (profileForm.gender ?? displayMember?.gender) === "male"
-                  ? "admin"
-                  : "sub"
-              }.jpg`
-            }
+            src={`/avatars/${
+              normalizeGender(profileForm.gender ?? displayMember?.gender) === "male"
+                ? "admin"
+                : "sub"
+            }.jpg`}
             alt={
               profileForm.nickname ??
               displayMember?.nickname ??
@@ -689,26 +684,9 @@ export function HouseManagementPage() {
           />
         </label>
         <label className="block space-y-2">
-          <span className="text-xs text-white/45">Avatar URL</span>
-          <input
-            type="url"
-            value={
-              profileForm.telegramAvatar ?? displayMember?.telegramAvatar ?? ""
-            }
-            onChange={(event) =>
-              setProfileForm((current) => ({
-                ...current,
-                telegramAvatar: event.target.value,
-              }))
-            }
-            className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white placeholder:text-white/20 focus:border-[#FF2A85]/50 focus:outline-none"
-            placeholder="https://..."
-          />
-        </label>
-        <label className="block space-y-2">
           <span className="text-xs text-white/45">Gender</span>
           <select
-            value={profileForm.gender ?? displayMember?.gender ?? "other"}
+            value={normalizeGender(profileForm.gender ?? displayMember?.gender)}
             onChange={(event) =>
               setProfileForm((current) => ({
                 ...current,
@@ -717,7 +695,6 @@ export function HouseManagementPage() {
             }
             className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 text-sm text-white focus:border-[#FF2A85]/50 focus:outline-none"
           >
-            <option value="other">Other</option>
             <option value="female">Female</option>
             <option value="male">Male</option>
           </select>
@@ -831,7 +808,6 @@ export function HouseManagementPage() {
                 <div className="relative shrink-0">
                   <img
                     src={
-                      member.telegramAvatar ||
                       `/avatars/${member.gender === "male" ? "admin" : "sub"}.jpg`
                     }
                     alt={member.nickname || "Member"}
@@ -931,7 +907,6 @@ export function HouseManagementPage() {
                   }
                   className="rounded-xl border border-white/10 bg-[#252532] px-3 py-3 text-sm text-white focus:border-[#FF2A85]/50 focus:outline-none"
                 >
-                  <option value="other">Other</option>
                   <option value="female">Female</option>
                   <option value="male">Male</option>
                 </select>

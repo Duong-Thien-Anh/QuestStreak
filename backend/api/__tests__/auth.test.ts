@@ -45,7 +45,7 @@ type RegistrationRow = {
   username?: string | null;
   phone?: string | null;
   lifestyleRole: "dominant" | "submissive" | "switch";
-  gender: "male" | "female" | "other";
+  gender: "male" | "female";
   passwordHash: string;
   status: "pending" | "approved" | "rejected";
   rejectionReason?: string | null;
@@ -285,7 +285,7 @@ function createRegistration(input?: Partial<RegistrationRow>) {
     username: "pending",
     phone: "0911111111",
     lifestyleRole: "submissive",
-    gender: "other",
+    gender: "female",
     passwordHash: "hash",
     status: "pending",
     rejectionReason: null,
@@ -341,7 +341,7 @@ describe("auth flow", () => {
         phone: "0999999999",
         password: "password123",
         lifestyleRole: "switch",
-        gender: "other",
+        gender: "female",
       });
 
       expect(result.status).toBe("pending");

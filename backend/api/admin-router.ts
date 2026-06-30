@@ -35,6 +35,7 @@ import {
   wheels,
 } from "@db/schema";
 import { sendMail, buildApprovalEmail, buildRejectionEmail } from "./lib/mailer";
+import { avatarForGender, supportedGenders } from "./lib/gender";
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_HASH_PREFIX = "scrypt";
@@ -101,7 +102,8 @@ async function ensureOwnerMember(input: {
       userId: input.ownerId,
       nickname: input.ownerName || "Room Owner",
       lifestyleRole: "dominant",
-      gender: "other",
+      gender: "male",
+      telegramAvatar: avatarForGender("male"),
     })
     .returning();
   await ensureMemberResources(member.id);
@@ -457,7 +459,7 @@ export const adminRouter = createRouter({
         userId: z.number().optional(),
         nickname: z.string().min(1).max(255),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]),
-        gender: z.enum(["male", "female", "other"]).default("other"),
+        gender: z.enum(supportedGenders).default("female"),
       }),
     )
     .mutation(async ({ input }) => {
@@ -481,6 +483,7 @@ export const adminRouter = createRouter({
           nickname: input.nickname.trim(),
           lifestyleRole: input.lifestyleRole,
           gender: input.gender,
+          telegramAvatar: avatarForGender(input.gender),
         })
         .returning();
       await ensureMemberResources(member.id);
@@ -493,7 +496,7 @@ export const adminRouter = createRouter({
         memberId: z.number(),
         nickname: z.string().max(255).optional(),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]).optional(),
-        gender: z.enum(["male", "female", "other"]).optional(),
+        gender: z.enum(supportedGenders).optional(),
       }),
     )
     .mutation(async ({ input }) => {
@@ -502,7 +505,10 @@ export const adminRouter = createRouter({
       if (input.lifestyleRole !== undefined) {
         updateData.lifestyleRole = input.lifestyleRole;
       }
-      if (input.gender !== undefined) updateData.gender = input.gender;
+      if (input.gender !== undefined) {
+        updateData.gender = input.gender;
+        updateData.telegramAvatar = avatarForGender(input.gender);
+      }
 
       const db = getDb();
       const [member] = await db

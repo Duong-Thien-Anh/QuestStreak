@@ -5,6 +5,7 @@ import {
   Heart,
   Star,
   Link2,
+  Calendar,
   ChevronDown,
   Pen,
   Trophy,
@@ -38,8 +39,13 @@ export function TasksPage() {
   const [frequency, setFrequency] = useState<"daily" | "weekly" | "monthly">("daily");
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
+  const [dueDate, setDueDate] = useState("");
   const [chymReward, setChymReward] = useState(0);
   const [chayPenalty, setChayPenalty] = useState(0);
+  const [bonusXp, setBonusXp] = useState(0);
+  const [linkedRewardId, setLinkedRewardId] = useState("");
+  const [linkedAchievementId, setLinkedAchievementId] = useState("");
+  const [linkedPunishmentId, setLinkedPunishmentId] = useState("");
   const [wheelTitle, setWheelTitle] = useState("");
   const [wheelDescription, setWheelDescription] = useState("");
   const [wheelOptions, setWheelOptions] = useState(
@@ -60,8 +66,13 @@ export function TasksPage() {
     title: string;
     description: string;
     category: string;
+    dueDate: Date | string | null;
     chymReward: number;
     chayPenalty: number;
+    bonusXp: number;
+    linkedRewardId: number | null;
+    linkedAchievementId: number | null;
+    linkedPunishmentId: number | null;
     status: string;
     assignedTo: number | null;
   }
@@ -83,6 +94,8 @@ export function TasksPage() {
   const utils = trpc.useUtils();
   const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
   const houseId = houseQuery.data?.id ?? 1;
+  const members = houseQuery.data?.members ?? mockMembers;
+  const subMember = members.find((m) => m.lifestyleRole === "submissive");
   const tasksQuery = trpc.task.list.useQuery(
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
@@ -94,6 +107,18 @@ export function TasksPage() {
   const submissionsQuery = trpc.task.submissions.useQuery(
     { taskId: reviewSheetTaskId ?? 0 },
     { enabled: !!reviewSheetTaskId && !!houseQuery.data?.id, retry: false }
+  );
+  const rewardsQuery = trpc.reward.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const punishmentsQuery = trpc.punishment.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
+  const gamificationSummaryQuery = trpc.gamification.summary.useQuery(
+    { memberId: subMember?.id ?? 0 },
+    { enabled: !!subMember?.id, retry: false }
   );
   const createTaskMutation = trpc.task.create.useMutation({
     onSuccess: async () => {
@@ -119,6 +144,9 @@ export function TasksPage() {
     onSuccess: async () => {
       await utils.task.list.invalidate();
       await utils.house.get.invalidate();
+      await utils.gamification.summary.invalidate();
+      await utils.reward.list.invalidate();
+      await utils.punishment.allAssignments.invalidate();
     },
   });
   const createWheelMutation = trpc.wheel.create.useMutation({
@@ -142,10 +170,23 @@ export function TasksPage() {
     },
   });
 
-  const members = houseQuery.data?.members ?? mockMembers;
-  const subMember = members.find((m) => m.lifestyleRole === "submissive");
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
   const visibleWheels = wheelsQuery.data ?? [];
+  const availableRewards = rewardsQuery.data ?? [];
+  const availablePunishments = punishmentsQuery.data ?? [];
+  const availableAchievements = gamificationSummaryQuery.data?.achievements ?? [];
+  const rewardById = useMemo(
+    () => new Map(availableRewards.map((reward) => [reward.id, reward])),
+    [availableRewards]
+  );
+  const punishmentById = useMemo(
+    () => new Map(availablePunishments.map((punishment) => [punishment.id, punishment])),
+    [availablePunishments]
+  );
+  const achievementById = useMemo(
+    () => new Map(availableAchievements.map((achievement) => [achievement.id, achievement])),
+    [availableAchievements]
+  );
   const wheelPalette = ["#FF2A85", "#A155FF", "#00F2FE", "#FFD700", "#FF7A59", "#35D07F"];
   const wheelPreviewOptions = useMemo(
     () =>
@@ -157,12 +198,26 @@ export function TasksPage() {
     [wheelOptions]
   );
 
+  const avatarForGender = (gender: string | null | undefined) =>
+    gender === "male" ? "/avatars/admin.jpg" : "/avatars/sub.jpg";
+
   const toggleCategory = (key: string) => {
     setExpandedCategories((prev) => {
       const next = new Set(prev);
       if (next.has(key)) next.delete(key);
       else next.add(key);
       return next;
+    });
+  };
+
+  const formatTaskDate = (value: Date | string | null | undefined) => {
+    if (!value) return null;
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return null;
+    return date.toLocaleDateString("vi-VN", {
+      day: "2-digit",
+      month: "2-digit",
+      year: "numeric",
     });
   };
 
@@ -181,8 +236,13 @@ export function TasksPage() {
                 title,
                 description: description || "",
                 category: taskType === "regular" ? frequency : taskType,
+                dueDate: dueDate || null,
                 chymReward,
                 chayPenalty,
+                bonusXp,
+                linkedRewardId: linkedRewardId ? Number(linkedRewardId) : null,
+                linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
+                linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
               }
             : task
         )
@@ -198,9 +258,14 @@ export function TasksPage() {
         title,
         description: description || undefined,
         category: taskType === "regular" ? frequency : taskType,
+        dueDate: dueDate || undefined,
         chymReward,
         chayPenalty,
+        bonusXp,
         assignedTo: subMember?.id,
+        linkedRewardId: linkedRewardId ? Number(linkedRewardId) : undefined,
+        linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : undefined,
+        linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : undefined,
       });
       setCreateSheet(false);
       resetForm();
@@ -213,8 +278,13 @@ export function TasksPage() {
       title,
       description: description || "",
       category: frequency as "daily" | "weekly" | "monthly" | "special" | "superSpecial",
+      dueDate: dueDate || null,
       chymReward,
       chayPenalty,
+      bonusXp,
+      linkedRewardId: linkedRewardId ? Number(linkedRewardId) : null,
+      linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
+      linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
       status: "active" as const,
       assignedTo: null as number | null,
     };
@@ -228,8 +298,13 @@ export function TasksPage() {
     setEditingTaskId(null);
     setTitle("");
     setDescription("");
+    setDueDate("");
     setChymReward(0);
     setChayPenalty(0);
+    setBonusXp(0);
+    setLinkedRewardId("");
+    setLinkedAchievementId("");
+    setLinkedPunishmentId("");
     setFrequency("daily");
     setTaskType("regular");
   };
@@ -239,8 +314,13 @@ export function TasksPage() {
     setCreateType("task");
     setTitle(task.title);
     setDescription(task.description || "");
+    setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : "");
     setChymReward(task.chymReward);
     setChayPenalty(task.chayPenalty);
+    setBonusXp(task.bonusXp ?? 0);
+    setLinkedRewardId(task.linkedRewardId ? String(task.linkedRewardId) : "");
+    setLinkedAchievementId(task.linkedAchievementId ? String(task.linkedAchievementId) : "");
+    setLinkedPunishmentId(task.linkedPunishmentId ? String(task.linkedPunishmentId) : "");
     if (task.category === "special" || task.category === "superSpecial") {
       setTaskType(task.category);
     } else {
@@ -504,6 +584,12 @@ export function TasksPage() {
                 {task.description}
               </p>
             )}
+            {formatTaskDate(task.dueDate) && (
+              <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#00F2FE]">
+                <Calendar className="h-3 w-3" />
+                {formatTaskDate(task.dueDate)}
+              </p>
+            )}
           </div>
           {isAdmin && (
             <button
@@ -525,6 +611,29 @@ export function TasksPage() {
           {task.chayPenalty > 0 && (
             <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#FF3B30]/10 text-[#FF3B30]">
               <Link2 className="w-3 h-3" /> {task.chayPenalty} Chày
+            </span>
+          )}
+          {(task.bonusXp ?? 0) > 0 && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#00F2FE]/10 text-[#00F2FE]">
+              <Zap className="w-3 h-3" /> {task.bonusXp} XP
+            </span>
+          )}
+          {task.linkedRewardId && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#35D07F]/10 text-[#35D07F]">
+              <Star className="w-3 h-3" />
+              {rewardById.get(task.linkedRewardId)?.title ?? "Reward"}
+            </span>
+          )}
+          {task.linkedAchievementId && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#A155FF]/10 text-[#C9A7FF]">
+              <Trophy className="w-3 h-3" />
+              {achievementById.get(task.linkedAchievementId)?.title ?? "Achievement"}
+            </span>
+          )}
+          {task.linkedPunishmentId && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#FF3B30]/10 text-[#FF7A59]">
+              <Trash2 className="w-3 h-3" />
+              {punishmentById.get(task.linkedPunishmentId)?.title ?? "Punishment"}
             </span>
           )}
           <span
@@ -613,7 +722,7 @@ export function TasksPage() {
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <img
-            src={subMember?.telegramAvatar || "/avatars/sub.jpg"}
+            src={avatarForGender(subMember?.gender)}
             alt="Avatar"
             className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
@@ -953,6 +1062,19 @@ export function TasksPage() {
             />
           </div>
 
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Ngày thực hiện</label>
+            <div className="relative">
+              <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+              <input
+                type="date"
+                value={dueDate}
+                onChange={(e) => setDueDate(e.target.value)}
+                className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+              />
+            </div>
+          </div>
+
           {/* Rewards/Penalties */}
           <div className="grid grid-cols-2 gap-3">
             <div>
@@ -975,6 +1097,72 @@ export function TasksPage() {
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none transition-colors"
               />
             </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Bonus XP</label>
+            <input
+              type="number"
+              value={bonusXp}
+              onChange={(e) => setBonusXp(Number(e.target.value))}
+              min={0}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none transition-colors"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Linked Reward</label>
+              <select
+                value={linkedRewardId}
+                onChange={(e) => setLinkedRewardId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#35D07F]/50 focus:outline-none transition-colors"
+              >
+                <option value="">Không gắn reward</option>
+                {availableRewards
+                  .filter((reward) => reward.isActive)
+                  .map((reward) => (
+                    <option key={reward.id} value={reward.id}>
+                      {reward.title}
+                    </option>
+                  ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Linked Achievement</label>
+              <select
+                value={linkedAchievementId}
+                onChange={(e) => setLinkedAchievementId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none transition-colors"
+              >
+                <option value="">Không gắn achievement</option>
+                {availableAchievements.map((achievement) => (
+                  <option key={achievement.id} value={achievement.id}>
+                    {achievement.title}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Linked Punishment</label>
+            <select
+              value={linkedPunishmentId}
+              onChange={(e) => setLinkedPunishmentId(e.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none transition-colors"
+            >
+              <option value="">Không gắn punishment</option>
+              {availablePunishments
+                .filter((punishment) => punishment.isActive)
+                .map((punishment) => (
+                  <option key={punishment.id} value={punishment.id}>
+                    {punishment.title}
+                    {punishment.chayCost > 0 ? ` - ${punishment.chayCost} Chày` : ""}
+                  </option>
+                ))}
+            </select>
           </div>
 
           {/* Submit */}

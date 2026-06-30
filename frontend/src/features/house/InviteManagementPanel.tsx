@@ -21,7 +21,7 @@ interface HouseInvite {
   invitedBy: number;
   intendedNickname: string | null;
   lifestyleRole: "dominant" | "submissive" | "switch";
-  gender: "male" | "female" | "other";
+  gender: "male" | "female";
   expiresAt: Date | null;
   status: InviteStatus;
   acceptedBy: number | null;
@@ -99,7 +99,7 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
   const [form, setForm] = useState({
     intendedNickname: "",
     lifestyleRole: "submissive" as "dominant" | "submissive" | "switch",
-    gender: "other" as "male" | "female" | "other",
+    gender: "female" as "male" | "female",
     expiresInDays: 7,
   });
 
@@ -114,7 +114,7 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
       void utils.invite.list.invalidate();
       setNewlyCreated((data as HouseInvite).code);
       setShowCreate(false);
-      setForm({ intendedNickname: "", lifestyleRole: "submissive", gender: "other", expiresInDays: 7 });
+      setForm({ intendedNickname: "", lifestyleRole: "submissive", gender: "female", expiresInDays: 7 });
       showToast("Đã tạo invite code!", "success");
     },
     onError: (err) => showToast(err.message, "error"),
@@ -225,7 +225,6 @@ export function InviteManagementPanel({ houseId }: InviteManagementPanelProps) {
                       onChange={(e) => setForm((f) => ({ ...f, gender: e.target.value as typeof f.gender }))}
                       className="w-full px-3 py-2.5 rounded-xl bg-[#1A1A22] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
                     >
-                      <option value="other">Other</option>
                       <option value="female">Female</option>
                       <option value="male">Male</option>
                     </select>

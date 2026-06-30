@@ -40,3 +40,57 @@ export async function ensureUserCredentialsSchema() {
     await sql.end();
   }
 }
+
+export async function ensureTaskRewardSchema() {
+  if (!env.databaseUrl) {
+    return;
+  }
+
+  const sql = postgres(env.databaseUrl, { max: 1 });
+  try {
+    await sql`
+      ALTER TABLE public."tasks"
+        ADD COLUMN IF NOT EXISTS "bonusXp" integer DEFAULT 0 NOT NULL,
+        ADD COLUMN IF NOT EXISTS "linkedAchievementId" bigint
+    `;
+  } finally {
+    await sql.end();
+  }
+}
+
+export async function ensureGenderAvatarSchema() {
+  if (!env.databaseUrl) {
+    return;
+  }
+
+  const sql = postgres(env.databaseUrl, { max: 1 });
+  try {
+    await sql`
+      ALTER TABLE public."registrationRequests" ALTER COLUMN "gender" SET DEFAULT 'female'
+    `;
+    await sql`
+      ALTER TABLE public."roomJoinRequests" ALTER COLUMN "gender" SET DEFAULT 'female'
+    `;
+    await sql`
+      ALTER TABLE public."houseMembers" ALTER COLUMN "gender" SET DEFAULT 'female'
+    `;
+    await sql`
+      ALTER TABLE public."houseInvites" ALTER COLUMN "gender" SET DEFAULT 'female'
+    `;
+
+    await sql`UPDATE public."registrationRequests" SET "gender" = 'female' WHERE "gender" = 'other'`;
+    await sql`UPDATE public."roomJoinRequests" SET "gender" = 'female' WHERE "gender" = 'other'`;
+    await sql`UPDATE public."houseMembers" SET "gender" = 'female' WHERE "gender" = 'other'`;
+    await sql`UPDATE public."houseInvites" SET "gender" = 'female' WHERE "gender" = 'other'`;
+
+    await sql`
+      UPDATE public."houseMembers"
+      SET "telegramAvatar" = CASE
+        WHEN "gender" = 'male' THEN '/avatars/admin.jpg'
+        ELSE '/avatars/sub.jpg'
+      END
+    `;
+  } finally {
+    await sql.end();
+  }
+}

@@ -26,7 +26,7 @@ await sql.begin(async (tx) => {
       "username"        varchar(100),
       "phone"           varchar(30),
       "lifestyleRole"   "lifestyleRole" NOT NULL DEFAULT 'submissive',
-      "gender"          "gender" NOT NULL DEFAULT 'other',
+      "gender"          "gender" NOT NULL DEFAULT 'female',
       "passwordHash"    text NOT NULL,
       "status"          "registrationStatus" NOT NULL DEFAULT 'pending',
       "rejectionReason" text,

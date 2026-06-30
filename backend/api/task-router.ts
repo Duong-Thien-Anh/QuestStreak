@@ -1,9 +1,23 @@
 import { z } from "zod";
 import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
-import { tasks, wallets, houseMembers, logs, taskSubmissions } from "@db/schema";
+import {
+  achievements,
+  memberAchievements,
+  memberProgress,
+  punishments,
+  punishmentAssignments,
+  rewards,
+  rewardGiftDetails,
+  rewardPurchases,
+  tasks,
+  wallets,
+  houseMembers,
+  logs,
+  taskSubmissions,
+} from "@db/schema";
 import { eq, and, desc } from "drizzle-orm";
-import { awardCompletionProgress } from "./lib/gamification";
+import { awardCompletionProgress, calculateLevel, ensureMemberProgress } from "./lib/gamification";
 import { createNotification } from "./lib/notifications";
 
 export const taskRouter = createRouter({
@@ -43,9 +57,11 @@ export const taskRouter = createRouter({
         category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial"]),
         chymReward: z.number().min(0).default(0),
         chayPenalty: z.number().min(0).default(0),
+        bonusXp: z.number().min(0).default(0),
         dueDate: z.string().optional(),
         assignedTo: z.number().optional(),
         linkedRewardId: z.number().optional(),
+        linkedAchievementId: z.number().optional(),
         linkedPunishmentId: z.number().optional(),
       })
     )
@@ -64,11 +80,13 @@ export const taskRouter = createRouter({
           category: input.category,
           chymReward: input.chymReward,
           chayPenalty: input.chayPenalty,
+          bonusXp: input.bonusXp,
           dueDate: input.dueDate ? new Date(input.dueDate) : null,
           assignedTo: input.assignedTo || null,
           status: input.assignedTo ? "active" : "pending",
           createdBy: actor?.id || 0,
           linkedRewardId: input.linkedRewardId || null,
+          linkedAchievementId: input.linkedAchievementId || null,
           linkedPunishmentId: input.linkedPunishmentId || null,
         })
         .returning({ id: tasks.id });
@@ -86,6 +104,10 @@ export const taskRouter = createRouter({
           category: input.category,
           chymReward: input.chymReward,
           chayPenalty: input.chayPenalty,
+          bonusXp: input.bonusXp,
+          linkedRewardId: input.linkedRewardId,
+          linkedAchievementId: input.linkedAchievementId,
+          linkedPunishmentId: input.linkedPunishmentId,
         },
       });
 
@@ -100,6 +122,10 @@ export const taskRouter = createRouter({
         description: z.string().optional(),
         chymReward: z.number().min(0).optional(),
         chayPenalty: z.number().min(0).optional(),
+        bonusXp: z.number().min(0).optional(),
+        linkedRewardId: z.number().nullable().optional(),
+        linkedAchievementId: z.number().nullable().optional(),
+        linkedPunishmentId: z.number().nullable().optional(),
         dueDate: z.string().optional(),
         isActive: z.boolean().optional(),
       })
@@ -111,6 +137,10 @@ export const taskRouter = createRouter({
       if (input.description !== undefined) updateData.description = input.description;
       if (input.chymReward !== undefined) updateData.chymReward = input.chymReward;
       if (input.chayPenalty !== undefined) updateData.chayPenalty = input.chayPenalty;
+      if (input.bonusXp !== undefined) updateData.bonusXp = input.bonusXp;
+      if (input.linkedRewardId !== undefined) updateData.linkedRewardId = input.linkedRewardId;
+      if (input.linkedAchievementId !== undefined) updateData.linkedAchievementId = input.linkedAchievementId;
+      if (input.linkedPunishmentId !== undefined) updateData.linkedPunishmentId = input.linkedPunishmentId;
       if (input.dueDate !== undefined) updateData.dueDate = input.dueDate ? new Date(input.dueDate) : null;
 
       await db.update(tasks).set(updateData).where(eq(tasks.id, input.taskId));
@@ -304,7 +334,14 @@ export const taskRouter = createRouter({
           action: "TASK_COMPLETED",
           actorId: actor?.id || 0,
           targetId: task.assignedTo,
-          details: JSON.stringify({ taskId: task.id, reward: task.chymReward }),
+          details: JSON.stringify({
+            taskId: task.id,
+            reward: task.chymReward,
+            bonusXp: task.bonusXp,
+            linkedRewardId: task.linkedRewardId,
+            linkedAchievementId: task.linkedAchievementId,
+            linkedPunishmentId: task.linkedPunishmentId,
+          }),
         });
 
         await createNotification({
@@ -316,7 +353,13 @@ export const taskRouter = createRouter({
           message: task.title,
           entityType: "task",
           entityId: task.id,
-          metadata: { reward: task.chymReward },
+          metadata: {
+            reward: task.chymReward,
+            bonusXp: task.bonusXp,
+            linkedRewardId: task.linkedRewardId,
+            linkedAchievementId: task.linkedAchievementId,
+            linkedPunishmentId: task.linkedPunishmentId,
+          },
         });
 
         const latestSubmission = await db.query.taskSubmissions.findFirst({
@@ -341,10 +384,80 @@ export const taskRouter = createRouter({
             sourceType: "task",
             sourceId: task.id,
             chymReward: task.chymReward,
+            bonusXp: task.bonusXp,
           });
 
+          const linkedAchievements: typeof progress.achievementsUnlocked = [];
+          if (task.linkedAchievementId) {
+            const linkedAchievement = await db.query.achievements.findFirst({
+              where: eq(achievements.id, task.linkedAchievementId),
+            });
+            if (linkedAchievement) {
+              const inserted = await db
+                .insert(memberAchievements)
+                .values({
+                  memberId: task.assignedTo,
+                  achievementId: linkedAchievement.id,
+                })
+                .onConflictDoNothing({
+                  target: [memberAchievements.memberId, memberAchievements.achievementId],
+                })
+                .returning();
+
+              if (inserted.length > 0) {
+                linkedAchievements.push(linkedAchievement);
+                if (linkedAchievement.xpReward > 0) {
+                  const memberProgressRow = await ensureMemberProgress(db, task.assignedTo);
+                  const xp = memberProgressRow.xp + linkedAchievement.xpReward;
+                  await db
+                    .update(memberProgress)
+                    .set({ xp, level: calculateLevel(xp) })
+                    .where(eq(memberProgress.memberId, task.assignedTo));
+                }
+              }
+            }
+          }
+
+          if (task.linkedRewardId) {
+            const linkedReward = await db.query.rewards.findFirst({
+              where: and(
+                eq(rewards.id, task.linkedRewardId),
+                eq(rewards.houseId, task.houseId),
+                eq(rewards.isActive, true)
+              ),
+            });
+            if (linkedReward) {
+              const [purchase] = await db
+                .insert(rewardPurchases)
+                .values({
+                  rewardId: linkedReward.id,
+                  memberId: task.assignedTo,
+                  giftedBy: actor?.id ?? null,
+                })
+                .returning({ id: rewardPurchases.id });
+
+              await db.insert(rewardGiftDetails).values({
+                purchaseId: purchase.id,
+                giftMessage: `Hoàn thành task: ${task.title}`,
+                giftReason: "task_completion",
+              });
+
+              await createNotification({
+                houseId: task.houseId,
+                recipientId: task.assignedTo,
+                actorId: actor?.id ?? null,
+                type: "reward_gifted",
+                title: "Phần thưởng đã được tặng",
+                message: linkedReward.title,
+                entityType: "reward",
+                entityId: linkedReward.id,
+                metadata: { taskId: task.id, purchaseId: purchase.id },
+              });
+            }
+          }
+
           await Promise.all(
-            progress.achievementsUnlocked.map((achievement) =>
+            [...progress.achievementsUnlocked, ...linkedAchievements].map((achievement) =>
               createNotification({
                 houseId: task.houseId,
                 recipientId: task.assignedTo,
@@ -369,6 +482,37 @@ export const taskRouter = createRouter({
           where: eq(houseMembers.userId, ctx.user.id),
         });
 
+        if (task.assignedTo && task.linkedPunishmentId) {
+          const linkedPunishment = await db.query.punishments.findFirst({
+            where: and(
+              eq(punishments.id, task.linkedPunishmentId),
+              eq(punishments.houseId, task.houseId),
+              eq(punishments.isActive, true)
+            ),
+          });
+
+          if (linkedPunishment) {
+            const [assignment] = await db.insert(punishmentAssignments).values({
+              punishmentId: linkedPunishment.id,
+              memberId: task.assignedTo,
+              assignedBy: actor?.id || 0,
+              checklist: null,
+            }).returning({ id: punishmentAssignments.id });
+
+            await db.insert(logs).values({
+              houseId: task.houseId,
+              action: "PUNISHMENT_ASSIGNED",
+              actorId: actor?.id || 0,
+              targetId: task.assignedTo,
+              details: JSON.stringify({
+                taskId: task.id,
+                punishmentId: linkedPunishment.id,
+                assignmentId: assignment.id,
+              }),
+            });
+          }
+        }
+
         await createNotification({
           houseId: task.houseId,
           recipientId: task.assignedTo,
@@ -378,7 +522,10 @@ export const taskRouter = createRouter({
           message: task.title,
           entityType: "task",
           entityId: task.id,
-          metadata: { reviewNote: input.reviewNote },
+          metadata: {
+            reviewNote: input.reviewNote,
+            linkedPunishmentId: task.linkedPunishmentId,
+          },
         });
 
         const latestSubmission = await db.query.taskSubmissions.findFirst({

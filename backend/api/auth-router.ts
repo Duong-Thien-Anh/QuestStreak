@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { Session } from "@contracts/constants";
 import { getSessionCookieOptions } from "./lib/cookies";
 import { env } from "./lib/env";
+import { supportedGenders } from "./lib/gender";
 import { ensureUserCredentialsSchema } from "./lib/schema-repair";
 import { verifyTelegramInitData } from "./lib/telegram";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
@@ -133,7 +134,7 @@ export const authRouter = createRouter({
         phone: z.string().max(30).optional(),
         password: z.string().min(8),
         lifestyleRole: z.enum(["dominant", "submissive", "switch"]).default("submissive"),
-        gender: z.enum(["male", "female", "other"]).default("other"),
+        gender: z.enum(supportedGenders).default("female"),
       })
     )
     .mutation(async ({ input }) => {

@@ -56,7 +56,7 @@ type OperationSection =
   | "activity";
 type RegistrationStatus = "pending" | "approved" | "rejected" | "all";
 type MemberRole = "dominant" | "submissive" | "switch";
-type Gender = "male" | "female" | "other";
+type Gender = "male" | "female";
 type AccountRole = "user" | "admin";
 
 const sectionTabs: Array<{
@@ -96,8 +96,11 @@ const memberRoleLabels: Record<MemberRole, string> = {
 const genderLabels: Record<Gender, string> = {
   male: "Nam",
   female: "Nữ",
-  other: "Khác",
 };
+
+function normalizeGender(gender: string): Gender {
+  return gender === "male" ? "male" : "female";
+}
 
 function formatDate(value: Date | string | null | undefined) {
   if (!value) return "-";
@@ -132,7 +135,7 @@ export default function AdminRegistrationsPage() {
   const [memberUserId, setMemberUserId] = useState("");
   const [memberNickname, setMemberNickname] = useState("");
   const [memberRole, setMemberRole] = useState<MemberRole>("submissive");
-  const [memberGender, setMemberGender] = useState<Gender>("other");
+  const [memberGender, setMemberGender] = useState<Gender>("female");
   const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
 
   const [accountName, setAccountName] = useState("");
@@ -379,7 +382,7 @@ export default function AdminRegistrationsPage() {
     setMemberUserId("");
     setMemberNickname("");
     setMemberRole("submissive");
-    setMemberGender("other");
+    setMemberGender("female");
     setEditingMemberId(null);
   }
 
@@ -395,7 +398,7 @@ export default function AdminRegistrationsPage() {
     setMemberUserId(member.user ? String(member.user.id) : "");
     setMemberNickname(member.nickname ?? "");
     setMemberRole(member.lifestyleRole);
-    setMemberGender(member.gender);
+    setMemberGender(normalizeGender(member.gender));
   }
 
   function submitRoom() {
@@ -892,7 +895,6 @@ export default function AdminRegistrationsPage() {
                       }
                       className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
                     >
-                      <option value="other">Khác</option>
                       <option value="female">Nữ</option>
                       <option value="male">Nam</option>
                     </select>
@@ -1057,7 +1059,7 @@ export default function AdminRegistrationsPage() {
                               <TableCell>
                                 {memberRoleLabels[member.lifestyleRole]}
                               </TableCell>
-                              <TableCell>{genderLabels[member.gender]}</TableCell>
+                              <TableCell>{genderLabels[normalizeGender(member.gender)]}</TableCell>
                               <TableCell className="text-right">
                                 <div className="flex justify-end gap-2">
                                   <Button
@@ -2471,7 +2473,7 @@ export default function AdminRegistrationsPage() {
                         <TableCell>
                           {memberRoleLabels[registration.lifestyleRole]}
                         </TableCell>
-                        <TableCell>{genderLabels[registration.gender]}</TableCell>
+                        <TableCell>{genderLabels[normalizeGender(registration.gender)]}</TableCell>
                         <TableCell className="whitespace-nowrap text-white/65">
                           {formatDate(registration.createdAt)}
                         </TableCell>

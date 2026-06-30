@@ -25,7 +25,11 @@ function resolveDatabaseUrl(): string {
 const DATABASE_URL = resolveDatabaseUrl();
 
 function createDb(): PostgresJsDatabase<Schema> {
-  const client = postgresJs(DATABASE_URL);
+  const client = postgresJs(DATABASE_URL, {
+    connection: {
+      search_path: "public",
+    },
+  });
   return drizzle(client, { schema });
 }
 

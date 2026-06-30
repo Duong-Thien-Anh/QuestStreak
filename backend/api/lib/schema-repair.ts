@@ -6,10 +6,15 @@ export async function ensureUserCredentialsSchema() {
     return;
   }
 
-  const sql = postgres(env.databaseUrl, { max: 1 });
+  const sql = postgres(env.databaseUrl, {
+    max: 1,
+    connection: {
+      search_path: "public",
+    },
+  });
   try {
     await sql`
-      CREATE TABLE IF NOT EXISTS "userCredentials" (
+      CREATE TABLE IF NOT EXISTS public."userCredentials" (
         "id" serial PRIMARY KEY,
         "userId" bigint NOT NULL,
         "email" varchar(320) NOT NULL,
@@ -22,19 +27,19 @@ export async function ensureUserCredentialsSchema() {
     `;
 
     await sql`
-      ALTER TABLE "userCredentials"
+      ALTER TABLE public."userCredentials"
         ADD COLUMN IF NOT EXISTS "username" varchar(100),
         ADD COLUMN IF NOT EXISTS "phone" varchar(30)
     `;
 
     await sql`
       CREATE UNIQUE INDEX IF NOT EXISTS "user_credentials_user_idx"
-      ON "userCredentials" ("userId")
+      ON public."userCredentials" ("userId")
     `;
 
     await sql`
       CREATE UNIQUE INDEX IF NOT EXISTS "user_credentials_email_idx"
-      ON "userCredentials" ("email")
+      ON public."userCredentials" ("email")
     `;
   } finally {
     await sql.end();

@@ -10,6 +10,7 @@ import { TRPCError } from "@trpc/server";
 import { Session } from "@contracts/constants";
 import { getSessionCookieOptions } from "./lib/cookies";
 import { env } from "./lib/env";
+import { ensureUserCredentialsSchema } from "./lib/schema-repair";
 import { verifyTelegramInitData } from "./lib/telegram";
 import { createRouter, authedQuery, publicQuery } from "./middleware";
 import { getDb } from "./queries/connection";
@@ -34,6 +35,15 @@ export async function hashPassword(password: string) {
   const salt = randomBytes(16).toString("hex");
   const derivedKey = (await scrypt(password, salt, 64)) as Buffer;
   return `${PASSWORD_HASH_PREFIX}$${salt}$${derivedKey.toString("hex")}`;
+}
+
+function hasPostgresCode(error: unknown, code: string): boolean {
+  let current: unknown = error;
+  while (current && typeof current === "object") {
+    if ("code" in current && current.code === code) return true;
+    current = "cause" in current ? current.cause : undefined;
+  }
+  return false;
 }
 
 export const authRouter = createRouter({
@@ -191,13 +201,23 @@ export const authRouter = createRouter({
       const identifier = input.identifier.trim().toLowerCase();
 
       // Find credential by email, username, or phone
-      const credential = await db.query.userCredentials.findFirst({
-        where: or(
-          eq(userCredentials.email, identifier),
-          eq(userCredentials.username, identifier),
-          eq(userCredentials.phone, identifier),
-        ),
-      });
+      const findCredential = () =>
+        db.query.userCredentials.findFirst({
+          where: or(
+            eq(userCredentials.email, identifier),
+            eq(userCredentials.username, identifier),
+            eq(userCredentials.phone, identifier),
+          ),
+        });
+
+      let credential;
+      try {
+        credential = await findCredential();
+      } catch (error) {
+        if (!hasPostgresCode(error, "42P01")) throw error;
+        await ensureUserCredentialsSchema();
+        credential = await findCredential();
+      }
 
       if (!credential) {
         throw new Error("Thông tin đăng nhập không đúng");

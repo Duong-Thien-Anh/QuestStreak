@@ -367,6 +367,7 @@ export const tasks = pgTable("tasks", {
   bonusXp: integer("bonusXp").default(0).notNull(),
   assignedTo: bigint("assignedTo", { mode: "number" }),
   status: taskStatusEnum("status").default("pending").notNull(),
+  startDate: timestamp("startDate"),
   dueDate: timestamp("dueDate"),
   completedAt: timestamp("completedAt"),
   createdBy: bigint("createdBy", { mode: "number" }).notNull(),

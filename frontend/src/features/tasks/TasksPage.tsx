@@ -40,6 +40,8 @@ export function TasksPage() {
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
   const [dueDate, setDueDate] = useState("");
+  const [startDate, setStartDate] = useState("");
+  const [scheduleMode, setScheduleMode] = useState<"frequency" | "custom">("frequency");
   const [chymReward, setChymReward] = useState(0);
   const [chayPenalty, setChayPenalty] = useState(0);
   const [bonusXp, setBonusXp] = useState(0);
@@ -169,6 +171,11 @@ export function TasksPage() {
       await utils.wheel.list.invalidate();
     },
   });
+  const purchaseRewardMutation = trpc.reward.purchase.useMutation({
+    onSuccess: async () => {
+      await utils.house.get.invalidate();
+    },
+  });
 
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
   const visibleWheels = wheelsQuery.data ?? [];
@@ -257,8 +264,9 @@ export function TasksPage() {
         houseId,
         title,
         description: description || undefined,
-        category: taskType === "regular" ? frequency : taskType,
+        category: taskType === "regular" ? (scheduleMode === "custom" ? "special" : frequency) : taskType,
         dueDate: dueDate || undefined,
+        startDate: scheduleMode === "custom" ? (startDate || undefined) : undefined,
         chymReward,
         chayPenalty,
         bonusXp,
@@ -299,6 +307,8 @@ export function TasksPage() {
     setTitle("");
     setDescription("");
     setDueDate("");
+    setStartDate("");
+    setScheduleMode("frequency");
     setChymReward(0);
     setChayPenalty(0);
     setBonusXp(0);
@@ -315,6 +325,10 @@ export function TasksPage() {
     setTitle(task.title);
     setDescription(task.description || "");
     setDueDate(task.dueDate ? new Date(task.dueDate).toISOString().slice(0, 10) : "");
+    setStartDate((task as TaskItem & { startDate?: Date | string | null }).startDate
+      ? new Date((task as TaskItem & { startDate?: Date | string | null }).startDate!).toISOString().slice(0, 10)
+      : "");
+    setScheduleMode("frequency");
     setChymReward(task.chymReward);
     setChayPenalty(task.chayPenalty);
     setBonusXp(task.bonusXp ?? 0);
@@ -756,6 +770,55 @@ export function TasksPage() {
         memberName={subMember?.nickname ?? undefined}
       />
 
+      {/* Rewards shop — chỉ hiện cho sub (không phải admin) */}
+      {!isAdmin && availableRewards.filter((r) => r.isActive).length > 0 && (
+        <motion.div
+          initial={{ opacity: 0, y: 15 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.06 }}
+          className="space-y-2"
+        >
+          <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
+            Đổi Chym lấy Rewards
+          </h2>
+          {availableRewards.filter((r) => r.isActive).map((reward) => {
+            const canAfford = (subMember?.wallet.chymBalance ?? 0) >= reward.cost;
+            return (
+              <div
+                key={reward.id}
+                className="bg-[#1A1A22] rounded-xl border border-white/5 p-4 flex items-center justify-between gap-3"
+              >
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-white truncate">{reward.title}</p>
+                  {reward.description && (
+                    <p className="text-xs text-white/40 mt-0.5 line-clamp-1">{reward.description}</p>
+                  )}
+                  <span className="inline-flex items-center gap-1 mt-1 text-xs text-[#FFD700]">
+                    <Star className="w-3 h-3" /> {reward.cost} Chym
+                  </span>
+                </div>
+                <button
+                  disabled={!canAfford || !houseQuery.data || purchaseRewardMutation.isPending}
+                  onClick={() => {
+                    if (!houseQuery.data) return;
+                    purchaseRewardMutation.mutate(
+                      { rewardId: reward.id },
+                      {
+                        onSuccess: () => showToast(`Đã đổi: ${reward.title}!`, "success"),
+                        onError: (err) => showToast(err.message, "error"),
+                      }
+                    );
+                  }}
+                  className="shrink-0 px-3 py-1.5 rounded-lg text-xs font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed bg-[#FFD700]/10 text-[#FFD700] hover:bg-[#FFD700]/20"
+                >
+                  Đổi
+                </button>
+              </div>
+            );
+          })}
+        </motion.div>
+      )}
+
       {/* Manage button for admin */}
       {isAdmin && (
         <div className="flex justify-end gap-2">
@@ -1018,25 +1081,75 @@ export function TasksPage() {
             ))}
           </div>
 
-          {/* Frequency */}
-          <div>
-            <label className="text-xs text-white/50 mb-2 block">Frequency</label>
-            <div className="flex gap-2">
-              {(["daily", "weekly", "monthly"] as const).map((f) => (
-                <button
-                  key={f}
-                  onClick={() => setFrequency(f)}
-                  className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
-                    frequency === f
-                      ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
-                      : "border-white/10 text-white/40"
-                  }`}
-                >
-                  {f.charAt(0).toUpperCase() + f.slice(1)}
-                </button>
-              ))}
+          {/* Frequency / Schedule */}
+          {taskType === "regular" && (
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Lịch thực hiện</label>
+              <div className="flex gap-2 mb-3">
+                {([
+                  { key: "frequency" as const, label: "Chu kỳ" },
+                  { key: "custom" as const, label: "Ngày cụ thể" },
+                ] as const).map((m) => (
+                  <button
+                    key={m.key}
+                    onClick={() => setScheduleMode(m.key)}
+                    className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                      scheduleMode === m.key
+                        ? "border-[#00F2FE] bg-[#00F2FE]/10 text-[#00F2FE]"
+                        : "border-white/10 text-white/40"
+                    }`}
+                  >
+                    {m.label}
+                  </button>
+                ))}
+              </div>
+              {scheduleMode === "frequency" ? (
+                <div className="flex gap-2">
+                  {(["daily", "weekly", "monthly"] as const).map((f) => (
+                    <button
+                      key={f}
+                      onClick={() => setFrequency(f)}
+                      className={`flex-1 py-2 rounded-lg border text-xs font-medium transition-all ${
+                        frequency === f
+                          ? "border-[#FF2A85] bg-[#FF2A85]/10 text-[#FF2A85]"
+                          : "border-white/10 text-white/40"
+                      }`}
+                    >
+                      {f === "daily" ? "Hàng ngày" : f === "weekly" ? "Hàng tuần" : "Hàng tháng"}
+                    </button>
+                  ))}
+                </div>
+              ) : (
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Ngày bắt đầu</label>
+                    <div className="relative">
+                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                      <input
+                        type="date"
+                        value={startDate}
+                        onChange={(e) => setStartDate(e.target.value)}
+                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-white/40 mb-1 block">Ngày kết thúc</label>
+                    <div className="relative">
+                      <Calendar className="pointer-events-none absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-white/30" />
+                      <input
+                        type="date"
+                        value={dueDate}
+                        onChange={(e) => setDueDate(e.target.value)}
+                        min={startDate || undefined}
+                        className="w-full rounded-xl border border-white/10 bg-[#252532] px-3 py-2.5 pl-9 text-xs text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
-          </div>
+          )}
 
           {/* Title */}
           <div>
@@ -1062,18 +1175,21 @@ export function TasksPage() {
             />
           </div>
 
-          <div>
-            <label className="text-xs text-white/50 mb-2 block">Ngày thực hiện</label>
-            <div className="relative">
-              <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
-              <input
-                type="date"
-                value={dueDate}
-                onChange={(e) => setDueDate(e.target.value)}
-                className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
-              />
+          {/* Due date chỉ cho special/superSpecial hoặc frequency mode */}
+          {(taskType !== "regular" || scheduleMode === "frequency") && (
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Ngày thực hiện</label>
+              <div className="relative">
+                <Calendar className="pointer-events-none absolute left-4 top-1/2 h-4 w-4 -translate-y-1/2 text-white/30" />
+                <input
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  className="w-full rounded-xl border border-white/10 bg-[#252532] px-4 py-3 pl-11 text-sm text-white [color-scheme:dark] focus:border-[#00F2FE]/50 focus:outline-none"
+                />
+              </div>
             </div>
-          </div>
+          )}
 
           {/* Rewards/Penalties */}
           <div className="grid grid-cols-2 gap-3">

@@ -71,6 +71,8 @@ export function PunishmentsPage() {
     description: "",
     chayCost: 1,
   });
+  const [assignSheet, setAssignSheet] = useState<{ punishmentId: number; title: string } | null>(null);
+  const [assignChecklist, setAssignChecklist] = useState("");
   const [punishments, setPunishments] = useState(mockPunishments);
   const utils = trpc.useUtils();
   const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
@@ -127,6 +129,54 @@ export function PunishmentsPage() {
   });
   const visibleWallet = walletQuery.data ?? wallet;
   const visiblePunishments = punishmentsQuery.data ?? punishments;
+
+  const checklistFromText = (text: string): ChecklistItem[] =>
+    text
+      .split("\n")
+      .map((line) => line.trim())
+      .filter(Boolean)
+      .map((label) => ({ label, completed: false }));
+
+  const handleAssign = () => {
+    if (!assignSheet || !subMember?.id) return;
+    const checklist =
+      assignChecklist.trim()
+        ? checklistFromText(assignChecklist)
+        : [
+            { label: "Hoàn thành yêu cầu", completed: false },
+            { label: "Xác nhận chuộc lỗi", completed: false },
+          ];
+    if (houseQuery.data) {
+      assignPunishmentMutation.mutate(
+        { punishmentId: assignSheet.punishmentId, memberId: subMember.id, checklist },
+        {
+          onSuccess: () => {
+            setAssignSheet(null);
+            setAssignChecklist("");
+            showToast("Đã gán hình phạt!", "success");
+          },
+          onError: (err) => showToast(err.message, "error"),
+        }
+      );
+      return;
+    }
+    setAssignments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        punishmentId: assignSheet.punishmentId,
+        memberId: subMember.id ?? 2,
+        assignedBy: 1,
+        status: "active",
+        assignedAt: new Date(),
+        checklist,
+        punishment: visiblePunishments.find((p) => p.id === assignSheet.punishmentId) ?? visiblePunishments[0],
+      },
+    ]);
+    setAssignSheet(null);
+    setAssignChecklist("");
+    showToast("Đã gán hình phạt tạm thời!", "success");
+  };
 
   const parseChecklist = (value: unknown): ChecklistItem[] => {
     if (Array.isArray(value)) return value as ChecklistItem[];
@@ -479,35 +529,8 @@ export function PunishmentsPage() {
               {isAdmin && (
                 <button
                   onClick={() => {
-                    if (houseQuery.data && subMember?.id) {
-                      assignPunishmentMutation.mutate({
-                        punishmentId: p.id,
-                        memberId: subMember.id,
-                        checklist: [
-                          { label: "Hoàn thành yêu cầu", completed: false },
-                          { label: "Xác nhận chuộc lỗi", completed: false },
-                        ],
-                      });
-                      showToast("Đã gán hình phạt!", "success");
-                      return;
-                    }
-                    setAssignments((prev) => [
-                      ...prev,
-                      {
-                        id: Date.now(),
-                        punishmentId: p.id,
-                        memberId: subMember?.id ?? 2,
-                        assignedBy: 1,
-                        status: "active",
-                        assignedAt: new Date(),
-                        checklist: [
-                          { label: "Hoàn thành yêu cầu", completed: false },
-                          { label: "Xác nhận chuộc lỗi", completed: false },
-                        ],
-                        punishment: p,
-                      },
-                    ]);
-                    showToast("Đã gán hình phạt tạm thời!", "success");
+                    setAssignSheet({ punishmentId: p.id, title: p.title });
+                    setAssignChecklist("");
                   }}
                   className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
                 >
@@ -670,6 +693,36 @@ export function PunishmentsPage() {
           >
             <Heart className="w-4 h-4 inline mr-2" />
             Forgive
+          </button>
+        </div>
+      </BottomSheet>
+
+      {/* Assign punishment sheet */}
+      <BottomSheet
+        isOpen={assignSheet !== null}
+        onClose={() => { setAssignSheet(null); setAssignChecklist(""); }}
+        title={`Gán hình phạt: ${assignSheet?.title ?? ""}`}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-white/40">
+            Nhập danh sách việc cần làm (mỗi dòng một việc). Để trống sẽ dùng mặc định.
+          </p>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Checklist (mỗi dòng 1 việc)</label>
+            <textarea
+              value={assignChecklist}
+              onChange={(e) => setAssignChecklist(e.target.value)}
+              placeholder={"Hoàn thành yêu cầu\nXác nhận chuộc lỗi"}
+              rows={4}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none resize-none"
+            />
+          </div>
+          <button
+            onClick={handleAssign}
+            disabled={assignPunishmentMutation.isPending}
+            className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
+          >
+            {assignPunishmentMutation.isPending ? "Đang gán..." : "Gán hình phạt"}
           </button>
         </div>
       </BottomSheet>

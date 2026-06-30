@@ -143,7 +143,10 @@ export default function AdminRegistrationsPage() {
   const [accountUsername, setAccountUsername] = useState("");
   const [accountPassword, setAccountPassword] = useState("");
   const [accountRole, setAccountRole] = useState<AccountRole>("user");
+  const [avatarUrl, setAvatarUrl] = useState("");
+  const [avatarLabel, setAvatarLabel] = useState("");
 
+  const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
   const usersQuery = trpc.admin.listUsers.useQuery(undefined, {
     retry: false,
   });
@@ -162,8 +165,14 @@ export default function AdminRegistrationsPage() {
     retry: false,
   });
 
+  const houseId = houseQuery.data?.id ?? 0;
+  const avatarsQuery = trpc.admin.listAvatars.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id },
+  );
   const users = usersQuery.data ?? [];
   const rooms = roomsQuery.data ?? [];
+  const avatars = avatarsQuery.data ?? [];
   const registrations = registrationsQuery.data ?? [];
   const operations = operationsQuery.data;
   const selectedRegistration = registrations.find(
@@ -246,6 +255,16 @@ export default function AdminRegistrationsPage() {
   const deleteUserAccountMutation = trpc.admin.deleteUserAccount.useMutation({
     onSuccess: async () => {
       await invalidateAdminData();
+    },
+  });
+  const addAvatarMutation = trpc.admin.addAvatar.useMutation({
+    onSuccess: async () => {
+      await utils.admin.listAvatars.invalidate();
+    },
+  });
+  const deleteAvatarMutation = trpc.admin.deleteAvatar.useMutation({
+    onSuccess: async () => {
+      await utils.admin.listAvatars.invalidate();
     },
   });
   const approveMutation = trpc.admin.approveRegistration.useMutation({
@@ -464,6 +483,23 @@ export default function AdminRegistrationsPage() {
       password: inputValue(`user-${userId}-password`) || undefined,
       role: inputValue(`user-${userId}-role`) as AccountRole,
     });
+  }
+
+  function handleAddAvatar() {
+    if (!avatarUrl.trim() || !houseId) return;
+    addAvatarMutation.mutate(
+      {
+        houseId,
+        url: avatarUrl.trim(),
+        label: avatarLabel.trim() || undefined,
+      },
+      {
+        onSuccess: () => {
+          setAvatarUrl("");
+          setAvatarLabel("");
+        },
+      },
+    );
   }
 
   function deleteUserAccount(userId: number, label: string) {
@@ -1099,68 +1135,147 @@ export default function AdminRegistrationsPage() {
         ) : null}
 
         {!isLoading && activeSection === "users" ? (
-          <section className="grid gap-4 xl:grid-cols-[360px_1fr]">
-            <aside className="rounded-lg border border-white/10 bg-[#11141D] p-4">
-              <h2 className="text-base font-semibold">Tạo account</h2>
-              <div className="mt-4 space-y-3">
-                <Input
-                  value={accountName}
-                  onChange={(event) => setAccountName(event.target.value)}
-                  placeholder="Tên"
-                  className="border-white/10 bg-[#1D2230] text-white"
-                />
-                <Input
-                  value={accountEmail}
-                  onChange={(event) => setAccountEmail(event.target.value)}
-                  placeholder="Email"
-                  className="border-white/10 bg-[#1D2230] text-white"
-                />
-                <Input
-                  value={accountUsername}
-                  onChange={(event) => setAccountUsername(event.target.value)}
-                  placeholder="Username optional"
-                  className="border-white/10 bg-[#1D2230] text-white"
-                />
-                <Input
-                  value={accountPassword}
-                  onChange={(event) => setAccountPassword(event.target.value)}
-                  placeholder="Password"
-                  type="password"
-                  className="border-white/10 bg-[#1D2230] text-white"
-                />
-                <select
-                  value={accountRole}
-                  onChange={(event) =>
-                    setAccountRole(event.target.value as AccountRole)
-                  }
-                  className="w-full rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
-                >
-                  <option value="user">Member user</option>
-                  <option value="admin">Root admin</option>
-                </select>
-                <Button
-                  type="button"
-                  className="w-full bg-[#F59E0B] text-black hover:bg-[#D97706]"
-                  disabled={
-                    !accountName.trim() ||
-                    !accountEmail.trim() ||
-                    !accountPassword ||
-                    createAccountMutation.isPending
-                  }
-                  onClick={submitAccount}
-                >
-                  Tạo account
-                </Button>
-                {createAccountMutation.error ? (
-                  <p className="text-xs text-[#FF6B6B]">
-                    {createAccountMutation.error.message}
-                  </p>
-                ) : null}
-              </div>
-            </aside>
+          <section className="grid gap-4">
+            <div className="grid gap-4 2xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
+              <aside className="min-w-0 rounded-lg border border-white/10 bg-[#11141D] p-4">
+                <h2 className="text-base font-semibold">Tạo account</h2>
+                <div className="mt-4 grid gap-3 sm:grid-cols-2 2xl:grid-cols-1">
+                  <Input
+                    value={accountName}
+                    onChange={(event) => setAccountName(event.target.value)}
+                    placeholder="Tên"
+                    className="border-white/10 bg-[#1D2230] text-white"
+                  />
+                  <Input
+                    value={accountEmail}
+                    onChange={(event) => setAccountEmail(event.target.value)}
+                    placeholder="Email"
+                    className="border-white/10 bg-[#1D2230] text-white"
+                  />
+                  <Input
+                    value={accountUsername}
+                    onChange={(event) => setAccountUsername(event.target.value)}
+                    placeholder="Username optional"
+                    className="border-white/10 bg-[#1D2230] text-white"
+                  />
+                  <Input
+                    value={accountPassword}
+                    onChange={(event) => setAccountPassword(event.target.value)}
+                    placeholder="Password"
+                    type="password"
+                    className="border-white/10 bg-[#1D2230] text-white"
+                  />
+                  <select
+                    value={accountRole}
+                    onChange={(event) =>
+                      setAccountRole(event.target.value as AccountRole)
+                    }
+                    className="w-full rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
+                  >
+                    <option value="user">Member user</option>
+                    <option value="admin">Root admin</option>
+                  </select>
+                  <Button
+                    type="button"
+                    className="w-full bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                    disabled={
+                      !accountName.trim() ||
+                      !accountEmail.trim() ||
+                      !accountPassword ||
+                      createAccountMutation.isPending
+                    }
+                    onClick={submitAccount}
+                  >
+                    Tạo account
+                  </Button>
+                  {createAccountMutation.error ? (
+                    <p className="text-xs text-[#FF6B6B] sm:col-span-2 2xl:col-span-1">
+                      {createAccountMutation.error.message}
+                    </p>
+                  ) : null}
+                </div>
+              </aside>
 
-            <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-              <Table className="min-w-[1100px]">
+              <div className="min-w-0 rounded-lg border border-white/10 bg-[#11141D] p-4">
+                <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                  <div className="flex-1">
+                    <label className="mb-2 block text-xs text-white/45">URL avatar</label>
+                    <Input
+                      value={avatarUrl}
+                      onChange={(event) => setAvatarUrl(event.target.value)}
+                      placeholder="https://..."
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                  </div>
+                  <div className="md:w-56">
+                    <label className="mb-2 block text-xs text-white/45">Label tùy chọn</label>
+                    <Input
+                      value={avatarLabel}
+                      onChange={(event) => setAvatarLabel(event.target.value)}
+                      placeholder="Tên avatar"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                  </div>
+                  <Button
+                    type="button"
+                    className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                    disabled={!avatarUrl.trim() || !houseId || addAvatarMutation.isPending}
+                    onClick={handleAddAvatar}
+                  >
+                    Thêm avatar
+                  </Button>
+                </div>
+                <div className="mt-4">
+                  <h2 className="text-sm font-semibold text-white">Quản lý Avatar</h2>
+                  <p className="mt-1 text-xs text-white/45">
+                    Danh sách avatar hiện có cho house hiện tại.
+                  </p>
+                  <div className="mt-3 space-y-2">
+                    {avatars.length === 0 ? (
+                      <p className="rounded-lg border border-white/10 bg-white/[0.03] px-3 py-2 text-xs text-white/40">
+                        Chưa có avatar nào.
+                      </p>
+                    ) : (
+                      avatars.map((avatar) => (
+                        <div
+                          key={avatar.id}
+                          className="flex items-center gap-3 rounded-lg border border-white/10 bg-white/[0.03] p-2"
+                        >
+                          <img
+                            src={avatar.url}
+                            alt={avatar.label ?? "avatar"}
+                            className="h-10 w-10 rounded-lg object-cover"
+                            onError={(event) => {
+                              event.currentTarget.src = "/avatars/sub.jpg";
+                            }}
+                          />
+                          <div className="min-w-0 flex-1">
+                            <p className="truncate text-sm text-white">
+                              {avatar.label || "Avatar"}
+                            </p>
+                            <p className="truncate text-xs text-white/40">{avatar.url}</p>
+                          </div>
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="destructive"
+                            disabled={deleteAvatarMutation.isPending}
+                            onClick={() =>
+                              deleteAvatarMutation.mutate({ avatarId: avatar.id })
+                            }
+                          >
+                            Xóa
+                          </Button>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="min-w-0 overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+              <Table className="min-w-[980px] xl:min-w-full">
                 <TableHeader>
                   <TableRow className="border-white/10 hover:bg-transparent">
                     <TableHead className="text-white/60">Account</TableHead>

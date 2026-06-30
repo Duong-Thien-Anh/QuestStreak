@@ -4,13 +4,14 @@ import { createRouter, authedQuery, domQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   houses,
+  houseAvatars,
   houseMembers,
   wallets,
   memberProgress,
   roomCodes,
   roomJoinRequests,
 } from "@db/schema";
-import { desc, eq } from "drizzle-orm";
+import { asc, desc, eq } from "drizzle-orm";
 import { avatarForGender, supportedGenders } from "./lib/gender";
 
 function createRoomCode() {
@@ -68,6 +69,16 @@ async function createOwnedHouseForUser(input: {
 }
 
 export const houseRouter = createRouter({
+  "avatars.list": authedQuery
+    .input(z.object({ houseId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      return db.query.houseAvatars.findMany({
+        where: eq(houseAvatars.houseId, input.houseId),
+        orderBy: [asc(houseAvatars.createdAt)],
+      });
+    }),
+
   get: authedQuery.query(async ({ ctx }) => {
     const db = getDb();
     const userId = ctx.user.id;
@@ -441,9 +452,11 @@ export const houseRouter = createRouter({
       if (input.nickname !== undefined) updateData.nickname = input.nickname;
       if (input.gender !== undefined) {
         updateData.gender = input.gender;
-        updateData.telegramAvatar = avatarForGender(input.gender);
+        if (input.telegramAvatar === undefined) {
+          updateData.telegramAvatar = avatarForGender(input.gender);
+        }
       }
-      if (input.telegramAvatar !== undefined && input.gender === undefined) {
+      if (input.telegramAvatar !== undefined) {
         updateData.telegramAvatar = input.telegramAvatar;
       }
 

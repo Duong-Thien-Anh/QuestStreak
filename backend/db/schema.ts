@@ -96,6 +96,23 @@ export const userPreferences = pgTable(
 
 export type UserPreference = typeof userPreferences.$inferSelect;
 
+// ─── House Avatars ────────────────────────────────────────────────
+
+export const houseAvatars = pgTable(
+  "houseAvatars",
+  {
+    id: serial("id").primaryKey(),
+    houseId: bigint("houseId", { mode: "number" }).notNull(),
+    url: text("url").notNull(),
+    label: varchar("label", { length: 100 }),
+    addedBy: bigint("addedBy", { mode: "number" }).notNull(),
+    createdAt: timestamp("createdAt").defaultNow().notNull(),
+  },
+  (table) => [index("house_avatars_house_idx").on(table.houseId)],
+);
+
+export type HouseAvatar = typeof houseAvatars.$inferSelect;
+
 // ─── User Login Credentials ──────────────────────────────────────
 
 export const userCredentials = pgTable(

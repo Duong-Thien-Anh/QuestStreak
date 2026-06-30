@@ -6,6 +6,7 @@ import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
   houses,
+  houseAvatars,
   houseMembers,
   agreements,
   journalEntries,
@@ -78,6 +79,13 @@ async function ensureRoomCode(houseId: number) {
   return created;
 }
 
+async function getAdminMember(userId: number) {
+  const db = getDb();
+  return db.query.houseMembers.findFirst({
+    where: eq(houseMembers.userId, userId),
+  });
+}
+
 async function ensureOwnerMember(input: {
   houseId: number;
   ownerId: number;
@@ -111,6 +119,47 @@ async function ensureOwnerMember(input: {
 }
 
 export const adminRouter = createRouter({
+  listAvatars: adminQuery
+    .input(z.object({ houseId: z.number() }))
+    .query(async ({ input }) => {
+      const db = getDb();
+      return db.query.houseAvatars.findMany({
+        where: eq(houseAvatars.houseId, input.houseId),
+        orderBy: [desc(houseAvatars.createdAt)],
+      });
+    }),
+
+  addAvatar: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        url: z.string().url().max(2000),
+        label: z.string().max(100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
+      const [avatar] = await db
+        .insert(houseAvatars)
+        .values({
+          houseId: input.houseId,
+          url: input.url.trim(),
+          label: input.label?.trim() ?? null,
+          addedBy: actor?.id ?? 0,
+        })
+        .returning();
+      return avatar;
+    }),
+
+  deleteAvatar: adminQuery
+    .input(z.object({ avatarId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db.delete(houseAvatars).where(eq(houseAvatars.id, input.avatarId));
+      return { success: true };
+    }),
+
   listUsers: adminQuery.query(async () => {
     const db = getDb();
     const [userRows, credentials] = await Promise.all([

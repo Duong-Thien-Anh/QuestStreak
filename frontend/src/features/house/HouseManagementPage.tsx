@@ -166,6 +166,10 @@ export function HouseManagementPage() {
   const { user, currentMember, isAdmin } = useCurrentUser();
   const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
   const house = houseQuery.data;
+  const avatarsQuery = trpc.house["avatars.list"].useQuery(
+    { houseId: house?.id ?? 0 },
+    { enabled: !!house?.id },
+  );
   const utils = trpc.useUtils();
   const currentLanguage = (user?.language ?? "vi") as AppLanguage;
   const copy = accountCopy[currentLanguage];
@@ -194,6 +198,7 @@ export function HouseManagementPage() {
   const [profileForm, setProfileForm] = useState({
     nickname: undefined as string | undefined,
     gender: undefined as Gender | undefined,
+    telegramAvatar: undefined as string | undefined,
   });
   const [editingMemberId, setEditingMemberId] = useState<number | null>(null);
   const [memberDialogOpen, setMemberDialogOpen] = useState(false);
@@ -210,6 +215,7 @@ export function HouseManagementPage() {
       setProfileForm({
         nickname: undefined,
         gender: undefined,
+        telegramAvatar: undefined,
       });
       showToast("Đã cập nhật profile", "success");
     },
@@ -320,10 +326,12 @@ export function HouseManagementPage() {
   const submitProfileForm = () => {
     const nickname = profileForm.nickname ?? displayMember?.nickname ?? "";
     const gender = normalizeGender(profileForm.gender ?? displayMember?.gender);
+    const telegramAvatar = profileForm.telegramAvatar ?? displayMember?.telegramAvatar ?? undefined;
 
     selfUpdateMutation.mutate({
       nickname: nickname.trim() || undefined,
       gender,
+      telegramAvatar,
     });
   };
 
@@ -638,11 +646,15 @@ export function HouseManagementPage() {
       <section className="rounded-xl border border-white/5 bg-[#1A1A22] p-4">
         <div className="flex items-center gap-4">
           <img
-            src={`/avatars/${
-              normalizeGender(profileForm.gender ?? displayMember?.gender) === "male"
-                ? "admin"
-                : "sub"
-            }.jpg`}
+            src={
+              profileForm.telegramAvatar ??
+              displayMember?.telegramAvatar ??
+              `/avatars/${
+                normalizeGender(profileForm.gender ?? displayMember?.gender) === "male"
+                  ? "admin"
+                  : "sub"
+              }.jpg`
+            }
             alt={
               profileForm.nickname ??
               displayMember?.nickname ??
@@ -650,6 +662,9 @@ export function HouseManagementPage() {
               "Hồ sơ"
             }
             className="h-16 w-16 rounded-full border-2 border-white/10 object-cover"
+            onError={(event) => {
+              event.currentTarget.src = "/avatars/sub.jpg";
+            }}
           />
           <div className="min-w-0 flex-1">
             <h2 className="truncate text-base font-semibold text-white">
@@ -699,6 +714,44 @@ export function HouseManagementPage() {
             <option value="male">Nam</option>
           </select>
         </label>
+        <div>
+          <label className="text-xs text-white/50 mb-2 block">Chọn Avatar</label>
+          <div className="grid grid-cols-4 gap-2">
+            {(avatarsQuery.data ?? []).map((avatar) => {
+              const selected =
+                (profileForm.telegramAvatar ?? displayMember?.telegramAvatar) === avatar.url;
+              return (
+                <button
+                  key={avatar.id}
+                  type="button"
+                  onClick={() =>
+                    setProfileForm((prev) => ({
+                      ...prev,
+                      telegramAvatar: avatar.url,
+                    }))
+                  }
+                  className={`rounded-xl overflow-hidden border-2 transition-all ${
+                    selected ? "border-[#FF2A85]" : "border-white/10 hover:border-white/30"
+                  }`}
+                >
+                  <img
+                    src={avatar.url}
+                    alt={avatar.label ?? "avatar"}
+                    className="w-full h-16 object-cover"
+                    onError={(event) => {
+                      event.currentTarget.src = "/avatars/sub.jpg";
+                    }}
+                  />
+                </button>
+              );
+            })}
+            {avatarsQuery.data?.length === 0 && (
+              <p className="col-span-4 text-xs text-white/30">
+                Chưa có avatar nào. Admin cần thêm avatar vào hệ thống.
+              </p>
+            )}
+          </div>
+        </div>
         <button
           onClick={submitProfileForm}
           disabled={selfUpdateMutation.isPending || !displayMember}

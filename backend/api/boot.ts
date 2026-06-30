@@ -9,6 +9,7 @@ import { createContext } from "./context";
 import { env } from "./lib/env";
 import { createDevLoginHandler } from "./dev-auth";
 import { createDemoAuthHandler } from "./demo-auth";
+import { ensureUserCredentialsSchema } from "./lib/schema-repair";
 
 const app = new Hono<{ Bindings: HttpBindings }>();
 
@@ -77,6 +78,8 @@ export default app;
 
 if (env.isProduction) {
   const { serve } = await import("@hono/node-server");
+
+  await ensureUserCredentialsSchema();
 
   const port = parseInt(process.env.PORT || "3000");
   serve({ fetch: app.fetch, port }, () => {

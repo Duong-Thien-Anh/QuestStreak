@@ -21,7 +21,7 @@ import { trpc } from "@/providers/trpc";
 import { LOGIN_PATH } from "@/const";
 
 function MainApp() {
-  const { activeTab, managementPanel, toast, clearToast } = useAppStore();
+  const { activeTab, managementPanel } = useAppStore();
   const userQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     staleTime: 60_000,
@@ -57,29 +57,13 @@ function MainApp() {
 
   // User authenticated but not a member of any house → invite join flow
   if (houseQuery.isFetched && houseQuery.data === null) {
-    return (
-      <>
-        <InviteJoinPage />
-        <Toast
-          message={toast?.message || ""}
-          type={toast?.type || "info"}
-          visible={!!toast}
-          onClose={clearToast}
-        />
-      </>
-    );
+    return <InviteJoinPage />;
   }
 
   if (managementPanel) {
     return (
       <div className="min-h-screen bg-[#0D0D11] text-white flex flex-col">
         <HouseManagementPage />
-        <Toast
-          message={toast?.message || ""}
-          type={toast?.type || "info"}
-          visible={!!toast}
-          onClose={clearToast}
-        />
       </div>
     );
   }
@@ -116,12 +100,6 @@ function MainApp() {
         </AnimatePresence>
       </main>
       <BottomNav />
-      <Toast
-        message={toast?.message || ""}
-        type={toast?.type || "info"}
-        visible={!!toast}
-        onClose={clearToast}
-      />
     </div>
   );
 }
@@ -157,6 +135,8 @@ function AdminRoute() {
 }
 
 export default function App() {
+  const { toast, clearToast } = useAppStore();
+
   return (
     <>
       {getPlatform() === "telegram" ? <TelegramAuthBootstrap /> : null}
@@ -168,6 +148,12 @@ export default function App() {
         <Route path="/admin" element={<AdminRoute />} />
         <Route path="*" element={<NotFound />} />
       </Routes>
+      <Toast
+        message={toast?.message || ""}
+        type={toast?.type || "info"}
+        visible={!!toast}
+        onClose={clearToast}
+      />
     </>
   );
 }

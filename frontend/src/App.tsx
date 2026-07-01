@@ -1,4 +1,5 @@
-import { Navigate, Routes, Route } from "react-router";
+import { Navigate, Routes, Route, useLocation } from "react-router";
+import { useEffect } from "react";
 import { useAppStore } from "@/shared/store/useAppStore";
 import { AnimatePresence, motion } from "framer-motion";
 import { TopBar } from "@/shared/layout/TopBar";
@@ -21,7 +22,8 @@ import { trpc } from "@/providers/trpc";
 import { LOGIN_PATH } from "@/const";
 
 function MainApp() {
-  const { activeTab, managementPanel } = useAppStore();
+  const { activeTab, setActiveTab, managementPanel } = useAppStore();
+  const location = useLocation();
   const userQuery = trpc.auth.me.useQuery(undefined, {
     retry: false,
     staleTime: 60_000,
@@ -34,6 +36,20 @@ function MainApp() {
     staleTime: 60_000,
   });
   const isRootAdmin = userQuery.data?.role === "admin";
+  const tabFromUrl = new URLSearchParams(location.search).get("tab");
+
+  useEffect(() => {
+    if (
+      tabFromUrl === "tasks" ||
+      tabFromUrl === "shop" ||
+      tabFromUrl === "punishments" ||
+      tabFromUrl === "notebook"
+    ) {
+      setActiveTab(tabFromUrl);
+    } else if (!tabFromUrl && activeTab !== "tasks") {
+      setActiveTab("tasks");
+    }
+  }, [activeTab, setActiveTab, tabFromUrl]);
 
   // While loading, show a minimal spinner so there's no layout flash
   if (userQuery.isLoading || houseQuery.isLoading) {

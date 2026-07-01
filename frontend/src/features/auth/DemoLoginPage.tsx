@@ -73,7 +73,7 @@ export default function DemoLoginPage() {
 
       // Invalidate cached auth state then redirect
       await utils.auth.me.invalidate();
-      navigate("/");
+      navigate("/", { replace: true });
     } catch (err) {
       setError(err instanceof Error ? err.message : "Có lỗi xảy ra");
     } finally {

@@ -1,5 +1,6 @@
 import { useAppStore, type Tab } from "@/shared/store/useAppStore";
 import { CheckSquare, ShoppingBag, AlertOctagon, BookOpen } from "lucide-react";
+import { useLocation, useNavigate } from "react-router";
 
 const tabs: { key: Tab; label: string; icon: typeof CheckSquare; color: string }[] = [
   { key: "tasks", label: "Nhiệm vụ", icon: CheckSquare, color: "#FF2A85" },
@@ -10,6 +11,24 @@ const tabs: { key: Tab; label: string; icon: typeof CheckSquare; color: string }
 
 export function BottomNav() {
   const { activeTab, setActiveTab } = useAppStore();
+  const location = useLocation();
+  const navigate = useNavigate();
+
+  const handleTabChange = (tab: Tab) => {
+    setActiveTab(tab);
+
+    if (location.pathname !== "/") return;
+
+    const params = new URLSearchParams(location.search);
+    if (tab === "tasks") {
+      params.delete("tab");
+    } else {
+      params.set("tab", tab);
+    }
+
+    const search = params.toString();
+    navigate({ pathname: "/", search: search ? `?${search}` : "" });
+  };
 
   return (
     <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0D0D11]/95 backdrop-blur-sm border-t border-white/5 z-50">
@@ -20,7 +39,7 @@ export function BottomNav() {
           return (
             <button
               key={tab.key}
-              onClick={() => setActiveTab(tab.key)}
+              onClick={() => handleTabChange(tab.key)}
               className="flex flex-col items-center justify-center gap-1 w-16 h-14 rounded-xl transition-all relative"
               style={{
                 color: isActive ? tab.color : "#52525B",

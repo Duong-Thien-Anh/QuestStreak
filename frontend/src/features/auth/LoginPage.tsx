@@ -19,7 +19,7 @@ export default function Login() {
     onSuccess: async ({ token, user }) => {
       setAuthToken(token);
       await utils.auth.me.invalidate();
-      navigate(user.role === "admin" ? "/admin" : "/");
+      navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
     },
     onError: (err) => setError(err.message),
   });
@@ -27,7 +27,7 @@ export default function Login() {
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (user) => {
       await utils.auth.me.invalidate();
-      navigate(user.role === "admin" ? "/admin" : "/");
+      navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
     },
     onError: (err) => setError(err.message),
   });

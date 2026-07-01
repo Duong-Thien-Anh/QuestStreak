@@ -185,6 +185,144 @@ export const adminRouter = createRouter({
     });
   }),
 
+  listUserProfiles: adminQuery.query(async () => {
+    const db = getDb();
+    const [
+      memberRows,
+      userRows,
+      roomRows,
+      walletRows,
+      progressRows,
+      streakRows,
+      taskRows,
+      rewardRows,
+      rewardPurchaseRows,
+      privilegeRows,
+      privilegeAssignmentRows,
+      punishmentRows,
+      punishmentAssignmentRows,
+      logRows,
+    ] = await Promise.all([
+      db.query.houseMembers.findMany({ orderBy: [desc(houseMembers.createdAt)] }),
+      db.query.users.findMany(),
+      db.query.houses.findMany(),
+      db.query.wallets.findMany(),
+      db.query.memberProgress.findMany(),
+      db.query.streaks.findMany({ orderBy: [desc(streaks.updatedAt)] }),
+      db.query.tasks.findMany({ orderBy: [desc(tasks.createdAt)] }),
+      db.query.rewards.findMany(),
+      db.query.rewardPurchases.findMany({
+        orderBy: [desc(rewardPurchases.purchasedAt)],
+      }),
+      db.query.privileges.findMany(),
+      db.query.privilegeAssignments.findMany({
+        orderBy: [desc(privilegeAssignments.assignedAt)],
+      }),
+      db.query.punishments.findMany(),
+      db.query.punishmentAssignments.findMany({
+        orderBy: [desc(punishmentAssignments.assignedAt)],
+      }),
+      db.query.logs.findMany({ orderBy: [desc(logs.createdAt)] }),
+    ]);
+
+    const userById = new Map(userRows.map((user) => [user.id, user]));
+    const roomById = new Map(roomRows.map((room) => [room.id, room]));
+    const rewardById = new Map(rewardRows.map((reward) => [reward.id, reward]));
+    const privilegeById = new Map(
+      privilegeRows.map((privilege) => [privilege.id, privilege]),
+    );
+    const punishmentById = new Map(
+      punishmentRows.map((punishment) => [punishment.id, punishment]),
+    );
+
+    return memberRows.map((member) => {
+      const user = userById.get(member.userId) ?? null;
+      const wallet = walletRows.find((item) => item.memberId === member.id) ?? null;
+      const progress =
+        progressRows.find((item) => item.memberId === member.id) ?? null;
+      const memberTasks = taskRows.filter((task) => task.assignedTo === member.id);
+      const memberStreaks = streakRows.filter((streak) => streak.memberId === member.id);
+      const memberRewardPurchases = rewardPurchaseRows
+        .filter((purchase) => purchase.memberId === member.id)
+        .slice(0, 8)
+        .map((purchase) => ({
+          ...purchase,
+          rewardTitle:
+            rewardById.get(purchase.rewardId)?.title ??
+            `Reward #${purchase.rewardId}`,
+        }));
+      const activePrivileges = privilegeAssignmentRows
+        .filter(
+          (assignment) =>
+            assignment.memberId === member.id && assignment.status === "active",
+        )
+        .slice(0, 8)
+        .map((assignment) => ({
+          ...assignment,
+          privilegeTitle:
+            privilegeById.get(assignment.privilegeId)?.title ??
+            `Privilege #${assignment.privilegeId}`,
+        }));
+      const activePunishments = punishmentAssignmentRows
+        .filter(
+          (assignment) =>
+            assignment.memberId === member.id && assignment.status === "active",
+        )
+        .slice(0, 8)
+        .map((assignment) => ({
+          ...assignment,
+          punishmentTitle:
+            punishmentById.get(assignment.punishmentId)?.title ??
+            `Punishment #${assignment.punishmentId}`,
+        }));
+      const recentLogs = logRows
+        .filter((log) => log.actorId === member.id || log.targetId === member.id)
+        .slice(0, 8);
+
+      return {
+        member,
+        user,
+        room: roomById.get(member.houseId) ?? null,
+        wallet: {
+          chymBalance: wallet?.chymBalance ?? 0,
+          chayBalance: wallet?.chayBalance ?? 0,
+        },
+        progress: {
+          xp: progress?.xp ?? 0,
+          level: progress?.level ?? 1,
+        },
+        streak: {
+          current: memberStreaks.reduce(
+            (max, streak) => Math.max(max, streak.currentStreak),
+            0,
+          ),
+          longest: memberStreaks.reduce(
+            (max, streak) => Math.max(max, streak.longestStreak),
+            0,
+          ),
+          count: memberStreaks.length,
+        },
+        tasks: {
+          total: memberTasks.length,
+          active: memberTasks.filter((task) => task.status === "active").length,
+          submitted: memberTasks.filter((task) => task.status === "submitted").length,
+          completed: memberTasks.filter((task) => task.status === "completed").length,
+          recent: memberTasks.slice(0, 5).map((task) => ({
+            id: task.id,
+            title: task.title,
+            status: task.status,
+            chymReward: task.chymReward,
+            chayPenalty: task.chayPenalty,
+          })),
+        },
+        rewards: memberRewardPurchases,
+        privileges: activePrivileges,
+        punishments: activePunishments,
+        recentLogs,
+      };
+    });
+  }),
+
   createLocalAccount: adminQuery
     .input(
       z.object({

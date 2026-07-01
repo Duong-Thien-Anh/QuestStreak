@@ -55,6 +55,7 @@ type OperationSection =
   | "punishments"
   | "notebook"
   | "activity";
+type UserSection = "accounts" | "profiles";
 type RegistrationStatus = "pending" | "approved" | "rejected" | "all";
 type MemberRole = "dominant" | "submissive" | "switch";
 type Gender = "male" | "female";
@@ -79,6 +80,11 @@ const operationTabs: Array<{ value: OperationSection; label: string; icon: typeo
   { value: "punishments", label: "Punishments", icon: Target },
   { value: "notebook", label: "Notebook", icon: Flame },
   { value: "activity", label: "Activity", icon: Activity },
+];
+
+const userTabs: Array<{ value: UserSection; label: string }> = [
+  { value: "accounts", label: "Users Account" },
+  { value: "profiles", label: "Users Profile" },
 ];
 
 const registrationTabs: Array<{ value: RegistrationStatus; label: string }> = [
@@ -118,6 +124,8 @@ export default function AdminRegistrationsPage() {
   const utils = trpc.useUtils();
   const { showToast } = useAppStore();
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
+  const [activeUserSection, setActiveUserSection] =
+    useState<UserSection>("accounts");
   const [activeOperationSection, setActiveOperationSection] =
     useState<OperationSection>("tasks");
   const [registrationStatus, setRegistrationStatus] =
@@ -152,6 +160,9 @@ export default function AdminRegistrationsPage() {
   const usersQuery = trpc.admin.listUsers.useQuery(undefined, {
     retry: false,
   });
+  const userProfilesQuery = trpc.admin.listUserProfiles.useQuery(undefined, {
+    retry: false,
+  });
   const roomsQuery = trpc.admin.listRooms.useQuery(undefined, {
     retry: false,
   });
@@ -173,6 +184,7 @@ export default function AdminRegistrationsPage() {
     { enabled: !!houseQuery.data?.id },
   );
   const users = usersQuery.data ?? [];
+  const userProfiles = userProfilesQuery.data ?? [];
   const rooms = roomsQuery.data ?? [];
   const avatars = avatarsQuery.data ?? [];
   const registrations = registrationsQuery.data ?? [];
@@ -195,18 +207,32 @@ export default function AdminRegistrationsPage() {
   const invalidateAdminData = async () => {
     await Promise.all([
       utils.admin.listUsers.invalidate(),
+      utils.admin.listUserProfiles.invalidate(),
       utils.admin.listRooms.invalidate(),
       utils.admin.listRegistrations.invalidate(),
       utils.admin.listOperations.invalidate(),
     ]);
   };
 
+  const invalidateRoomsData = async () => {
+    await Promise.all([
+      utils.admin.listRooms.invalidate(),
+      utils.admin.listUserProfiles.invalidate(),
+    ]);
+  };
+
+  const invalidateOperationsData = async () => {
+    await Promise.all([
+      utils.admin.listOperations.invalidate(),
+      utils.admin.listUserProfiles.invalidate(),
+    ]);
+  };
 
   const createRoomMutation = trpc.admin.createRoom.useMutation({
     onSuccess: async () => {
       setNewRoomName("");
       setNewRoomOwnerId("");
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã tạo room", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -216,14 +242,14 @@ export default function AdminRegistrationsPage() {
       setEditingRoomId(null);
       setRoomEditName("");
       setRoomEditOwnerId("");
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã cập nhật room", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const deleteRoomMutation = trpc.admin.deleteRoom.useMutation({
     onSuccess: async () => {
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã xóa room", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -231,7 +257,7 @@ export default function AdminRegistrationsPage() {
   const addMemberMutation = trpc.admin.addRoomMember.useMutation({
     onSuccess: async () => {
       resetMemberForm();
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã thêm thành viên", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -239,14 +265,14 @@ export default function AdminRegistrationsPage() {
   const updateMemberMutation = trpc.admin.updateRoomMember.useMutation({
     onSuccess: async () => {
       resetMemberForm();
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã cập nhật thành viên", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const removeMemberMutation = trpc.admin.removeRoomMember.useMutation({
     onSuccess: async () => {
-      await utils.admin.listRooms.invalidate();
+      await invalidateRoomsData();
       showToast("Đã xóa thành viên", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -258,7 +284,10 @@ export default function AdminRegistrationsPage() {
       setAccountUsername("");
       setAccountPassword("");
       setAccountRole("user");
-      await utils.admin.listUsers.invalidate();
+      await Promise.all([
+        utils.admin.listUsers.invalidate(),
+        utils.admin.listUserProfiles.invalidate(),
+      ]);
       showToast("Đã tạo tài khoản", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -308,21 +337,21 @@ export default function AdminRegistrationsPage() {
   });
   const updateWalletProgressMutation = trpc.admin.updateWalletProgress.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật ví và tiến độ", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const updateStreakMutation = trpc.admin.updateStreak.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật streak", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const updateTaskStatusMutation = trpc.admin.updateTaskStatus.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật trạng thái task", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -330,14 +359,14 @@ export default function AdminRegistrationsPage() {
   const updateTaskSubmissionStatusMutation =
     trpc.admin.updateTaskSubmissionStatus.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã cập nhật submission", "success");
       },
       onError: (error) => showToast(error.message, "error"),
     });
   const updateCatalogActiveMutation = trpc.admin.updateCatalogActive.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật trạng thái catalog", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -345,7 +374,7 @@ export default function AdminRegistrationsPage() {
   const updateRewardPurchaseStatusMutation =
     trpc.admin.updateRewardPurchaseStatus.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã cập nhật purchase", "success");
       },
       onError: (error) => showToast(error.message, "error"),
@@ -353,7 +382,7 @@ export default function AdminRegistrationsPage() {
   const updatePrivilegeAssignmentStatusMutation =
     trpc.admin.updatePrivilegeAssignmentStatus.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã cập nhật privilege assignment", "success");
       },
       onError: (error) => showToast(error.message, "error"),
@@ -361,70 +390,70 @@ export default function AdminRegistrationsPage() {
   const updatePunishmentAssignmentStatusMutation =
     trpc.admin.updatePunishmentAssignmentStatus.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã cập nhật punishment assignment", "success");
       },
       onError: (error) => showToast(error.message, "error"),
     });
   const updateAgreementStatusMutation = trpc.admin.updateAgreementStatus.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật agreement", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const deleteOperationRecordMutation = trpc.admin.deleteOperationRecord.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã xóa record", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const createTaskMutation = trpc.admin.createTask.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã tạo task", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const updateTaskMutation = trpc.admin.updateTask.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật task", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const deleteTaskMutation = trpc.admin.deleteTask.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã xóa task", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const createCatalogItemMutation = trpc.admin.createCatalogItem.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã tạo mục mới", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const updateCatalogItemMutation = trpc.admin.updateCatalogItem.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã lưu thay đổi", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const deleteCatalogItemMutation = trpc.admin.deleteCatalogItem.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã xóa mục", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const createRewardPurchaseMutation = trpc.admin.createRewardPurchase.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã tạo gift/purchase", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -432,7 +461,7 @@ export default function AdminRegistrationsPage() {
   const createPrivilegeAssignmentMutation =
     trpc.admin.createPrivilegeAssignment.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã gán privilege", "success");
       },
       onError: (error) => showToast(error.message, "error"),
@@ -440,21 +469,21 @@ export default function AdminRegistrationsPage() {
   const createPunishmentAssignmentMutation =
     trpc.admin.createPunishmentAssignment.useMutation({
       onSuccess: async () => {
-        await utils.admin.listOperations.invalidate();
+        await invalidateOperationsData();
         showToast("Đã gán punishment", "success");
       },
       onError: (error) => showToast(error.message, "error"),
     });
   const createNoteMutation = trpc.admin.createNote.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã tạo note", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const updateNoteMutation = trpc.admin.updateNote.useMutation({
     onSuccess: async () => {
-      await utils.admin.listOperations.invalidate();
+      await invalidateOperationsData();
       showToast("Đã cập nhật note", "success");
     },
     onError: (error) => showToast(error.message, "error"),
@@ -1219,6 +1248,27 @@ export default function AdminRegistrationsPage() {
 
         {!isLoading && activeSection === "users" ? (
           <section className="grid gap-4">
+            <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+              <Tabs
+                value={activeUserSection}
+                onValueChange={(value) => setActiveUserSection(value as UserSection)}
+              >
+                <TabsList className="bg-white/10 text-white/60">
+                  {userTabs.map((tab) => (
+                    <TabsTrigger
+                      key={tab.value}
+                      value={tab.value}
+                      className="data-[state=active]:bg-[#F59E0B] data-[state=active]:text-black"
+                    >
+                      {tab.label}
+                    </TabsTrigger>
+                  ))}
+                </TabsList>
+              </Tabs>
+            </div>
+
+            {activeUserSection === "accounts" ? (
+              <>
             <div className="grid gap-4 2xl:grid-cols-[minmax(320px,420px)_minmax(0,1fr)]">
               <aside className="min-w-0 rounded-lg border border-white/10 bg-[#11141D] p-4">
                 <h2 className="text-base font-semibold">Tạo account</h2>
@@ -1460,6 +1510,181 @@ export default function AdminRegistrationsPage() {
                 </TableBody>
               </Table>
             </div>
+              </>
+            ) : null}
+
+            {activeUserSection === "profiles" ? (
+              <div className="grid gap-4">
+                {userProfilesQuery.isLoading ? (
+                  <div className="flex min-h-48 items-center justify-center rounded-lg border border-white/10 bg-[#11141D]">
+                    <Spinner className="size-8 text-[#F59E0B]" />
+                  </div>
+                ) : null}
+                {!userProfilesQuery.isLoading && userProfiles.length === 0 ? (
+                  <Empty className="rounded-lg border border-white/10 bg-[#11141D]">
+                    <EmptyHeader>
+                      <EmptyTitle>Chưa có user profile</EmptyTitle>
+                      <EmptyDescription>
+                        Profile sẽ xuất hiện khi account đã có membership trong room.
+                      </EmptyDescription>
+                    </EmptyHeader>
+                  </Empty>
+                ) : null}
+                <div className="grid gap-4 xl:grid-cols-2">
+                  {userProfiles.map((profile) => (
+                    <div
+                      key={profile.member.id}
+                      className="rounded-lg border border-white/10 bg-[#11141D] p-4"
+                    >
+                      <div className="flex items-start gap-4">
+                        <img
+                          src={
+                            profile.member.telegramAvatar ||
+                            profile.user?.avatar ||
+                            `/avatars/${
+                              normalizeGender(profile.member.gender) === "male"
+                                ? "admin"
+                                : "sub"
+                            }.jpg`
+                          }
+                          alt={profile.member.nickname ?? profile.user?.name ?? "Avatar"}
+                          className="h-16 w-16 rounded-xl border border-white/10 object-cover"
+                          onError={(event) => {
+                            event.currentTarget.src = "/avatars/sub.jpg";
+                          }}
+                        />
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h3 className="truncate text-base font-semibold text-white">
+                              {profile.member.nickname ||
+                                profile.user?.name ||
+                                `Member #${profile.member.id}`}
+                            </h3>
+                            <Badge
+                              variant="outline"
+                              className="border-[#F59E0B]/30 text-[#F59E0B]"
+                            >
+                              {profile.user?.role ?? "member"}
+                            </Badge>
+                          </div>
+                          <p className="mt-1 truncate text-xs text-white/45">
+                            {profile.user?.email ?? profile.user?.unionId ?? "Chưa link account"}
+                          </p>
+                          <p className="mt-1 text-xs text-white/45">
+                            {profile.room?.name ?? `Room #${profile.member.houseId}`} ·{" "}
+                            {memberRoleLabels[profile.member.lifestyleRole]} ·{" "}
+                            {genderLabels[normalizeGender(profile.member.gender)]}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-2 sm:grid-cols-4">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-xs text-white/45">Chym</p>
+                          <p className="mt-1 text-lg font-semibold text-white">
+                            {profile.wallet.chymBalance}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-xs text-white/45">Chày</p>
+                          <p className="mt-1 text-lg font-semibold text-white">
+                            {profile.wallet.chayBalance}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-xs text-white/45">Level / XP</p>
+                          <p className="mt-1 text-lg font-semibold text-white">
+                            {profile.progress.level} / {profile.progress.xp}
+                          </p>
+                        </div>
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-xs text-white/45">Streak</p>
+                          <p className="mt-1 text-lg font-semibold text-white">
+                            {profile.streak.current}/{profile.streak.longest}
+                          </p>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 grid gap-3 lg:grid-cols-2">
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">Tasks</p>
+                          <p className="mt-1 text-xs text-white/45">
+                            Tổng {profile.tasks.total} · Active {profile.tasks.active} · Submitted{" "}
+                            {profile.tasks.submitted} · Done {profile.tasks.completed}
+                          </p>
+                          <div className="mt-2 space-y-1">
+                            {profile.tasks.recent.map((task) => (
+                              <p key={task.id} className="truncate text-xs text-white/55">
+                                {task.title} · {task.status}
+                              </p>
+                            ))}
+                            {profile.tasks.recent.length === 0 ? (
+                              <p className="text-xs text-white/30">Chưa có task.</p>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">Rewards</p>
+                          <div className="mt-2 space-y-1">
+                            {profile.rewards.slice(0, 4).map((purchase) => (
+                              <p key={purchase.id} className="truncate text-xs text-white/55">
+                                {purchase.rewardTitle} · {formatDate(purchase.purchasedAt)}
+                              </p>
+                            ))}
+                            {profile.rewards.length === 0 ? (
+                              <p className="text-xs text-white/30">Chưa có reward.</p>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">Privilege active</p>
+                          <div className="mt-2 space-y-1">
+                            {profile.privileges.slice(0, 4).map((assignment) => (
+                              <p key={assignment.id} className="truncate text-xs text-white/55">
+                                {assignment.privilegeTitle}
+                              </p>
+                            ))}
+                            {profile.privileges.length === 0 ? (
+                              <p className="text-xs text-white/30">Không có privilege active.</p>
+                            ) : null}
+                          </div>
+                        </div>
+
+                        <div className="rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                          <p className="text-sm font-semibold text-white">Punishment active</p>
+                          <div className="mt-2 space-y-1">
+                            {profile.punishments.slice(0, 4).map((assignment) => (
+                              <p key={assignment.id} className="truncate text-xs text-white/55">
+                                {assignment.punishmentTitle}
+                              </p>
+                            ))}
+                            {profile.punishments.length === 0 ? (
+                              <p className="text-xs text-white/30">Không có punishment active.</p>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="mt-4 rounded-lg border border-white/10 bg-white/[0.03] p-3">
+                        <p className="text-sm font-semibold text-white">Hoạt động gần đây</p>
+                        <div className="mt-2 space-y-1">
+                          {profile.recentLogs.slice(0, 5).map((log) => (
+                            <p key={log.id} className="truncate text-xs text-white/55">
+                              {formatDate(log.createdAt)} · {log.action}
+                            </p>
+                          ))}
+                          {profile.recentLogs.length === 0 ? (
+                            <p className="text-xs text-white/30">Chưa có hoạt động.</p>
+                          ) : null}
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ) : null}
           </section>
         ) : null}
 

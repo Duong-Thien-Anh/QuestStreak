@@ -140,18 +140,24 @@ export const authRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const normalizedEmail = input.email.trim().toLowerCase();
+      const normalizedUsername = input.username?.trim().toLowerCase();
 
       // Reject if already has a pending/approved request or active credential
-      const [existingReq, existingCred, existingUsername] = await Promise.all([
+      const [existingReq, existingCred, existingUsername, existingUsernameReq] = await Promise.all([
         db.query.registrationRequests.findFirst({
           where: eq(registrationRequests.email, normalizedEmail),
         }),
         db.query.userCredentials.findFirst({
           where: eq(userCredentials.email, normalizedEmail),
         }),
-        input.username
+        normalizedUsername
           ? db.query.userCredentials.findFirst({
-              where: eq(userCredentials.username, input.username.trim()),
+              where: eq(userCredentials.username, normalizedUsername),
+            })
+          : Promise.resolve(undefined),
+        normalizedUsername
+          ? db.query.registrationRequests.findFirst({
+              where: eq(registrationRequests.username, normalizedUsername),
             })
           : Promise.resolve(undefined),
       ]);
@@ -160,6 +166,12 @@ export const authRouter = createRouter({
         throw new Error("Email đã được đăng ký");
       }
       if (existingUsername) {
+        throw new Error("Tên đăng nhập đã được đăng ký");
+      }
+      if (existingUsernameReq && existingUsernameReq.status === "pending") {
+        throw new Error("Tên đăng nhập đang chờ duyệt");
+      }
+      if (existingUsernameReq && existingUsernameReq.status === "approved") {
         throw new Error("Tên đăng nhập đã được đăng ký");
       }
       if (existingReq && existingReq.status === "pending") {
@@ -176,7 +188,7 @@ export const authRouter = createRouter({
         .values({
           name: input.name.trim(),
           email: normalizedEmail,
-          username: input.username?.trim() || null,
+          username: normalizedUsername || null,
           phone: input.phone?.trim() || null,
           lifestyleRole: input.lifestyleRole,
           gender: input.gender,
@@ -199,7 +211,8 @@ export const authRouter = createRouter({
     )
     .mutation(async ({ ctx, input }) => {
       const db = getDb();
-      const identifier = input.identifier.trim().toLowerCase();
+      const rawIdentifier = input.identifier.trim();
+      const identifier = rawIdentifier.toLowerCase();
 
       // Find credential by email, username, or phone
       const findCredential = () =>
@@ -207,6 +220,8 @@ export const authRouter = createRouter({
           where: or(
             eq(userCredentials.email, identifier),
             eq(userCredentials.username, identifier),
+            eq(userCredentials.username, rawIdentifier),
+            eq(userCredentials.phone, rawIdentifier),
             eq(userCredentials.phone, identifier),
           ),
         });

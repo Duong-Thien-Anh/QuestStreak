@@ -155,6 +155,7 @@ export default function AdminRegistrationsPage() {
   const [accountRole, setAccountRole] = useState<AccountRole>("user");
   const [avatarUrl, setAvatarUrl] = useState("");
   const [avatarLabel, setAvatarLabel] = useState("");
+  const [avatarHouseId, setAvatarHouseId] = useState("all");
 
   const houseQuery = trpc.house.get.useQuery(undefined, { retry: false });
   const usersQuery = trpc.admin.listUsers.useQuery(undefined, {
@@ -179,13 +180,15 @@ export default function AdminRegistrationsPage() {
   });
 
   const houseId = houseQuery.data?.id ?? 0;
-  const avatarsQuery = trpc.admin.listAvatars.useQuery(
-    { houseId },
-    { enabled: !!houseQuery.data?.id },
-  );
   const users = usersQuery.data ?? [];
   const userProfiles = userProfilesQuery.data ?? [];
   const rooms = roomsQuery.data ?? [];
+  const selectedAvatarHouseId =
+    avatarHouseId === "all" ? rooms[0]?.id ?? houseId : Number(avatarHouseId);
+  const avatarsQuery = trpc.admin.listAvatars.useQuery(
+    { houseId: selectedAvatarHouseId },
+    { enabled: !!selectedAvatarHouseId },
+  );
   const avatars = avatarsQuery.data ?? [];
   const registrations = registrationsQuery.data ?? [];
   const operations = operationsQuery.data;
@@ -310,6 +313,13 @@ export default function AdminRegistrationsPage() {
     onSuccess: async () => {
       await utils.admin.listAvatars.invalidate();
       showToast("Đã thêm avatar", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const addAvatarToRoomsMutation = trpc.admin.addAvatarToRooms.useMutation({
+    onSuccess: async () => {
+      await utils.admin.listAvatars.invalidate();
+      showToast("Đã thêm avatar vào tất cả rooms", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
@@ -585,19 +595,38 @@ export default function AdminRegistrationsPage() {
   }
 
   function handleAddAvatar() {
-    if (!avatarUrl.trim() || !houseId) return;
+    if (!avatarUrl.trim()) return;
+    const targetHouseIds =
+      avatarHouseId === "all" ? rooms.map((room) => room.id) : [Number(avatarHouseId)];
+    if (targetHouseIds.length === 0 || targetHouseIds.some((id) => !id)) return;
+    const payload = {
+      url: avatarUrl.trim(),
+      label: avatarLabel.trim() || undefined,
+    };
+    const callbacks = {
+      onSuccess: () => {
+        setAvatarUrl("");
+        setAvatarLabel("");
+      },
+    };
+
+    if (avatarHouseId === "all") {
+      addAvatarToRoomsMutation.mutate(
+        {
+          houseIds: targetHouseIds,
+          ...payload,
+        },
+        callbacks,
+      );
+      return;
+    }
+
     addAvatarMutation.mutate(
       {
-        houseId,
-        url: avatarUrl.trim(),
-        label: avatarLabel.trim() || undefined,
+        houseId: targetHouseIds[0],
+        ...payload,
       },
-      {
-        onSuccess: () => {
-          setAvatarUrl("");
-          setAvatarLabel("");
-        },
-      },
+      callbacks,
     );
   }
 
@@ -1331,6 +1360,21 @@ export default function AdminRegistrationsPage() {
 
               <div className="min-w-0 rounded-lg border border-white/10 bg-[#11141D] p-4">
                 <div className="flex flex-col gap-2 md:flex-row md:items-end">
+                  <div className="md:w-56">
+                    <label className="mb-2 block text-xs text-white/45">Áp dụng cho</label>
+                    <select
+                      value={avatarHouseId}
+                      onChange={(event) => setAvatarHouseId(event.target.value)}
+                      className="w-full rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="all">Tất cả rooms</option>
+                      {rooms.map((room) => (
+                        <option key={room.id} value={room.id}>
+                          {room.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="flex-1">
                     <label className="mb-2 block text-xs text-white/45">URL avatar</label>
                     <Input
@@ -1352,16 +1396,28 @@ export default function AdminRegistrationsPage() {
                   <Button
                     type="button"
                     className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
-                    disabled={!avatarUrl.trim() || !houseId || addAvatarMutation.isPending}
+                    disabled={
+                      !avatarUrl.trim() ||
+                      rooms.length === 0 ||
+                      addAvatarMutation.isPending ||
+                      addAvatarToRoomsMutation.isPending
+                    }
                     onClick={handleAddAvatar}
                   >
-                    Thêm avatar
+                    {addAvatarMutation.isPending || addAvatarToRoomsMutation.isPending
+                      ? "Đang thêm..."
+                      : "Thêm avatar"}
                   </Button>
                 </div>
                 <div className="mt-4">
                   <h2 className="text-sm font-semibold text-white">Quản lý Avatar</h2>
                   <p className="mt-1 text-xs text-white/45">
-                    Danh sách avatar hiện có cho house hiện tại.
+                    Danh sách đang hiển thị theo{" "}
+                    {avatarHouseId === "all"
+                      ? rooms[0]?.name ?? "room đầu tiên"
+                      : rooms.find((room) => room.id === Number(avatarHouseId))?.name ??
+                        "room đã chọn"}
+                    . Khi chọn “Tất cả rooms”, avatar mới sẽ được thêm vào mọi room để user đều thấy.
                   </p>
                   <div className="mt-3 space-y-2">
                     {avatars.length === 0 ? (

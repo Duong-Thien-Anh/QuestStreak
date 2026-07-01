@@ -152,6 +152,32 @@ export const adminRouter = createRouter({
       return avatar;
     }),
 
+  addAvatarToRooms: adminQuery
+    .input(
+      z.object({
+        houseIds: z.array(z.number()).min(1),
+        url: z.string().url().max(2000),
+        label: z.string().max(100).optional(),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
+      const uniqueHouseIds = [...new Set(input.houseIds)];
+      const created = await db
+        .insert(houseAvatars)
+        .values(
+          uniqueHouseIds.map((houseId) => ({
+            houseId,
+            url: input.url.trim(),
+            label: input.label?.trim() ?? null,
+            addedBy: actor?.id ?? 0,
+          })),
+        )
+        .returning();
+      return created;
+    }),
+
   deleteAvatar: adminQuery
     .input(z.object({ avatarId: z.number() }))
     .mutation(async ({ input }) => {
@@ -336,10 +362,19 @@ export const adminRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const email = input.email.trim().toLowerCase();
-      const existing = await db.query.userCredentials.findFirst({
-        where: eq(userCredentials.email, email),
-      });
+      const username = input.username?.trim().toLowerCase() || null;
+      const [existing, existingUsername] = await Promise.all([
+        db.query.userCredentials.findFirst({
+          where: eq(userCredentials.email, email),
+        }),
+        username
+          ? db.query.userCredentials.findFirst({
+              where: eq(userCredentials.username, username),
+            })
+          : Promise.resolve(undefined),
+      ]);
       if (existing) throw new Error("Email đã tồn tại");
+      if (existingUsername) throw new Error("Tên đăng nhập đã tồn tại");
 
       const [user] = await db
         .insert(users)
@@ -355,7 +390,7 @@ export const adminRouter = createRouter({
       await db.insert(userCredentials).values({
         userId: user.id,
         email,
-        username: input.username?.trim() || null,
+        username,
         passwordHash: await hashPassword(input.password),
       });
 
@@ -389,7 +424,7 @@ export const adminRouter = createRouter({
     .mutation(async ({ input }) => {
       const db = getDb();
       const email = input.email.trim().toLowerCase();
-      const username = input.username?.trim() || null;
+      const username = input.username?.trim().toLowerCase() || null;
       const phone = input.phone?.trim() || null;
 
       const existingCredential = await db.query.userCredentials.findFirst({
@@ -397,6 +432,14 @@ export const adminRouter = createRouter({
       });
       if (existingCredential && existingCredential.userId !== input.userId) {
         throw new Error("Email đã tồn tại");
+      }
+      const existingUsername = username
+        ? await db.query.userCredentials.findFirst({
+            where: eq(userCredentials.username, username),
+          })
+        : null;
+      if (existingUsername && existingUsername.userId !== input.userId) {
+        throw new Error("Tên đăng nhập đã tồn tại");
       }
 
       const [user] = await db
@@ -1753,6 +1796,13 @@ export const adminRouter = createRouter({
         where: eq(userCredentials.email, req.email),
       });
       if (existingCred) throw new Error("Email đã tồn tại trong hệ thống");
+      const normalizedUsername = req.username?.trim().toLowerCase();
+      const existingUsername = normalizedUsername
+        ? await db.query.userCredentials.findFirst({
+            where: eq(userCredentials.username, normalizedUsername),
+          })
+        : null;
+      if (existingUsername) throw new Error("Tên đăng nhập đã tồn tại trong hệ thống");
 
       // Create user account
       const unionId = `local:${req.email}`;
@@ -1771,7 +1821,7 @@ export const adminRouter = createRouter({
       await db.insert(userCredentials).values({
         userId: newUser.id,
         email: req.email,
-        username: req.username ?? undefined,
+        username: normalizedUsername ?? undefined,
         phone: req.phone ?? undefined,
         passwordHash: req.passwordHash,
       });

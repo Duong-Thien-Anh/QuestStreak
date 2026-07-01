@@ -49,6 +49,9 @@ export function TasksPage() {
   const [linkedRewardId, setLinkedRewardId] = useState("");
   const [linkedAchievementId, setLinkedAchievementId] = useState("");
   const [linkedPunishmentId, setLinkedPunishmentId] = useState("");
+  const [selectedTaskAssigneeId, setSelectedTaskAssigneeId] = useState("");
+  const [assignTaskSheetId, setAssignTaskSheetId] = useState<number | null>(null);
+  const [assignTaskMemberId, setAssignTaskMemberId] = useState("");
   const [wheelTitle, setWheelTitle] = useState("");
   const [wheelDescription, setWheelDescription] = useState("");
   const [wheelSelectedOptions, setWheelSelectedOptions] = useState<
@@ -186,11 +189,16 @@ export function TasksPage() {
 
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
   const visibleWheels = wheelsQuery.data ?? [];
+  const assignTaskTarget = visibleTasks.find((task) => task.id === assignTaskSheetId);
   const availableRewards = rewardsQuery.data ?? [];
   const availablePunishments = punishmentsQuery.data ?? [];
   const activeWheelRewards = availableRewards.filter((reward) => reward.isActive);
   const activeWheelPunishments = availablePunishments.filter((punishment) => punishment.isActive);
   const availableAchievements = gamificationSummaryQuery.data?.achievements ?? [];
+  const memberById = useMemo(
+    () => new Map(members.map((member) => [member.id, member])),
+    [members]
+  );
   const rewardById = useMemo(
     () => new Map(availableRewards.map((reward) => [reward.id, reward])),
     [availableRewards]
@@ -257,6 +265,7 @@ export function TasksPage() {
                 linkedRewardId: linkedRewardId ? Number(linkedRewardId) : null,
                 linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
                 linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
+                assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : null,
               }
             : task
         )
@@ -284,7 +293,7 @@ export function TasksPage() {
         chymReward,
         chayPenalty,
         bonusXp,
-        assignedTo: subMember?.id,
+        assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : undefined,
         linkedRewardId: linkedRewardId ? Number(linkedRewardId) : undefined,
         linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : undefined,
         linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : undefined,
@@ -312,7 +321,7 @@ export function TasksPage() {
       linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
       linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
       status: "active" as const,
-      assignedTo: null as number | null,
+      assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : null,
     };
     setTasksState([...tasksState, newTask]);
     setCreateSheet(false);
@@ -334,6 +343,7 @@ export function TasksPage() {
     setLinkedRewardId("");
     setLinkedAchievementId("");
     setLinkedPunishmentId("");
+    setSelectedTaskAssigneeId(subMember?.id ? String(subMember.id) : "");
     setFrequency("daily");
     setTaskType("regular");
   };
@@ -355,6 +365,7 @@ export function TasksPage() {
     setLinkedRewardId(task.linkedRewardId ? String(task.linkedRewardId) : "");
     setLinkedAchievementId(task.linkedAchievementId ? String(task.linkedAchievementId) : "");
     setLinkedPunishmentId(task.linkedPunishmentId ? String(task.linkedPunishmentId) : "");
+    setSelectedTaskAssigneeId(task.assignedTo ? String(task.assignedTo) : "");
     if (task.category === "special" || task.category === "superSpecial") {
       setTaskType(task.category);
     } else {
@@ -442,9 +453,23 @@ export function TasksPage() {
     wheelSelectedOptions.some((option) => option.type === type && option.id === id);
 
   const assignTask = (taskId: number) => {
-    if (!houseQuery.data || !subMember?.id) return;
-    assignTaskMutation.mutate({ taskId, memberId: subMember.id });
-    showToast("Đã giao việc!", "success");
+    setAssignTaskSheetId(taskId);
+    setAssignTaskMemberId(subMember?.id ? String(subMember.id) : members[0]?.id ? String(members[0].id) : "");
+  };
+
+  const confirmAssignTask = () => {
+    if (!houseQuery.data || !assignTaskSheetId || !assignTaskMemberId) return;
+    assignTaskMutation.mutate(
+      { taskId: assignTaskSheetId, memberId: Number(assignTaskMemberId) },
+      {
+        onSuccess: () => {
+          setAssignTaskSheetId(null);
+          setAssignTaskMemberId("");
+          showToast("Đã giao việc!", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const acceptTask = (taskId: number) => {
@@ -658,6 +683,15 @@ export function TasksPage() {
               <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#00F2FE]">
                 <Calendar className="h-3 w-3" />
                 {formatTaskDate(task.dueDate)}
+              </p>
+            )}
+            {task.assignedTo && (
+              <p className="mt-2 text-xs text-white/45">
+                Người nhận:{" "}
+                <span className="font-medium text-white/70">
+                  {memberById.get(task.assignedTo)?.nickname ??
+                    `Member #${task.assignedTo}`}
+                </span>
               </p>
             )}
           </div>
@@ -1382,6 +1416,24 @@ export function TasksPage() {
             />
           </div>
 
+          {isAdmin && (
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Người nhận nhiệm vụ</label>
+              <select
+                value={selectedTaskAssigneeId}
+                onChange={(e) => setSelectedTaskAssigneeId(e.target.value)}
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none transition-colors"
+              >
+                <option value="">Chưa giao</option>
+                {members.map((member) => (
+                  <option key={member.id} value={member.id}>
+                    {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           {/* Due date chỉ cho special/superSpecial */}
           {taskType !== "regular" && (
             <div>
@@ -1518,6 +1570,50 @@ export function TasksPage() {
           </button>
         </div>
         )}
+      </BottomSheet>
+
+      <BottomSheet
+        isOpen={assignTaskSheetId !== null}
+        onClose={() => {
+          setAssignTaskSheetId(null);
+          setAssignTaskMemberId("");
+        }}
+        title="Giao nhiệm vụ"
+      >
+        <div className="space-y-4">
+          {assignTaskTarget && (
+            <div className="rounded-xl border border-[#FF2A85]/20 bg-[#FF2A85]/5 p-3">
+              <p className="text-sm font-semibold text-white">{assignTaskTarget.title}</p>
+              {assignTaskTarget.description && (
+                <p className="mt-1 text-xs text-white/45 line-clamp-2">
+                  {assignTaskTarget.description}
+                </p>
+              )}
+            </div>
+          )}
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận nhiệm vụ</label>
+            <select
+              value={assignTaskMemberId}
+              onChange={(event) => setAssignTaskMemberId(event.target.value)}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF2A85]/50 focus:outline-none"
+            >
+              <option value="">Chọn người nhận</option>
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
+          </div>
+          <button
+            onClick={confirmAssignTask}
+            disabled={assignTaskMutation.isPending || !assignTaskMemberId}
+            className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 transition-colors"
+          >
+            {assignTaskMutation.isPending ? "Đang giao..." : "Giao nhiệm vụ"}
+          </button>
+        </div>
       </BottomSheet>
 
       {/* ── Submit Proof Sheet ── */}

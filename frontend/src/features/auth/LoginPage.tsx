@@ -9,6 +9,7 @@ export default function Login() {
   const navigate = useNavigate();
   const utils = trpc.useUtils();
   const setAuthToken = useAppStore((state) => state.setAuthToken);
+  const showToast = useAppStore((state) => state.showToast);
   const [identifier, setIdentifier] = useState("");
   const [password, setPassword] = useState("");
   const [rememberMe, setRememberMe] = useState(true);
@@ -18,18 +19,28 @@ export default function Login() {
   const telegramLoginMutation = trpc.auth.telegramLogin.useMutation({
     onSuccess: async ({ token, user }) => {
       setAuthToken(token);
+      utils.auth.me.setData(undefined, { ...user, language: "vi" });
       await utils.auth.me.invalidate();
+      showToast("Đăng nhập thành công", "success");
       navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
     },
-    onError: (err) => setError(err.message),
+    onError: (err) => {
+      setError(err.message);
+      showToast(err.message || "Đăng nhập thất bại", "error");
+    },
   });
 
   const loginMutation = trpc.auth.login.useMutation({
     onSuccess: async (user) => {
+      utils.auth.me.setData(undefined, { ...user, language: "vi" });
       await utils.auth.me.invalidate();
+      showToast("Đăng nhập thành công", "success");
       navigate(user.role === "admin" ? "/admin" : "/", { replace: true });
     },
-    onError: (err) => setError(err.message),
+    onError: (err) => {
+      setError(err.message);
+      showToast(err.message || "Đăng nhập thất bại", "error");
+    },
   });
 
   const handleSubmit = (e: React.FormEvent) => {

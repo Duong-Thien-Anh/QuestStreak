@@ -499,10 +499,12 @@ export default function AdminRegistrationsPage() {
     onError: (error) => showToast(error.message, "error"),
   });
   const logoutMutation = trpc.auth.logout.useMutation({
-    onSuccess: () => {
-      utils.auth.me.invalidate();
-      window.location.assign("/login");
+    onSuccess: async () => {
+      await utils.auth.me.invalidate();
+      showToast("Đã đăng xuất", "success");
+      window.location.replace("/login");
     },
+    onError: (error) => showToast(error.message || "Đăng xuất thất bại", "error"),
   });
 
   function resetMemberForm() {
@@ -882,7 +884,11 @@ export default function AdminRegistrationsPage() {
               variant="outline"
               className="border-red-500/30 bg-red-500/10 text-red-400 hover:bg-red-500/20"
               disabled={logoutMutation.isPending}
-              onClick={() => logoutMutation.mutate()}
+              onClick={() => {
+                if (window.confirm("Bạn có chắc muốn đăng xuất không?")) {
+                  logoutMutation.mutate();
+                }
+              }}
             >
               <LogOut className="h-4 w-4" />
               Logout

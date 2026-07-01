@@ -2,6 +2,7 @@ import { trpc } from "@/providers/trpc";
 import { useCallback, useEffect, useMemo } from "react";
 import { useNavigate } from "react-router";
 import { LOGIN_PATH } from "@/const";
+import { useAppStore } from "@/shared/store/useAppStore";
 
 type UseAuthOptions = {
   redirectOnUnauthenticated?: boolean;
@@ -13,6 +14,8 @@ export function useAuth(options?: UseAuthOptions) {
     options ?? {};
 
   const navigate = useNavigate();
+  const setAuthToken = useAppStore((state) => state.setAuthToken);
+  const showToast = useAppStore((state) => state.showToast);
 
   const utils = trpc.useUtils();
 
@@ -28,12 +31,19 @@ export function useAuth(options?: UseAuthOptions) {
 
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: async () => {
+      setAuthToken(null);
       await utils.invalidate();
-      navigate(redirectPath);
+      showToast("Đã đăng xuất", "success");
+      navigate(redirectPath, { replace: true });
     },
+    onError: (error) => showToast(error.message || "Đăng xuất thất bại", "error"),
   });
 
-  const logout = useCallback(() => logoutMutation.mutate(), [logoutMutation]);
+  const logout = useCallback(() => {
+    if (window.confirm("Bạn có chắc muốn đăng xuất không?")) {
+      logoutMutation.mutate();
+    }
+  }, [logoutMutation]);
 
   useEffect(() => {
     if (redirectOnUnauthenticated && !isLoading && !user) {

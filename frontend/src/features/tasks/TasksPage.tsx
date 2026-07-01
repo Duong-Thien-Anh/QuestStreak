@@ -27,7 +27,7 @@ import { useCurrentUser } from "@/shared/hooks/useCurrentUser";
 
 export function TasksPage() {
   const { showToast } = useAppStore();
-  const { isAdmin } = useCurrentUser();
+  const { currentMember, isAdmin } = useCurrentUser();
   const [expandedCategories, setExpandedCategories] = useState<Set<string>>(
     new Set(["daily"])
   );
@@ -108,6 +108,14 @@ export function TasksPage() {
   const houseId = houseQuery.data?.id ?? 1;
   const members = houseQuery.data?.members ?? mockMembers;
   const subMember = members.find((m) => m.lifestyleRole === "submissive");
+  const profileMember =
+    (currentMember
+      ? members.find((member) => member.id === currentMember.id) ?? currentMember
+      : null) ?? subMember;
+  const profileWallet = profileMember?.wallet ?? subMember?.wallet;
+  const profileAvatar =
+    profileMember?.telegramAvatar ||
+    (profileMember?.gender === "male" ? "/avatars/admin.jpg" : "/avatars/sub.jpg");
   const tasksQuery = trpc.task.list.useQuery(
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
@@ -824,8 +832,8 @@ export function TasksPage() {
         {/* Avatar */}
         <div className="relative flex-shrink-0">
           <img
-            src={subMember?.telegramAvatar || (subMember?.gender === "male" ? "/avatars/admin.jpg" : "/avatars/sub.jpg")}
-            alt="Avatar"
+            src={profileAvatar}
+            alt={profileMember?.nickname ? `Avatar của ${profileMember.nickname}` : "Avatar"}
             className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
           <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF2A85] flex items-center justify-center">
@@ -837,14 +845,14 @@ export function TasksPage() {
         <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
-              <p className="text-2xl font-bold text-white">{subMember?.wallet.chymBalance}</p>
+              <p className="text-2xl font-bold text-white">{profileWallet?.chymBalance ?? 0}</p>
               <p className="text-xs text-white/50">Chym</p>
             </div>
             <Star className="w-6 h-6 text-[#FFD700]" />
           </div>
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
-              <p className="text-2xl font-bold text-white">{subMember?.wallet.chayBalance}</p>
+              <p className="text-2xl font-bold text-white">{profileWallet?.chayBalance ?? 0}</p>
               <p className="text-xs text-white/50">Chày</p>
             </div>
             <Link2 className="w-6 h-6 text-[#FF3B30]" />
@@ -854,8 +862,8 @@ export function TasksPage() {
 
       {/* Gamification: Streak / XP / Level */}
       <GamificationPanel
-        memberId={subMember?.id}
-        memberName={subMember?.nickname ?? undefined}
+        memberId={profileMember?.id}
+        memberName={profileMember?.nickname ?? undefined}
       />
 
       {/* Rewards shop — chỉ hiện cho sub (không phải admin) */}
@@ -870,7 +878,7 @@ export function TasksPage() {
             Đổi Chym lấy Rewards
           </h2>
           {availableRewards.filter((r) => r.isActive).map((reward) => {
-            const canAfford = (subMember?.wallet.chymBalance ?? 0) >= reward.cost;
+            const canAfford = (profileWallet?.chymBalance ?? 0) >= reward.cost;
             return (
               <div
                 key={reward.id}

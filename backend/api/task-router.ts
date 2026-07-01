@@ -5,6 +5,8 @@ import {
   achievements,
   memberAchievements,
   memberProgress,
+  privileges,
+  privilegeAssignments,
   punishments,
   punishmentAssignments,
   rewards,
@@ -64,6 +66,7 @@ export const taskRouter = createRouter({
         assignedTo: z.number().optional(),
         linkedRewardId: z.number().optional(),
         linkedAchievementId: z.number().optional(),
+        linkedPrivilegeId: z.number().optional(),
         linkedPunishmentId: z.number().optional(),
       })
     )
@@ -91,6 +94,7 @@ export const taskRouter = createRouter({
           createdBy: actor?.id || 0,
           linkedRewardId: input.linkedRewardId || null,
           linkedAchievementId: input.linkedAchievementId || null,
+          linkedPrivilegeId: input.linkedPrivilegeId || null,
           linkedPunishmentId: input.linkedPunishmentId || null,
         })
         .returning({ id: tasks.id });
@@ -111,6 +115,7 @@ export const taskRouter = createRouter({
           bonusXp: input.bonusXp,
           linkedRewardId: input.linkedRewardId,
           linkedAchievementId: input.linkedAchievementId,
+          linkedPrivilegeId: input.linkedPrivilegeId,
           linkedPunishmentId: input.linkedPunishmentId,
         },
       });
@@ -129,6 +134,7 @@ export const taskRouter = createRouter({
         bonusXp: z.number().min(0).optional(),
         linkedRewardId: z.number().nullable().optional(),
         linkedAchievementId: z.number().nullable().optional(),
+        linkedPrivilegeId: z.number().nullable().optional(),
         linkedPunishmentId: z.number().nullable().optional(),
         startDate: z.string().optional(),
         recurringDays: z.array(z.number().min(0).max(31)).nullable().optional(),
@@ -146,6 +152,7 @@ export const taskRouter = createRouter({
       if (input.bonusXp !== undefined) updateData.bonusXp = input.bonusXp;
       if (input.linkedRewardId !== undefined) updateData.linkedRewardId = input.linkedRewardId;
       if (input.linkedAchievementId !== undefined) updateData.linkedAchievementId = input.linkedAchievementId;
+      if (input.linkedPrivilegeId !== undefined) updateData.linkedPrivilegeId = input.linkedPrivilegeId;
       if (input.linkedPunishmentId !== undefined) updateData.linkedPunishmentId = input.linkedPunishmentId;
       if (input.startDate !== undefined) updateData.startDate = input.startDate ? new Date(input.startDate) : null;
       if (input.recurringDays !== undefined)
@@ -349,6 +356,7 @@ export const taskRouter = createRouter({
             bonusXp: task.bonusXp,
             linkedRewardId: task.linkedRewardId,
             linkedAchievementId: task.linkedAchievementId,
+            linkedPrivilegeId: task.linkedPrivilegeId,
             linkedPunishmentId: task.linkedPunishmentId,
           }),
         });
@@ -367,6 +375,7 @@ export const taskRouter = createRouter({
             bonusXp: task.bonusXp,
             linkedRewardId: task.linkedRewardId,
             linkedAchievementId: task.linkedAchievementId,
+            linkedPrivilegeId: task.linkedPrivilegeId,
             linkedPunishmentId: task.linkedPunishmentId,
           },
         });
@@ -461,6 +470,38 @@ export const taskRouter = createRouter({
                 entityType: "reward",
                 entityId: linkedReward.id,
                 metadata: { taskId: task.id, purchaseId: purchase.id },
+              });
+            }
+          }
+
+          if (task.linkedPrivilegeId) {
+            const linkedPrivilege = await db.query.privileges.findFirst({
+              where: and(
+                eq(privileges.id, task.linkedPrivilegeId),
+                eq(privileges.houseId, task.houseId),
+                eq(privileges.isActive, true)
+              ),
+            });
+            if (linkedPrivilege) {
+              const [assignment] = await db
+                .insert(privilegeAssignments)
+                .values({
+                  privilegeId: linkedPrivilege.id,
+                  memberId: task.assignedTo,
+                  assignedBy: actor?.id ?? 0,
+                })
+                .returning({ id: privilegeAssignments.id });
+
+              await createNotification({
+                houseId: task.houseId,
+                recipientId: task.assignedTo,
+                actorId: actor?.id ?? null,
+                type: "system",
+                title: "Privilege đã được gán",
+                message: linkedPrivilege.title,
+                entityType: "privilege",
+                entityId: linkedPrivilege.id,
+                metadata: { taskId: task.id, assignmentId: assignment.id },
               });
             }
           }

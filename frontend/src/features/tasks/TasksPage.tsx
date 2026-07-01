@@ -47,7 +47,7 @@ export function TasksPage() {
   const [chayPenalty, setChayPenalty] = useState(0);
   const [bonusXp, setBonusXp] = useState(0);
   const [linkedRewardId, setLinkedRewardId] = useState("");
-  const [linkedAchievementId, setLinkedAchievementId] = useState("");
+  const [linkedPrivilegeId, setLinkedPrivilegeId] = useState("");
   const [linkedPunishmentId, setLinkedPunishmentId] = useState("");
   const [selectedTaskAssigneeId, setSelectedTaskAssigneeId] = useState("");
   const [assignTaskSheetId, setAssignTaskSheetId] = useState<number | null>(null);
@@ -79,6 +79,7 @@ export function TasksPage() {
     bonusXp: number;
     linkedRewardId: number | null;
     linkedAchievementId: number | null;
+    linkedPrivilegeId?: number | null;
     linkedPunishmentId: number | null;
     status: string;
     assignedTo: number | null;
@@ -132,6 +133,10 @@ export function TasksPage() {
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
   );
+  const privilegesQuery = trpc.privilege.list.useQuery(
+    { houseId },
+    { enabled: !!houseQuery.data?.id, retry: false }
+  );
   const punishmentsQuery = trpc.punishment.list.useQuery(
     { houseId },
     { enabled: !!houseQuery.data?.id, retry: false }
@@ -166,6 +171,7 @@ export function TasksPage() {
       await utils.house.get.invalidate();
       await utils.gamification.summary.invalidate();
       await utils.reward.list.invalidate();
+      await utils.privilege.myAssignments.invalidate();
       await utils.punishment.allAssignments.invalidate();
     },
   });
@@ -199,6 +205,7 @@ export function TasksPage() {
   const visibleWheels = wheelsQuery.data ?? [];
   const assignTaskTarget = visibleTasks.find((task) => task.id === assignTaskSheetId);
   const availableRewards = rewardsQuery.data ?? [];
+  const availablePrivileges = privilegesQuery.data ?? [];
   const availablePunishments = punishmentsQuery.data ?? [];
   const activeWheelRewards = availableRewards.filter((reward) => reward.isActive);
   const activeWheelPunishments = availablePunishments.filter((punishment) => punishment.isActive);
@@ -218,6 +225,10 @@ export function TasksPage() {
   const achievementById = useMemo(
     () => new Map(availableAchievements.map((achievement) => [achievement.id, achievement])),
     [availableAchievements]
+  );
+  const privilegeById = useMemo(
+    () => new Map(availablePrivileges.map((privilege) => [privilege.id, privilege])),
+    [availablePrivileges]
   );
   const wheelPalette = ["#FF2A85", "#A155FF", "#00F2FE", "#FFD700", "#FF7A59", "#35D07F"];
   const wheelPreviewOptions = useMemo(
@@ -271,7 +282,7 @@ export function TasksPage() {
                 chayPenalty,
                 bonusXp,
                 linkedRewardId: linkedRewardId ? Number(linkedRewardId) : null,
-                linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
+                linkedPrivilegeId: linkedPrivilegeId ? Number(linkedPrivilegeId) : null,
                 linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
                 assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : null,
               }
@@ -303,7 +314,7 @@ export function TasksPage() {
         bonusXp,
         assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : undefined,
         linkedRewardId: linkedRewardId ? Number(linkedRewardId) : undefined,
-        linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : undefined,
+        linkedPrivilegeId: linkedPrivilegeId ? Number(linkedPrivilegeId) : undefined,
         linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : undefined,
       });
       setCreateSheet(false);
@@ -326,7 +337,8 @@ export function TasksPage() {
       chayPenalty,
       bonusXp,
       linkedRewardId: linkedRewardId ? Number(linkedRewardId) : null,
-      linkedAchievementId: linkedAchievementId ? Number(linkedAchievementId) : null,
+      linkedAchievementId: null,
+      linkedPrivilegeId: linkedPrivilegeId ? Number(linkedPrivilegeId) : null,
       linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : null,
       status: "active" as const,
       assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : null,
@@ -349,7 +361,7 @@ export function TasksPage() {
     setChayPenalty(0);
     setBonusXp(0);
     setLinkedRewardId("");
-    setLinkedAchievementId("");
+    setLinkedPrivilegeId("");
     setLinkedPunishmentId("");
     setSelectedTaskAssigneeId(subMember?.id ? String(subMember.id) : "");
     setFrequency("daily");
@@ -371,7 +383,7 @@ export function TasksPage() {
     setChayPenalty(task.chayPenalty);
     setBonusXp(task.bonusXp ?? 0);
     setLinkedRewardId(task.linkedRewardId ? String(task.linkedRewardId) : "");
-    setLinkedAchievementId(task.linkedAchievementId ? String(task.linkedAchievementId) : "");
+    setLinkedPrivilegeId(task.linkedPrivilegeId ? String(task.linkedPrivilegeId) : "");
     setLinkedPunishmentId(task.linkedPunishmentId ? String(task.linkedPunishmentId) : "");
     setSelectedTaskAssigneeId(task.assignedTo ? String(task.assignedTo) : "");
     if (task.category === "special" || task.category === "superSpecial") {
@@ -740,6 +752,12 @@ export function TasksPage() {
             <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#A155FF]/10 text-[#C9A7FF]">
               <Trophy className="w-3 h-3" />
               {achievementById.get(task.linkedAchievementId)?.title ?? "Achievement"}
+            </span>
+          )}
+          {task.linkedPrivilegeId && (
+            <span className="inline-flex items-center gap-1 text-xs px-2 py-1 rounded-md bg-[#A155FF]/10 text-[#C9A7FF]">
+              <Trophy className="w-3 h-3" />
+              {privilegeById.get(task.linkedPrivilegeId)?.title ?? "Privilege"}
             </span>
           )}
           {task.linkedPunishmentId && (
@@ -1533,16 +1551,18 @@ export function TasksPage() {
             </div>
 
             <div>
-              <label className="text-xs text-white/50 mb-2 block">Achievement kèm</label>
+              <label className="text-xs text-white/50 mb-2 block">Privilege kèm</label>
               <select
-                value={linkedAchievementId}
-                onChange={(e) => setLinkedAchievementId(e.target.value)}
+                value={linkedPrivilegeId}
+                onChange={(e) => setLinkedPrivilegeId(e.target.value)}
                 className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none transition-colors"
               >
-                <option value="">Không gắn achievement</option>
-                {availableAchievements.map((achievement) => (
-                  <option key={achievement.id} value={achievement.id}>
-                    {achievement.title}
+                <option value="">Không gắn privilege</option>
+                {availablePrivileges
+                  .filter((privilege) => privilege.isActive)
+                  .map((privilege) => (
+                  <option key={privilege.id} value={privilege.id}>
+                    {privilege.title}
                   </option>
                 ))}
               </select>

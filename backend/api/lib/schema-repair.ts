@@ -53,7 +53,8 @@ export async function ensureTaskRewardSchema() {
     await sql`
       ALTER TABLE public."tasks"
         ADD COLUMN IF NOT EXISTS "bonusXp" integer DEFAULT 0 NOT NULL,
-        ADD COLUMN IF NOT EXISTS "linkedAchievementId" bigint
+        ADD COLUMN IF NOT EXISTS "linkedAchievementId" bigint,
+        ADD COLUMN IF NOT EXISTS "linkedPrivilegeId" bigint
     `;
   } finally {
     await sql.end();

@@ -391,6 +391,7 @@ export const tasks = pgTable("tasks", {
   createdBy: bigint("createdBy", { mode: "number" }).notNull(),
   linkedRewardId: bigint("linkedRewardId", { mode: "number" }),
   linkedAchievementId: bigint("linkedAchievementId", { mode: "number" }),
+  linkedPrivilegeId: bigint("linkedPrivilegeId", { mode: "number" }),
   linkedPunishmentId: bigint("linkedPunishmentId", { mode: "number" }),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
   updatedAt: timestamp("updatedAt")

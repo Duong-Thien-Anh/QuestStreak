@@ -7,10 +7,11 @@ try {
   await sql`
     ALTER TABLE "tasks"
       ADD COLUMN IF NOT EXISTS "bonusXp" integer DEFAULT 0 NOT NULL,
-      ADD COLUMN IF NOT EXISTS "linkedAchievementId" bigint
+      ADD COLUMN IF NOT EXISTS "linkedAchievementId" bigint,
+      ADD COLUMN IF NOT EXISTS "linkedPrivilegeId" bigint
   `;
 
-  console.log("Task reward schema applied.");
+  console.log("Task reward/privilege schema applied.");
 } finally {
   await sql.end();
 }

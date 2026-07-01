@@ -24,7 +24,9 @@ export async function ensureUserCredentialsSchema() {
     await sql`
       ALTER TABLE public."userCredentials"
         ADD COLUMN IF NOT EXISTS "username" varchar(100),
-        ADD COLUMN IF NOT EXISTS "phone" varchar(30)
+        ADD COLUMN IF NOT EXISTS "phone" varchar(30),
+        ADD COLUMN IF NOT EXISTS "createdAt" timestamp NOT NULL DEFAULT now(),
+        ADD COLUMN IF NOT EXISTS "updatedAt" timestamp NOT NULL DEFAULT now()
     `;
 
     await sql`

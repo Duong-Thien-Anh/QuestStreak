@@ -1,5 +1,5 @@
 import { motion } from "framer-motion";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useAppStore } from "@/shared/store/useAppStore";
 import {
   ArrowLeftRight,
@@ -188,11 +188,14 @@ export function HouseManagementPage() {
       ),
     [house?.pendingJoinRequests],
   );
-  const displayMember =
-    currentMember ??
-    members.find((member) => member.userId === user?.id) ??
-    members[0] ??
-    null;
+  const displayMember = useMemo(() => {
+    if (!user) return null;
+    const memberFromHouse = members.find((member) => member.userId === user.id) ?? null;
+    if (currentMember && currentMember.userId === user.id) {
+      return memberFromHouse ?? currentMember;
+    }
+    return memberFromHouse;
+  }, [currentMember, members, user]);
   const isRootAdmin = user?.role === "admin";
 
   const [profileForm, setProfileForm] = useState({
@@ -208,6 +211,14 @@ export function HouseManagementPage() {
     gender: "female" as Gender,
   });
   const [roomNameDraft, setRoomNameDraft] = useState<string | undefined>();
+
+  useEffect(() => {
+    setProfileForm({
+      nickname: undefined,
+      gender: undefined,
+      telegramAvatar: undefined,
+    });
+  }, [displayMember?.id, user?.id]);
 
   const selfUpdateMutation = trpc.house["member.selfUpdate"].useMutation({
     onSuccess: async () => {

@@ -9,7 +9,7 @@ import {
   houseMembers,
   logs,
 } from "@db/schema";
-import { eq } from "drizzle-orm";
+import { and, count, eq } from "drizzle-orm";
 import { createNotification } from "./lib/notifications";
 
 export const rewardRouter = createRouter({
@@ -17,9 +17,15 @@ export const rewardRouter = createRouter({
     .input(z.object({ houseId: z.number() }))
     .query(async ({ input }) => {
       const db = getDb();
-      return db.query.rewards.findMany({
+      const rewardRows = await db.query.rewards.findMany({
         where: eq(rewards.houseId, input.houseId),
       });
+      const purchaseRows = await db.query.rewardPurchases.findMany();
+
+      return rewardRows.map((reward) => ({
+        ...reward,
+        purchaseCount: purchaseRows.filter((purchase) => purchase.rewardId === reward.id).length,
+      }));
     }),
 
   create: domQuery
@@ -29,6 +35,8 @@ export const rewardRouter = createRouter({
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         cost: z.number().min(0).default(0),
+        purchaseLimit: z.number().int().min(0).nullable().optional(),
+        purchaseLimitPerUser: z.number().int().min(0).nullable().optional(),
         image: z.string().optional(),
         rarity: z.enum(["common", "rare", "epic", "legendary"]).default("common"),
       })
@@ -46,6 +54,8 @@ export const rewardRouter = createRouter({
           title: input.title,
           description: input.description,
           cost: input.cost,
+          purchaseLimit: input.purchaseLimit ?? null,
+          purchaseLimitPerUser: input.purchaseLimitPerUser ?? null,
           image: input.image,
           rarity: input.rarity,
           createdBy: actor?.id || 0,
@@ -62,6 +72,8 @@ export const rewardRouter = createRouter({
         title: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
         cost: z.number().min(0).optional(),
+        purchaseLimit: z.number().int().min(0).nullable().optional(),
+        purchaseLimitPerUser: z.number().int().min(0).nullable().optional(),
         rarity: z.enum(["common", "rare", "epic", "legendary"]).optional(),
         isActive: z.boolean().optional(),
       })
@@ -72,6 +84,10 @@ export const rewardRouter = createRouter({
       if (input.title !== undefined) updateData.title = input.title;
       if (input.description !== undefined) updateData.description = input.description;
       if (input.cost !== undefined) updateData.cost = input.cost;
+      if (input.purchaseLimit !== undefined) updateData.purchaseLimit = input.purchaseLimit;
+      if (input.purchaseLimitPerUser !== undefined) {
+        updateData.purchaseLimitPerUser = input.purchaseLimitPerUser;
+      }
       if (input.rarity !== undefined) updateData.rarity = input.rarity;
       if (input.isActive !== undefined) updateData.isActive = input.isActive;
 
@@ -100,6 +116,31 @@ export const rewardRouter = createRouter({
         where: eq(houseMembers.userId, ctx.user.id),
       });
       if (!member) throw new Error("Member not found");
+
+      if (reward.purchaseLimit !== null) {
+        const [totalPurchases] = await db
+          .select({ value: count() })
+          .from(rewardPurchases)
+          .where(eq(rewardPurchases.rewardId, reward.id));
+        if (Number(totalPurchases?.value ?? 0) >= reward.purchaseLimit) {
+          throw new Error("Reward này đã hết lượt mua");
+        }
+      }
+
+      if (reward.purchaseLimitPerUser !== null) {
+        const [memberPurchases] = await db
+          .select({ value: count() })
+          .from(rewardPurchases)
+          .where(
+            and(
+              eq(rewardPurchases.rewardId, reward.id),
+              eq(rewardPurchases.memberId, member.id),
+            ),
+          );
+        if (Number(memberPurchases?.value ?? 0) >= reward.purchaseLimitPerUser) {
+          throw new Error("Bạn đã đạt giới hạn mua reward này");
+        }
+      }
 
       const wallet = await db.query.wallets.findFirst({
         where: eq(wallets.memberId, member.id),

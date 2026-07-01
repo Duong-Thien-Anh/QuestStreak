@@ -23,6 +23,9 @@ type LocalReward = {
   title: string;
   description: string;
   cost: number;
+  purchaseLimit?: number | null;
+  purchaseLimitPerUser?: number | null;
+  purchaseCount?: number;
   image: string;
   rarity: Rarity;
   isActive: boolean;
@@ -56,6 +59,8 @@ export function ShopPage() {
     title: "",
     description: "",
     cost: 0,
+    purchaseLimit: "",
+    purchaseLimitPerUser: "",
     rarity: "common" as Rarity,
   });
   const [editingPrivilegeId, setEditingPrivilegeId] = useState<number | null>(null);
@@ -118,8 +123,11 @@ export function ShopPage() {
   const purchaseRewardMutation = trpc.reward.purchase.useMutation({
     onSuccess: async () => {
       await utils.wallet.get.invalidate();
+      await utils.reward.list.invalidate();
       await utils.reward.myPurchases.invalidate();
+      showToast("Đã mua phần thưởng!", "success");
     },
+    onError: (err) => showToast(err.message, "error"),
   });
   const giftRewardMutation = trpc.reward.gift.useMutation();
   const createPrivilegeMutation = trpc.privilege.create.useMutation({
@@ -144,18 +152,47 @@ export function ShopPage() {
   const purchasedCount = purchasesQuery.data?.length ?? 0;
   const selectedGiftMember = members.find((member) => member.id === selectedGiftMemberId);
   const selectedPrivilegeMember = members.find((member) => member.id === selectedPrivilegeMemberId);
+  const purchaseCountByRewardId = new Map<number, number>();
+  for (const purchase of purchasesQuery.data ?? []) {
+    purchaseCountByRewardId.set(
+      purchase.rewardId,
+      (purchaseCountByRewardId.get(purchase.rewardId) ?? 0) + 1,
+    );
+  }
 
-  const handlePurchase = (rewardId: number, cost: number) => {
-    if (visibleWallet.chymBalance < cost) {
+  const rewardLimitState = (reward: (typeof visibleRewards)[number]) => {
+    const totalLimit = reward.purchaseLimit ?? null;
+    const perUserLimit = reward.purchaseLimitPerUser ?? null;
+    const totalPurchased = reward.purchaseCount ?? 0;
+    const userPurchased = purchaseCountByRewardId.get(reward.id) ?? 0;
+    const remaining =
+      totalLimit === null ? null : Math.max(0, totalLimit - totalPurchased);
+    return {
+      remaining,
+      totalReached: remaining !== null && remaining <= 0,
+      perUserReached: perUserLimit !== null && userPurchased >= perUserLimit,
+    };
+  };
+
+  const handlePurchase = (reward: (typeof visibleRewards)[number]) => {
+    const limit = rewardLimitState(reward);
+    if (visibleWallet.chymBalance < reward.cost) {
       showToast("Không đủ Chym!", "error");
       return;
     }
-    if (houseQuery.data) {
-      purchaseRewardMutation.mutate({ rewardId });
-      showToast("Đã mua phần thưởng!", "success");
+    if (limit.totalReached) {
+      showToast("Reward này đã hết lượt mua", "error");
       return;
     }
-    setWallet((prev) => ({ ...prev, chymBalance: prev.chymBalance - cost }));
+    if (limit.perUserReached) {
+      showToast("Bạn đã đạt giới hạn mua reward này", "error");
+      return;
+    }
+    if (houseQuery.data) {
+      purchaseRewardMutation.mutate({ rewardId: reward.id });
+      return;
+    }
+    setWallet((prev) => ({ ...prev, chymBalance: prev.chymBalance - reward.cost }));
     showToast("Đã mua phần thưởng!", "success");
   };
 
@@ -262,44 +299,14 @@ export function ShopPage() {
     showToast(`Đã trừ ${amount} Chym!`, "success");
   };
 
-  const handleQuickGrant = () => {
-    if (!reasonInput.trim()) return;
-    if (houseQuery.data) {
-      createRewardMutation.mutate({
-        houseId,
-        title: reasonInput,
-        description: "Tặng nhanh từ admin",
-        cost: 0,
-        image: "/shop/reward_gift.jpg",
-        rarity: "common",
-      });
-      setActionSheet(null);
-      setReasonInput("");
-      showToast("Đã tặng nhanh!", "success");
-      return;
-    }
-    const newReward = {
-      id: rewards.length + 1,
-      houseId: 1,
-      title: reasonInput,
-      description: "Tặng nhanh từ admin",
-      cost: 0,
-      image: "/shop/reward_gift.jpg",
-      rarity: "common" as const,
-      isActive: true,
-    };
-    setRewards([...rewards, newReward]);
-    setActionSheet(null);
-    setReasonInput("");
-    showToast("Đã tặng nhanh!", "success");
-  };
-
   const resetRewardForm = () => {
     setEditingRewardId(null);
     setRewardForm({
       title: "",
       description: "",
       cost: 0,
+      purchaseLimit: "",
+      purchaseLimitPerUser: "",
       rarity: "common",
     });
   };
@@ -311,6 +318,8 @@ export function ShopPage() {
         title: reward.title,
         description: reward.description ?? "",
         cost: reward.cost,
+        purchaseLimit: reward.purchaseLimit?.toString() ?? "",
+        purchaseLimitPerUser: reward.purchaseLimitPerUser?.toString() ?? "",
         rarity: reward.rarity,
       });
     } else {
@@ -331,6 +340,10 @@ export function ShopPage() {
                   title: rewardForm.title,
                   description: rewardForm.description,
                   cost: rewardForm.cost,
+                  purchaseLimit: rewardForm.purchaseLimit ? Number(rewardForm.purchaseLimit) : null,
+                  purchaseLimitPerUser: rewardForm.purchaseLimitPerUser
+                    ? Number(rewardForm.purchaseLimitPerUser)
+                    : null,
                   rarity: rewardForm.rarity,
                 }
               : reward
@@ -346,6 +359,10 @@ export function ShopPage() {
             title: rewardForm.title,
             description: rewardForm.description,
             cost: rewardForm.cost,
+            purchaseLimit: rewardForm.purchaseLimit ? Number(rewardForm.purchaseLimit) : null,
+            purchaseLimitPerUser: rewardForm.purchaseLimitPerUser
+              ? Number(rewardForm.purchaseLimitPerUser)
+              : null,
             image: "/shop/reward_gift.jpg",
             rarity: rewardForm.rarity,
             isActive: true,
@@ -364,6 +381,10 @@ export function ShopPage() {
         title: rewardForm.title,
         description: rewardForm.description || undefined,
         cost: rewardForm.cost,
+        purchaseLimit: rewardForm.purchaseLimit ? Number(rewardForm.purchaseLimit) : null,
+        purchaseLimitPerUser: rewardForm.purchaseLimitPerUser
+          ? Number(rewardForm.purchaseLimitPerUser)
+          : null,
         rarity: rewardForm.rarity,
       });
       showToast("Đã cập nhật reward!", "success");
@@ -373,6 +394,10 @@ export function ShopPage() {
         title: rewardForm.title,
         description: rewardForm.description || undefined,
         cost: rewardForm.cost,
+        purchaseLimit: rewardForm.purchaseLimit ? Number(rewardForm.purchaseLimit) : null,
+        purchaseLimitPerUser: rewardForm.purchaseLimitPerUser
+          ? Number(rewardForm.purchaseLimitPerUser)
+          : null,
         image: "/shop/reward_gift.jpg",
         rarity: rewardForm.rarity,
       });
@@ -567,7 +592,16 @@ export function ShopPage() {
             exit={{ opacity: 0 }}
             className="space-y-3"
           >
-            {visibleRewards.map((reward, i) => (
+            {visibleRewards.map((reward, i) => {
+              const limit = rewardLimitState(reward);
+              const purchaseDisabled =
+                visibleWallet.chymBalance < reward.cost ||
+                limit.totalReached ||
+                limit.perUserReached ||
+                purchaseRewardMutation.isPending;
+              const purchaseLabel = limit.totalReached || limit.perUserReached ? "Hết lượt" : "Mua";
+
+              return (
               <motion.div
                 key={reward.id}
                 initial={{ opacity: 0, y: 10 }}
@@ -600,9 +634,21 @@ export function ShopPage() {
                       {reward.description}
                     </p>
                     <div className="flex items-center justify-between mt-3">
-                      <span className="text-xs flex items-center gap-1 text-[#FFD700]">
-                        <Star className="w-3 h-3" /> {reward.cost} Chym
-                      </span>
+                      <div className="flex flex-wrap items-center gap-2">
+                        <span className="text-xs flex items-center gap-1 text-[#FFD700]">
+                          <Star className="w-3 h-3" /> {reward.cost} Chym
+                        </span>
+                        {limit.remaining !== null ? (
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/55">
+                            Còn {limit.remaining} lượt
+                          </span>
+                        ) : null}
+                        {reward.purchaseLimitPerUser != null ? (
+                          <span className="rounded-full bg-white/5 px-2 py-0.5 text-[10px] text-white/55">
+                            {reward.purchaseLimitPerUser} lượt/user
+                          </span>
+                        ) : null}
+                      </div>
                       {isAdmin ? (
                         <button
                           onClick={() => handleGift(reward.id)}
@@ -612,11 +658,11 @@ export function ShopPage() {
                         </button>
                       ) : (
                         <button
-                          onClick={() => handlePurchase(reward.id, reward.cost)}
-                          disabled={visibleWallet.chymBalance < reward.cost}
+                          onClick={() => handlePurchase(reward)}
+                          disabled={purchaseDisabled}
                           className="px-4 py-1.5 rounded-lg bg-[#A155FF] text-white text-xs font-medium hover:bg-[#A155FF]/90 disabled:opacity-30 disabled:cursor-not-allowed transition-colors"
                         >
-                          Mua
+                          {purchaseLabel}
                         </button>
                       )}
                     </div>
@@ -639,7 +685,8 @@ export function ShopPage() {
                   )}
                 </div>
               </motion.div>
-            ))}
+              );
+            })}
           </motion.div>
         ) : (
           <motion.div
@@ -710,12 +757,6 @@ export function ShopPage() {
       {/* FAB */}
       <FAB
         actions={[
-          {
-            label: "Tặng nhanh",
-            icon: <Gift className="w-5 h-5 text-white" />,
-            onClick: () => setActionSheet("quickgrant"),
-            color: "#FFD700",
-          },
           {
             label: shopSubTab === "rewards" ? "Reward mới" : "Đặc quyền mới",
             icon: <Zap className="w-5 h-5 text-white" />,
@@ -794,6 +835,40 @@ export function ShopPage() {
               }
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#A155FF]/50 focus:outline-none"
             />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Tổng lượt</label>
+              <input
+                type="number"
+                min={0}
+                value={rewardForm.purchaseLimit}
+                onChange={(event) =>
+                  setRewardForm((current) => ({
+                    ...current,
+                    purchaseLimit: event.target.value,
+                  }))
+                }
+                placeholder="Không giới hạn"
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
+              />
+            </div>
+            <div>
+              <label className="text-xs text-white/50 mb-2 block">Lượt/user</label>
+              <input
+                type="number"
+                min={0}
+                value={rewardForm.purchaseLimitPerUser}
+                onChange={(event) =>
+                  setRewardForm((current) => ({
+                    ...current,
+                    purchaseLimitPerUser: event.target.value,
+                  }))
+                }
+                placeholder="Không giới hạn"
+                className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
+              />
+            </div>
           </div>
           <button
             onClick={submitRewardForm}
@@ -936,34 +1011,6 @@ export function ShopPage() {
             className="w-full py-3 rounded-xl bg-[#FF3B30] text-white font-semibold text-sm hover:bg-[#FF3B30]/90 transition-colors"
           >
             Trừ Chym
-          </button>
-        </div>
-      </BottomSheet>
-
-      <BottomSheet
-        isOpen={actionSheet === "quickgrant"}
-        onClose={() => setActionSheet(null)}
-        title="Tặng nhanh"
-      >
-        <div className="space-y-4">
-          <div>
-            <label className="text-xs text-white/50 mb-2 block">
-              Tên Reward
-            </label>
-            <input
-              type="text"
-              value={reasonInput}
-              onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Nhập Reward tùy chỉnh..."
-              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#A155FF]/50 focus:outline-none"
-            />
-          </div>
-          <button
-            onClick={handleQuickGrant}
-            disabled={!reasonInput.trim()}
-            className="w-full py-3 rounded-xl bg-[#A155FF] text-white font-semibold text-sm hover:bg-[#A155FF]/90 disabled:opacity-50 transition-colors"
-          >
-            Tặng Reward
           </button>
         </div>
       </BottomSheet>

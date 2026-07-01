@@ -45,6 +45,7 @@ import {
 } from "@/components/ui/table";
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { trpc } from "@/providers/trpc";
+import { useAppStore } from "@/shared/store/useAppStore";
 
 type AdminSection = "overview" | "rooms" | "users" | "operations" | "registrations";
 type OperationSection =
@@ -115,6 +116,7 @@ function formatDate(value: Date | string | null | undefined) {
 
 export default function AdminRegistrationsPage() {
   const utils = trpc.useUtils();
+  const { showToast } = useAppStore();
   const [activeSection, setActiveSection] = useState<AdminSection>("overview");
   const [activeOperationSection, setActiveOperationSection] =
     useState<OperationSection>("tasks");
@@ -205,7 +207,9 @@ export default function AdminRegistrationsPage() {
       setNewRoomName("");
       setNewRoomOwnerId("");
       await utils.admin.listRooms.invalidate();
+      showToast("Đã tạo room", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateRoomMutation = trpc.admin.updateRoom.useMutation({
     onSuccess: async () => {
@@ -213,29 +217,39 @@ export default function AdminRegistrationsPage() {
       setRoomEditName("");
       setRoomEditOwnerId("");
       await utils.admin.listRooms.invalidate();
+      showToast("Đã cập nhật room", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteRoomMutation = trpc.admin.deleteRoom.useMutation({
     onSuccess: async () => {
       await utils.admin.listRooms.invalidate();
+      showToast("Đã xóa room", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const addMemberMutation = trpc.admin.addRoomMember.useMutation({
     onSuccess: async () => {
       resetMemberForm();
       await utils.admin.listRooms.invalidate();
+      showToast("Đã thêm thành viên", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateMemberMutation = trpc.admin.updateRoomMember.useMutation({
     onSuccess: async () => {
       resetMemberForm();
       await utils.admin.listRooms.invalidate();
+      showToast("Đã cập nhật thành viên", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const removeMemberMutation = trpc.admin.removeRoomMember.useMutation({
     onSuccess: async () => {
       await utils.admin.listRooms.invalidate();
+      showToast("Đã xóa thành viên", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const createAccountMutation = trpc.admin.createLocalAccount.useMutation({
     onSuccess: async () => {
@@ -245,149 +259,205 @@ export default function AdminRegistrationsPage() {
       setAccountPassword("");
       setAccountRole("user");
       await utils.admin.listUsers.invalidate();
+      showToast("Đã tạo tài khoản", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateUserAccountMutation = trpc.admin.updateUserAccount.useMutation({
     onSuccess: async () => {
       await invalidateAdminData();
+      showToast("Đã cập nhật tài khoản", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteUserAccountMutation = trpc.admin.deleteUserAccount.useMutation({
     onSuccess: async () => {
       await invalidateAdminData();
+      showToast("Đã xóa tài khoản", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const addAvatarMutation = trpc.admin.addAvatar.useMutation({
     onSuccess: async () => {
       await utils.admin.listAvatars.invalidate();
+      showToast("Đã thêm avatar", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteAvatarMutation = trpc.admin.deleteAvatar.useMutation({
     onSuccess: async () => {
       await utils.admin.listAvatars.invalidate();
+      showToast("Đã xóa avatar", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const approveMutation = trpc.admin.approveRegistration.useMutation({
     onSuccess: async () => {
       await invalidateAdminData();
+      showToast("Đã duyệt đăng ký", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const rejectMutation = trpc.admin.rejectRegistration.useMutation({
     onSuccess: async () => {
       closeRejectModal();
       await invalidateAdminData();
+      showToast("Đã từ chối đăng ký", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateWalletProgressMutation = trpc.admin.updateWalletProgress.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật ví và tiến độ", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateStreakMutation = trpc.admin.updateStreak.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật streak", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateTaskStatusMutation = trpc.admin.updateTaskStatus.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật trạng thái task", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateTaskSubmissionStatusMutation =
     trpc.admin.updateTaskSubmissionStatus.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã cập nhật submission", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const updateCatalogActiveMutation = trpc.admin.updateCatalogActive.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật trạng thái catalog", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateRewardPurchaseStatusMutation =
     trpc.admin.updateRewardPurchaseStatus.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã cập nhật purchase", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const updatePrivilegeAssignmentStatusMutation =
     trpc.admin.updatePrivilegeAssignmentStatus.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã cập nhật privilege assignment", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const updatePunishmentAssignmentStatusMutation =
     trpc.admin.updatePunishmentAssignmentStatus.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã cập nhật punishment assignment", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const updateAgreementStatusMutation = trpc.admin.updateAgreementStatus.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật agreement", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteOperationRecordMutation = trpc.admin.deleteOperationRecord.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã xóa record", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const createTaskMutation = trpc.admin.createTask.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã tạo task", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateTaskMutation = trpc.admin.updateTask.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật task", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteTaskMutation = trpc.admin.deleteTask.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã xóa task", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const createCatalogItemMutation = trpc.admin.createCatalogItem.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã tạo mục mới", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateCatalogItemMutation = trpc.admin.updateCatalogItem.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã lưu thay đổi", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const deleteCatalogItemMutation = trpc.admin.deleteCatalogItem.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã xóa mục", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const createRewardPurchaseMutation = trpc.admin.createRewardPurchase.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã tạo gift/purchase", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const createPrivilegeAssignmentMutation =
     trpc.admin.createPrivilegeAssignment.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã gán privilege", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const createPunishmentAssignmentMutation =
     trpc.admin.createPunishmentAssignment.useMutation({
       onSuccess: async () => {
         await utils.admin.listOperations.invalidate();
+        showToast("Đã gán punishment", "success");
       },
+      onError: (error) => showToast(error.message, "error"),
     });
   const createNoteMutation = trpc.admin.createNote.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã tạo note", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const updateNoteMutation = trpc.admin.updateNote.useMutation({
     onSuccess: async () => {
       await utils.admin.listOperations.invalidate();
+      showToast("Đã cập nhật note", "success");
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const logoutMutation = trpc.auth.logout.useMutation({
     onSuccess: () => {
@@ -563,6 +633,13 @@ export default function AdminRegistrationsPage() {
     return Number.isFinite(value) ? value : fallback;
   }
 
+  function optionalInputNumber(id: string) {
+    const raw = inputValue(id).trim();
+    if (!raw) return undefined;
+    const value = Number(raw);
+    return Number.isFinite(value) ? value : undefined;
+  }
+
   function firstRoomId() {
     return rooms[0]?.id ?? 0;
   }
@@ -612,6 +689,12 @@ export default function AdminRegistrationsPage() {
       description: inputValue(`${prefix}-description`).trim() || undefined,
       createdBy,
       cost: inputNumber(`${prefix}-cost`),
+      purchaseLimit:
+        type === "reward" ? optionalInputNumber(`${prefix}-purchase-limit`) : undefined,
+      purchaseLimitPerUser:
+        type === "reward"
+          ? optionalInputNumber(`${prefix}-purchase-limit-per-user`)
+          : undefined,
       chayCost: inputNumber(`${prefix}-chay-cost`),
       rarity: inputValue(`${prefix}-rarity`) as
         | "common"
@@ -1653,7 +1736,11 @@ export default function AdminRegistrationsPage() {
                         <Input id={`admin-${type}-title`} placeholder="Tên" className="border-white/10 bg-[#1D2230] text-white" />
                         <Input id={`admin-${type}-description`} placeholder="Mô tả" className="border-white/10 bg-[#1D2230] text-white" />
                         {type === "reward" ? (
-                          <Input id={`admin-${type}-cost`} type="number" min={0} defaultValue={0} placeholder="Cost chym" className="border-white/10 bg-[#1D2230] text-white" />
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            <Input id={`admin-${type}-cost`} type="number" min={0} defaultValue={0} placeholder="Cost chym" className="border-white/10 bg-[#1D2230] text-white" />
+                            <Input id={`admin-${type}-purchase-limit`} type="number" min={0} placeholder="Tổng lượt" className="border-white/10 bg-[#1D2230] text-white" />
+                            <Input id={`admin-${type}-purchase-limit-per-user`} type="number" min={0} placeholder="Lượt/user" className="border-white/10 bg-[#1D2230] text-white" />
+                          </div>
                         ) : null}
                         <select id={`admin-${type}-rarity`} className="w-full rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
                           <option value="common">common</option>
@@ -1723,10 +1810,22 @@ export default function AdminRegistrationsPage() {
                           <p className="mt-1 text-sm text-white/45">
                             {item.roomName} · {item.rarity}
                             {"cost" in item ? ` · ${item.cost} chym` : ""}
+                            {item.kind === "reward" && item.purchaseLimit != null
+                              ? ` · còn ${Math.max(0, item.purchaseLimit - (item.purchaseCount ?? 0))}/${item.purchaseLimit} lượt`
+                              : ""}
+                            {item.kind === "reward" && item.purchaseLimitPerUser != null
+                              ? ` · ${item.purchaseLimitPerUser} lượt/user`
+                              : ""}
                           </p>
                           <div className="flex flex-wrap gap-2">
                             {"cost" in item ? (
                               <Input id={`${item.kind}-${item.id}-cost`} type="number" min={0} defaultValue={item.cost} className="w-24 border-white/10 bg-[#1D2230] text-white" />
+                            ) : null}
+                            {item.kind === "reward" ? (
+                              <>
+                                <Input id={`${item.kind}-${item.id}-purchase-limit`} type="number" min={0} defaultValue={item.purchaseLimit ?? ""} placeholder="Tổng lượt" className="w-28 border-white/10 bg-[#1D2230] text-white" />
+                                <Input id={`${item.kind}-${item.id}-purchase-limit-per-user`} type="number" min={0} defaultValue={item.purchaseLimitPerUser ?? ""} placeholder="Lượt/user" className="w-28 border-white/10 bg-[#1D2230] text-white" />
+                              </>
                             ) : null}
                             <select id={`${item.kind}-${item.id}-rarity`} defaultValue={item.rarity} className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
                               <option value="common">common</option>
@@ -1753,6 +1852,14 @@ export default function AdminRegistrationsPage() {
                                 cost:
                                   item.kind === "reward"
                                     ? inputNumber(`${item.kind}-${item.id}-cost`)
+                                    : undefined,
+                                purchaseLimit:
+                                  item.kind === "reward"
+                                    ? optionalInputNumber(`${item.kind}-${item.id}-purchase-limit`) ?? null
+                                    : undefined,
+                                purchaseLimitPerUser:
+                                  item.kind === "reward"
+                                    ? optionalInputNumber(`${item.kind}-${item.id}-purchase-limit-per-user`) ?? null
                                     : undefined,
                                 rarity: inputValue(`${item.kind}-${item.id}-rarity`) as
                                   | "common"

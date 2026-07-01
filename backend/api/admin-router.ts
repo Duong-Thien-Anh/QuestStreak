@@ -730,6 +730,7 @@ export const adminRouter = createRouter({
         ...reward,
         roomName: roomName(reward.houseId),
         createdByName: memberLabel(reward.createdBy),
+        purchaseCount: rewardPurchaseRows.filter((purchase) => purchase.rewardId === reward.id).length,
       })),
       rewardPurchases: rewardPurchaseRows.map((purchase) => ({
         ...purchase,
@@ -841,7 +842,7 @@ export const adminRouter = createRouter({
         level: z.number().int().min(1),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
       await ensureMemberResources(input.memberId);
       const [wallet] = await db
@@ -857,6 +858,19 @@ export const adminRouter = createRouter({
         .set({ xp: input.xp, level: input.level })
         .where(eq(memberProgress.memberId, input.memberId))
         .returning();
+      const [actor, member] = await Promise.all([
+        getAdminMember(ctx.user.id),
+        db.query.houseMembers.findFirst({ where: eq(houseMembers.id, input.memberId) }),
+      ]);
+      if (actor && member) {
+        await db.insert(logs).values({
+          houseId: member.houseId,
+          action: "ADMIN_WALLET_PROGRESS_UPDATED",
+          actorId: actor.id,
+          targetId: input.memberId,
+          details: JSON.stringify(input),
+        });
+      }
       return { wallet, progress };
     }),
 
@@ -1057,6 +1071,8 @@ export const adminRouter = createRouter({
         description: z.string().optional(),
         createdBy: z.number(),
         cost: z.number().int().min(0).optional(),
+        purchaseLimit: z.number().int().min(0).nullable().optional(),
+        purchaseLimitPerUser: z.number().int().min(0).nullable().optional(),
         chayCost: z.number().int().min(0).optional(),
         rarity: z.enum(["common", "rare", "epic", "legendary"]).optional(),
         assignedTo: z.number().optional(),
@@ -1064,24 +1080,36 @@ export const adminRouter = createRouter({
         isActive: z.boolean().default(true),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
       switch (input.type) {
-        case "reward":
-          return (
-            await db
+        case "reward": {
+          const [item] = await db
               .insert(rewards)
               .values({
                 houseId: input.houseId,
                 title: input.title.trim(),
                 description: input.description?.trim() || null,
                 cost: input.cost ?? 0,
+                purchaseLimit: input.purchaseLimit ?? null,
+                purchaseLimitPerUser: input.purchaseLimitPerUser ?? null,
                 rarity: input.rarity ?? "common",
                 isActive: input.isActive,
                 createdBy: input.createdBy,
               })
-              .returning()
-          )[0];
+              .returning();
+          if (actor) {
+            await db.insert(logs).values({
+              houseId: item.houseId,
+              action: "ADMIN_REWARD_CREATED",
+              actorId: actor.id,
+              targetId: item.id,
+              details: JSON.stringify({ title: item.title }),
+            });
+          }
+          return item;
+        }
         case "privilege":
           return (
             await db
@@ -1141,6 +1169,8 @@ export const adminRouter = createRouter({
         title: z.string().min(1).max(255),
         description: z.string().optional(),
         cost: z.number().int().min(0).optional(),
+        purchaseLimit: z.number().int().min(0).nullable().optional(),
+        purchaseLimitPerUser: z.number().int().min(0).nullable().optional(),
         chayCost: z.number().int().min(0).optional(),
         rarity: z.enum(["common", "rare", "epic", "legendary"]).optional(),
         assignedTo: z.number().optional(),
@@ -1148,23 +1178,41 @@ export const adminRouter = createRouter({
         isActive: z.boolean(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
       switch (input.type) {
-        case "reward":
-          return (
-            await db
+        case "reward": {
+          const [item] = await db
               .update(rewards)
               .set({
                 title: input.title.trim(),
                 description: input.description?.trim() || null,
                 cost: input.cost ?? 0,
+                purchaseLimit: input.purchaseLimit ?? null,
+                purchaseLimitPerUser: input.purchaseLimitPerUser ?? null,
                 rarity: input.rarity ?? "common",
                 isActive: input.isActive,
               })
               .where(eq(rewards.id, input.id))
-              .returning()
-          )[0];
+              .returning();
+          if (actor && item) {
+            await db.insert(logs).values({
+              houseId: item.houseId,
+              action: "ADMIN_REWARD_UPDATED",
+              actorId: actor.id,
+              targetId: item.id,
+              details: JSON.stringify({
+                title: item.title,
+                cost: item.cost,
+                purchaseLimit: item.purchaseLimit,
+                purchaseLimitPerUser: item.purchaseLimitPerUser,
+                isActive: item.isActive,
+              }),
+            });
+          }
+          return item;
+        }
         case "privilege":
           return (
             await db
@@ -1215,10 +1263,14 @@ export const adminRouter = createRouter({
         id: z.number(),
       }),
     )
-    .mutation(async ({ input }) => {
+    .mutation(async ({ ctx, input }) => {
       const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
       switch (input.type) {
         case "reward": {
+          const reward = await db.query.rewards.findFirst({
+            where: eq(rewards.id, input.id),
+          });
           const purchases = await db.query.rewardPurchases.findMany({
             where: eq(rewardPurchases.rewardId, input.id),
           });
@@ -1232,6 +1284,15 @@ export const adminRouter = createRouter({
               .where(inArray(rewardPurchases.id, purchaseIds));
           }
           await db.delete(rewards).where(eq(rewards.id, input.id));
+          if (actor && reward) {
+            await db.insert(logs).values({
+              houseId: reward.houseId,
+              action: "ADMIN_REWARD_DELETED",
+              actorId: actor.id,
+              targetId: input.id,
+              details: JSON.stringify({ title: reward.title }),
+            });
+          }
           break;
         }
         case "privilege":

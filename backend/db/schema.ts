@@ -434,6 +434,8 @@ export const rewards = pgTable("rewards", {
   title: varchar("title", { length: 255 }).notNull(),
   description: text("description"),
   cost: integer("cost").default(0).notNull(),
+  purchaseLimit: integer("purchaseLimit"),
+  purchaseLimitPerUser: integer("purchaseLimitPerUser"),
   image: text("image"),
   rarity: rarityEnum("rarity").default("common").notNull(),
   isActive: boolean("isActive").default(true).notNull(),

@@ -349,7 +349,7 @@ export function PunishmentsPage() {
             <Heart className="w-3 h-3 text-white" />
           </div>
         </div>
-        <div className="flex-1 grid grid-rows-3 gap-2">
+        <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{visibleWallet.chayBalance}</p>
@@ -361,15 +361,6 @@ export function PunishmentsPage() {
             <div>
               <p className="text-2xl font-bold text-white">{visibleWallet.chymBalance}</p>
               <p className="text-xs text-white/50">Chym hiện có</p>
-            </div>
-            <Crown className="w-6 h-6 text-[#FFD700]" />
-          </div>
-          <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
-            <div>
-              <p className="text-2xl font-bold text-white">
-                {activeAssignments.length}
-              </p>
-              <p className="text-xs text-white/50">Đã nhận</p>
             </div>
             <Crown className="w-6 h-6 text-[#FFD700]" />
           </div>

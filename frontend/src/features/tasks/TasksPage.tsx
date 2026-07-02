@@ -58,6 +58,7 @@ export function TasksPage() {
   >([]);
   const [spinningWheelId, setSpinningWheelId] = useState<number | null>(null);
   const [wheelRotations, setWheelRotations] = useState<Record<number, number>>({});
+  const [taskStatusNow] = useState(() => Date.now());
   // ─ Submit proof sheet ─
   const [submitSheetTaskId, setSubmitSheetTaskId] = useState<number | null>(null);
   const [submitNote, setSubmitNote] = useState("");
@@ -72,6 +73,7 @@ export function TasksPage() {
     description: string;
     category: string;
     recurringDays?: string | null;
+    startDate: Date | string | null;
     dueDate: Date | string | null;
     chymReward: number;
     chayPenalty: number;
@@ -179,6 +181,14 @@ export function TasksPage() {
       await utils.punishment.allAssignments.invalidate();
     },
   });
+  const failTaskMutation = trpc.task.fail.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+      await utils.house.get.invalidate();
+      await utils.gamification.summary.invalidate();
+      await utils.punishment.allAssignments.invalidate();
+    },
+  });
   const createWheelMutation = trpc.wheel.create.useMutation({
     onSuccess: async () => {
       await utils.wheel.list.invalidate();
@@ -265,6 +275,30 @@ export function TasksPage() {
     });
   };
 
+  const getTaskStartTime = (task: TaskItem) => {
+    if (!task.startDate) return null;
+    const date = new Date(task.startDate);
+    return Number.isNaN(date.getTime()) ? null : date.getTime();
+  };
+
+  const isTaskLocked = (task: TaskItem) => {
+    const startTime = getTaskStartTime(task);
+    return Boolean(startTime && startTime > taskStatusNow);
+  };
+
+  const getTaskLockedMessage = (task: TaskItem) =>
+    `Task sẽ mở vào ${formatTaskDate(task.startDate) ?? "ngày đã chọn"}`;
+
+  const getTaskStatusLabel = (task: TaskItem) => {
+    if (task.status === "pending") return "Chưa kích hoạt";
+    if (task.status === "submitted") return "Đã báo cáo";
+    if (task.status === "completed") return "Hoàn thành";
+    if (task.status === "failed") return "Không hoàn thành";
+    if (isTaskLocked(task)) return "Chưa mở";
+    if (task.assignedTo) return "Đã nhận task";
+    return "Chưa nhận";
+  };
+
   const handleCreateTask = () => {
     if (!title.trim()) return;
     const category =
@@ -322,6 +356,8 @@ export function TasksPage() {
                   scheduleMode === "frequency" && recurringDays.length > 0
                     ? JSON.stringify(recurringDays)
                     : null,
+                startDate:
+                  taskType !== "regular" || scheduleMode === "custom" ? startDate || null : null,
                 dueDate: taskType !== "regular" || scheduleMode === "custom" ? dueDate || null : null,
                 chymReward,
                 chayPenalty,
@@ -371,6 +407,7 @@ export function TasksPage() {
         scheduleMode === "frequency" && recurringDays.length > 0
           ? JSON.stringify(recurringDays)
           : null,
+      startDate: taskType !== "regular" || scheduleMode === "custom" ? startDate || null : null,
       dueDate: taskType !== "regular" || scheduleMode === "custom" ? dueDate || null : null,
       chymReward,
       chayPenalty,
@@ -533,12 +570,27 @@ export function TasksPage() {
 
   const acceptTask = (taskId: number) => {
     if (!houseQuery.data) return;
-    acceptTaskMutation.mutate({ taskId });
-    showToast("Đã nhận nhiệm vụ!", "success");
+    const task = visibleTasks.find((item) => item.id === taskId);
+    if (task && isTaskLocked(task)) {
+      showToast(getTaskLockedMessage(task), "error");
+      return;
+    }
+    acceptTaskMutation.mutate(
+      { taskId },
+      {
+        onSuccess: () => showToast("Đã nhận nhiệm vụ!", "success"),
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const submitTask = (taskId: number) => {
     if (!houseQuery.data) return;
+    const task = visibleTasks.find((item) => item.id === taskId);
+    if (task && isTaskLocked(task)) {
+      showToast(getTaskLockedMessage(task), "error");
+      return;
+    }
     // Open the proof/note sheet instead of submitting directly
     setSubmitSheetTaskId(taskId);
     setSubmitNote("");
@@ -548,6 +600,11 @@ export function TasksPage() {
 
   const confirmSubmitTask = () => {
     if (!submitSheetTaskId) return;
+    const task = visibleTasks.find((item) => item.id === submitSheetTaskId);
+    if (task && isTaskLocked(task)) {
+      showToast(getTaskLockedMessage(task), "error");
+      return;
+    }
     submitTaskMutation.mutate(
       {
         taskId: submitSheetTaskId,
@@ -577,6 +634,23 @@ export function TasksPage() {
       }
     );
     showToast(decision === "approve" ? "Đã duyệt nhiệm vụ!" : "Đã trả nhiệm vụ về trạng thái đang làm!", "success");
+  };
+
+  const failTask = (taskId: number, reason?: string) => {
+    const task = visibleTasks.find((item) => item.id === taskId);
+    if (!task) return;
+    if (!window.confirm(`Đánh dấu "${task.title}" là không hoàn thành?`)) return;
+    failTaskMutation.mutate(
+      { taskId, reason },
+      {
+        onSuccess: () => {
+          setReviewSheetTaskId(null);
+          setReviewNote("");
+          showToast("Đã đánh dấu task không hoàn thành", "success");
+        },
+        onError: (err) => showToast(err.message, "error"),
+      }
+    );
   };
 
   const openReviewSheet = (taskId: number) => {
@@ -738,10 +812,16 @@ export function TasksPage() {
                 {task.description}
               </p>
             )}
-            {formatTaskDate(task.dueDate) && (
-              <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#00F2FE]">
+            {formatTaskDate(task.startDate) && (
+              <p className="mt-2 inline-flex items-center gap-1 text-xs text-[#FFD700]">
                 <Calendar className="h-3 w-3" />
-                {formatTaskDate(task.dueDate)}
+                Mở: {formatTaskDate(task.startDate)}
+              </p>
+            )}
+            {formatTaskDate(task.dueDate) && (
+              <p className="mt-2 ml-2 inline-flex items-center gap-1 text-xs text-[#00F2FE]">
+                <Calendar className="h-3 w-3" />
+                Hạn: {formatTaskDate(task.dueDate)}
               </p>
             )}
             {task.assignedTo && (
@@ -814,6 +894,9 @@ export function TasksPage() {
           >
             {getCategoryLabel(task.category)}
           </span>
+          <span className="rounded-md bg-white/5 px-2 py-1 text-xs text-white/60">
+            {getTaskStatusLabel(task)}
+          </span>
         </div>
         {/* Admin/Sub actions */}
         <div className="flex gap-2 mt-3">
@@ -827,14 +910,31 @@ export function TasksPage() {
                   >
                     Xem báo cáo
                   </button>
+                  <button
+                    onClick={() => failTask(task.id, "Creator đánh dấu không hoàn thành từ danh sách task")}
+                    disabled={failTaskMutation.isPending}
+                    className="flex-1 py-2 rounded-lg bg-[#FF3B30]/10 text-[#FF3B30] text-xs font-medium hover:bg-[#FF3B30]/20 disabled:opacity-50 transition-colors"
+                  >
+                    Không hoàn thành
+                  </button>
                 </>
-              ) : task.assignedTo ? (
-                <span className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium text-center">
-                  Đang thực hiện
-                </span>
+              ) : task.assignedTo && task.status !== "completed" && task.status !== "failed" ? (
+                <>
+                  <span className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium text-center">
+                    {getTaskStatusLabel(task)}
+                  </span>
+                  <button
+                    onClick={() => failTask(task.id, "Creator đánh dấu không hoàn thành từ task đã giao")}
+                    disabled={failTaskMutation.isPending}
+                    className="flex-1 py-2 rounded-lg bg-[#FF3B30]/10 text-[#FF3B30] text-xs font-medium hover:bg-[#FF3B30]/20 disabled:opacity-50 transition-colors"
+                  >
+                    Không hoàn thành
+                  </button>
+                </>
               ) : (
                 <button
                   onClick={() => assignTask(task.id)}
+                  disabled={task.status === "completed" || task.status === "failed"}
                   className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors"
                 >
                   Giao việc
@@ -849,27 +949,35 @@ export function TasksPage() {
                     !task.assignedTo ? (
                       <button
                         onClick={() => acceptTask(task.id)}
-                        className="flex-1 py-2 rounded-lg bg-[#FF2A85] text-white text-xs font-medium hover:bg-[#FF2A85]/90 transition-colors"
+                        disabled={isTaskLocked(task)}
+                        className="flex-1 py-2 rounded-lg bg-[#FF2A85] text-white text-xs font-medium hover:bg-[#FF2A85]/90 disabled:opacity-50 transition-colors"
                       >
-                        Nhận nhiệm vụ
+                        {isTaskLocked(task) ? "Chưa mở" : "Nhận nhiệm vụ"}
                       </button>
                     ) : (
                       <button
                         onClick={() => submitTask(task.id)}
-                        className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                        disabled={isTaskLocked(task)}
+                        className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 disabled:opacity-50 transition-colors"
                       >
-                        Báo cáo
+                        {isTaskLocked(task) ? "Chưa mở" : "Báo cáo"}
                       </button>
                     )
                   ) : (
                     <button
                       onClick={() => submitTask(task.id)}
-                      className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 transition-colors"
+                      disabled={isTaskLocked(task)}
+                      className="flex-1 py-2 rounded-lg bg-[#00F2FE]/10 text-[#00F2FE] text-xs font-medium hover:bg-[#00F2FE]/20 disabled:opacity-50 transition-colors"
                     >
-                      Báo cáo
+                      {isTaskLocked(task) ? "Chưa mở" : "Báo cáo"}
                     </button>
                   )}
                 </>
+              )}
+              {task.status !== "active" && (
+                <span className="flex-1 py-2 rounded-lg bg-white/5 text-white/45 text-xs font-medium text-center">
+                  {getTaskStatusLabel(task)}
+                </span>
               )}
             </>
           )}
@@ -1832,13 +1940,26 @@ export function TasksPage() {
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-3 gap-3">
                 <button
                   onClick={() => reviewSheetTaskId && reviewTask(reviewSheetTaskId, "reject")}
                   disabled={reviewTaskMutation.isPending || !latestSubmission}
                   className="rounded-xl border border-[#FF3B30]/30 bg-[#FF3B30]/10 py-3 text-sm font-semibold text-[#FF3B30] transition-colors hover:bg-[#FF3B30]/15 disabled:opacity-50"
                 >
                   Trả lại
+                </button>
+                <button
+                  onClick={() =>
+                    reviewSheetTaskId &&
+                    failTask(
+                      reviewSheetTaskId,
+                      reviewNote.trim() || "Creator đánh dấu không hoàn thành từ màn hình xem báo cáo"
+                    )
+                  }
+                  disabled={failTaskMutation.isPending || !reviewSheetTaskId}
+                  className="rounded-xl border border-[#FF3B30]/30 bg-[#FF3B30]/10 py-3 text-sm font-semibold text-[#FF3B30] transition-colors hover:bg-[#FF3B30]/15 disabled:opacity-50"
+                >
+                  Không hoàn thành
                 </button>
                 <button
                   onClick={() => reviewSheetTaskId && reviewTask(reviewSheetTaskId, "approve")}

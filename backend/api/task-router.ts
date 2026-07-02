@@ -641,29 +641,36 @@ export const taskRouter = createRouter({
       });
       if (!task) throw new Error("Task not found");
 
+      const latestSubmission = await db.query.taskSubmissions.findFirst({
+        where: eq(taskSubmissions.taskId, task.id),
+        orderBy: desc(taskSubmissions.submittedAt),
+      });
+      const receiverId = task.assignedTo ?? latestSubmission?.memberId ?? null;
+      if (!receiverId) {
+        throw new Error("Task chưa có người nhận để cộng Chày");
+      }
+      const effectiveChayPenalty = Math.max(1, task.chayPenalty);
+
       await db
         .update(tasks)
-        .set({ status: "failed", completedAt: null })
+        .set({ status: "failed", assignedTo: receiverId, completedAt: null })
         .where(eq(tasks.id, input.taskId));
 
       const actor = await db.query.houseMembers.findFirst({
         where: eq(houseMembers.userId, ctx.user.id),
       });
 
-      if (task.assignedTo && task.chayPenalty > 0) {
-        const wallet = await db.query.wallets.findFirst({
-          where: eq(wallets.memberId, task.assignedTo),
-        });
-        if (wallet) {
-          await db
-            .update(wallets)
-            .set({ chayBalance: wallet.chayBalance + task.chayPenalty })
-            .where(eq(wallets.memberId, task.assignedTo));
-        }
-      }
+      const wallet = await db.query.wallets.findFirst({
+        where: eq(wallets.memberId, receiverId),
+      });
+      if (!wallet) throw new Error("Không tìm thấy ví của người nhận task");
+      await db
+        .update(wallets)
+        .set({ chayBalance: wallet.chayBalance + effectiveChayPenalty })
+        .where(eq(wallets.memberId, receiverId));
 
       let punishmentAssignmentId: number | null = null;
-      if (task.assignedTo && task.linkedPunishmentId) {
+      if (task.linkedPunishmentId) {
         const linkedPunishment = await db.query.punishments.findFirst({
           where: and(
             eq(punishments.id, task.linkedPunishmentId),
@@ -676,7 +683,7 @@ export const taskRouter = createRouter({
             .insert(punishmentAssignments)
             .values({
               punishmentId: linkedPunishment.id,
-              memberId: task.assignedTo,
+              memberId: receiverId,
               assignedBy: actor?.id || task.createdBy,
               checklist: null,
             })
@@ -689,10 +696,10 @@ export const taskRouter = createRouter({
         houseId: task.houseId,
         action: "TASK_FAILED",
         actorId: actor?.id || task.createdBy,
-        targetId: task.assignedTo,
+        targetId: receiverId,
         details: JSON.stringify({
           taskId: task.id,
-          chayPenalty: task.chayPenalty,
+          chayPenalty: effectiveChayPenalty,
           linkedPunishmentId: task.linkedPunishmentId,
           punishmentAssignmentId,
           reason: input.reason,
@@ -701,16 +708,16 @@ export const taskRouter = createRouter({
 
       await createNotification({
         houseId: task.houseId,
-        recipientId: task.assignedTo,
+        recipientId: receiverId,
         actorId: actor?.id ?? null,
         type: "task_rejected",
         title: "Task không hoàn thành",
-        message: task.title,
+        message: `${task.title} (+${effectiveChayPenalty} Chày)`,
         entityType: "task",
         entityId: task.id,
         metadata: {
           reason: input.reason,
-          chayPenalty: task.chayPenalty,
+          chayPenalty: effectiveChayPenalty,
           linkedPunishmentId: task.linkedPunishmentId,
           punishmentAssignmentId,
         },

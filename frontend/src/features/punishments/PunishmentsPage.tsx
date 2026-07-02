@@ -106,6 +106,11 @@ export function PunishmentsPage() {
       await utils.wallet.get.invalidate();
     },
   });
+  const redeemChayMutation = trpc.wallet.redeemChay.useMutation({
+    onSuccess: async () => {
+      await utils.wallet.get.invalidate();
+    },
+  });
   const assignPunishmentMutation = trpc.punishment.assign.useMutation({
     onSuccess: async () => {
       await utils.punishment.allAssignments.invalidate();
@@ -232,8 +237,8 @@ export function PunishmentsPage() {
       showToast("Vui lòng hoàn thành tất cả các mục!", "error");
       return;
     }
-    if (visibleWallet.chayBalance < assignment.punishment.chayCost) {
-      showToast("Không đủ Chày để chuộc lỗi!", "error");
+    if (visibleWallet.chymBalance < assignment.punishment.chayCost) {
+      showToast("Không đủ Chym để chuộc lỗi!", "error");
       return;
     }
     if (houseQuery.data) {
@@ -247,6 +252,7 @@ export function PunishmentsPage() {
     }
     setWallet((prev) => ({
       ...prev,
+      chymBalance: Math.max(0, prev.chymBalance - assignment.punishment.chayCost),
       chayBalance: Math.max(0, prev.chayBalance - assignment.punishment.chayCost),
     }));
     setAssignments((prev) =>
@@ -291,7 +297,7 @@ export function PunishmentsPage() {
   const handleForgiveDemerits = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
-    if (houseQuery.data && subMember?.id) {
+    if (isAdmin && houseQuery.data && subMember?.id) {
       forgiveChayMutation.mutate({
         memberId: subMember.id,
         amount,
@@ -301,12 +307,33 @@ export function PunishmentsPage() {
       showToast("Đã xóa " + amount + " Chày!", "success");
       return;
     }
+    if (houseQuery.data) {
+      redeemChayMutation.mutate(
+        {
+          amount,
+          reason: reasonInput || undefined,
+        },
+        {
+          onSuccess: () => {
+            setActionSheet(null);
+            showToast("Đã dùng " + amount + " Chym để chuộc " + amount + " Chày!", "success");
+          },
+          onError: (err) => showToast(err.message, "error"),
+        }
+      );
+      return;
+    }
+    if (wallet.chymBalance < amount) {
+      showToast("Không đủ Chym để chuộc lỗi!", "error");
+      return;
+    }
     setWallet((prev) => ({
       ...prev,
+      chymBalance: Math.max(0, prev.chymBalance - amount),
       chayBalance: Math.max(0, prev.chayBalance - amount),
     }));
     setActionSheet(null);
-    showToast("Đã xóa " + amount + " Chày!", "success");
+    showToast("Đã dùng " + amount + " Chym để chuộc " + amount + " Chày!", "success");
   };
 
   const handleCreatePunishment = () => {
@@ -361,13 +388,20 @@ export function PunishmentsPage() {
             <Heart className="w-3 h-3 text-white" />
           </div>
         </div>
-        <div className="flex-1 grid grid-rows-2 gap-2">
+        <div className="flex-1 grid grid-rows-3 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{visibleWallet.chayBalance}</p>
-              <p className="text-xs text-white/50">Chày</p>
+              <p className="text-xs text-white/50">Chày vi phạm</p>
             </div>
             <Link2 className="w-6 h-6 text-[#FF3B30]" />
+          </div>
+          <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
+            <div>
+              <p className="text-2xl font-bold text-white">{visibleWallet.chymBalance}</p>
+              <p className="text-xs text-white/50">Chym chuộc lỗi</p>
+            </div>
+            <Crown className="w-6 h-6 text-[#FFD700]" />
           </div>
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
@@ -413,6 +447,9 @@ export function PunishmentsPage() {
                       </h3>
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
                         <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chày
+                      </span>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FFD700]/10 text-[#FFD700] font-medium flex items-center gap-1">
+                        <Crown className="w-3 h-3" /> Chuộc {assignment.punishment.chayCost} Chym
                       </span>
                     </div>
                     <p className="text-xs text-white/50 mt-1">
@@ -495,7 +532,7 @@ export function PunishmentsPage() {
                         onClick={() => handleRedeem(assignment)}
                         className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors mt-2"
                       >
-                        Chuộc lỗi ({assignment.punishment.chayCost} Chày)
+                        Chuộc lỗi ({assignment.punishment.chayCost} Chym)
                       </button>
                     </div>
                   </motion.div>
@@ -525,6 +562,9 @@ export function PunishmentsPage() {
                   <h3 className="font-semibold text-white text-sm">{p.title}</h3>
                   <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
                     <Link2 className="w-3 h-3" /> {p.chayCost} Chày
+                  </span>
+                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FFD700]/10 text-[#FFD700] font-medium flex items-center gap-1">
+                    <Crown className="w-3 h-3" /> {p.chayCost} Chym chuộc
                   </span>
                 </div>
                 <p className="text-xs text-white/50 mt-1">{p.description}</p>
@@ -556,7 +596,7 @@ export function PunishmentsPage() {
             color: "#FF3B30",
           },
           {
-            label: "Tha Chày",
+            label: isAdmin ? "Tha Chày" : "Chuộc Chày",
             icon: <Heart className="w-5 h-5 text-white" />,
             onClick: () => setActionSheet("forgive"),
             color: "#00F2FE",
@@ -608,7 +648,7 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Chi phí Chày</label>
+            <label className="text-xs text-white/50 mb-2 block">Mức Chày vi phạm / Chym cần chuộc</label>
             <input
               type="number"
               min={0}
@@ -669,11 +709,13 @@ export function PunishmentsPage() {
       <BottomSheet
         isOpen={actionSheet === "forgive"}
         onClose={() => setActionSheet(null)}
-        title="Tha Chày"
+        title={isAdmin ? "Tha Chày" : "Chuộc Chày bằng Chym"}
       >
         <div className="space-y-4">
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Số Chày muốn tha</label>
+            <label className="text-xs text-white/50 mb-2 block">
+              {isAdmin ? "Số Chày muốn tha" : "Số Chày muốn chuộc"}
+            </label>
             <input
               type="number"
               value={pointsInput}
@@ -682,12 +724,14 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Lời tha thứ</label>
+            <label className="text-xs text-white/50 mb-2 block">
+              {isAdmin ? "Lời tha thứ" : "Lý do chuộc lỗi"}
+            </label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder="Viết lời nhắn dịu dàng..."
+              placeholder={isAdmin ? "Viết lời nhắn dịu dàng..." : "Ghi chú chuộc lỗi..."}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
@@ -696,7 +740,7 @@ export function PunishmentsPage() {
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
           >
             <Heart className="w-4 h-4 inline mr-2" />
-            Tha thứ
+            {isAdmin ? "Tha thứ" : "Chuộc lỗi bằng Chym"}
           </button>
         </div>
       </BottomSheet>

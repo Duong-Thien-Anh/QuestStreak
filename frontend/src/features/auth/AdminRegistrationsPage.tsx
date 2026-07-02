@@ -1893,7 +1893,7 @@ export default function AdminRegistrationsPage() {
                       <option value="superSpecial">superSpecial</option>
                     </select>
                     <Input id="admin-task-chym" type="number" min={0} defaultValue={0} placeholder="Chym" className="border-white/10 bg-[#1D2230] text-white" />
-                    <Input id="admin-task-chay" type="number" min={0} defaultValue={0} placeholder="Chay" className="border-white/10 bg-[#1D2230] text-white" />
+                    <Input id="admin-task-chay" type="number" min={0} defaultValue={1} placeholder="Chay" className="border-white/10 bg-[#1D2230] text-white" />
                     <Input id="admin-task-bonus-xp" type="number" min={0} defaultValue={0} placeholder="Bonus XP riêng task" className="border-white/10 bg-[#1D2230] text-white" />
                     <select id="admin-task-assigned-to" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
                       <option value="">Chưa assign</option>

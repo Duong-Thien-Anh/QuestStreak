@@ -87,6 +87,7 @@ function getTypeColor(type: string): string {
 export function NotificationBell() {
   const [open, setOpen] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
+  const previousUnreadCountRef = useRef<number | null>(null);
 
   const houseQuery = trpc.house.get.useQuery(undefined, {
     retry: false,
@@ -106,6 +107,20 @@ export function NotificationBell() {
     }
   );
   const unreadCount = countQuery.data?.count ?? 0;
+
+  useEffect(() => {
+    if (!countQuery.data) return;
+    const previous = previousUnreadCountRef.current;
+    previousUnreadCountRef.current = unreadCount;
+    if (previous === null || previous === unreadCount) return;
+
+    void utils.house.get.invalidate();
+    void utils.wallet.get.invalidate();
+    void utils.gamification.summary.invalidate();
+    void utils.task.list.invalidate();
+    void utils.punishment.myAssignments.invalidate();
+    void utils.punishment.allAssignments.invalidate();
+  }, [countQuery.data, unreadCount, utils]);
 
   // Load notifications only when dropdown is open
   const listQuery = trpc.notification.list.useQuery(

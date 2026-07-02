@@ -43,7 +43,7 @@ export function TasksPage() {
   const [scheduleMode, setScheduleMode] = useState<"frequency" | "custom">("frequency");
   const [recurringDays, setRecurringDays] = useState<number[]>([]);
   const [chymReward, setChymReward] = useState(0);
-  const [chayPenalty, setChayPenalty] = useState(0);
+  const [chayPenalty, setChayPenalty] = useState(1);
   const [bonusXp, setBonusXp] = useState(0);
   const [linkedRewardId, setLinkedRewardId] = useState("");
   const [linkedPrivilegeId, setLinkedPrivilegeId] = useState("");
@@ -185,6 +185,7 @@ export function TasksPage() {
     onSuccess: async () => {
       await utils.task.list.invalidate();
       await utils.house.get.invalidate();
+      await utils.wallet.get.invalidate();
       await utils.gamification.summary.invalidate();
       await utils.punishment.allAssignments.invalidate();
     },
@@ -434,7 +435,7 @@ export function TasksPage() {
     setScheduleMode("frequency");
     setRecurringDays([]);
     setChymReward(0);
-    setChayPenalty(0);
+    setChayPenalty(1);
     setBonusXp(0);
     setLinkedRewardId("");
     setLinkedPrivilegeId("");

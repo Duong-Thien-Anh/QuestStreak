@@ -94,12 +94,37 @@ export const punishmentRouter = createRouter({
       const actor = await db.query.houseMembers.findFirst({
         where: eq(houseMembers.userId, ctx.user.id),
       });
+      const punishment = await db.query.punishments.findFirst({
+        where: eq(punishments.id, input.punishmentId),
+      });
+      if (!punishment) throw new Error("Punishment not found");
 
       await db.insert(punishmentAssignments).values({
         punishmentId: input.punishmentId,
         memberId: input.memberId,
         assignedBy: actor?.id || 0,
         checklist: input.checklist ? JSON.stringify(input.checklist) : null,
+      });
+
+      const wallet = await db.query.wallets.findFirst({
+        where: eq(wallets.memberId, input.memberId),
+      });
+      if (wallet && punishment.chayCost > 0) {
+        await db
+          .update(wallets)
+          .set({ chayBalance: wallet.chayBalance + punishment.chayCost })
+          .where(eq(wallets.memberId, input.memberId));
+      }
+
+      await db.insert(logs).values({
+        houseId: actor?.houseId || punishment.houseId,
+        action: "PUNISHMENT_ASSIGNED",
+        actorId: actor?.id || 0,
+        targetId: input.memberId,
+        details: JSON.stringify({
+          punishmentId: input.punishmentId,
+          chayAdded: punishment.chayCost,
+        }),
       });
 
       return { success: true };
@@ -176,15 +201,21 @@ export const punishmentRouter = createRouter({
       const allCompleted = input.checklist.every((item) => item.completed);
       if (!allCompleted) throw new Error("Not all items completed");
 
-      // Deduct Chay
+      // Redeeming a violation costs Chym and clears the corresponding Chay.
       const wallet = await db.query.wallets.findFirst({
         where: eq(wallets.memberId, assignment.memberId),
       });
-      if (wallet && punishment.chayCost > 0) {
-        const newBalance = Math.max(0, wallet.chayBalance - punishment.chayCost);
+      if (!wallet) throw new Error("Wallet not found");
+      if (punishment.chayCost > 0) {
+        if (wallet.chymBalance < punishment.chayCost) {
+          throw new Error("Không đủ Chym để chuộc lỗi");
+        }
         await db
           .update(wallets)
-          .set({ chayBalance: newBalance })
+          .set({
+            chymBalance: wallet.chymBalance - punishment.chayCost,
+            chayBalance: Math.max(0, wallet.chayBalance - punishment.chayCost),
+          })
           .where(eq(wallets.memberId, assignment.memberId));
       }
 
@@ -208,7 +239,8 @@ export const punishmentRouter = createRouter({
         targetId: assignment.memberId,
         details: JSON.stringify({
           assignmentId: assignment.id,
-          chayCost: punishment.chayCost,
+          chymCost: punishment.chayCost,
+          chayCleared: punishment.chayCost,
         }),
       });
 

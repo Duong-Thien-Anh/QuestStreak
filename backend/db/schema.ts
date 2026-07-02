@@ -28,7 +28,12 @@ export const taskSubmissionStatusEnum = pgEnum("taskSubmissionStatus", [
 ]);
 export const rarityEnum = pgEnum("rarity", ["common", "rare", "epic", "legendary"]);
 export const purchaseStatusEnum = pgEnum("purchaseStatus", ["active", "used", "expired"]);
-export const assignmentStatusEnum = pgEnum("assignmentStatus", ["active", "redeemed", "forgiven"]);
+export const assignmentStatusEnum = pgEnum("assignmentStatus", [
+  "active",
+  "redeemed",
+  "forgiven",
+  "escaped",
+]);
 export const privilegeStatusEnum = pgEnum("privilegeStatus", ["active", "used", "expired"]);
 export const limitTypeEnum = pgEnum("limitType", ["limit", "desire"]);
 export const agreementStatusEnum = pgEnum("agreementStatus", ["pending", "active", "void"]);

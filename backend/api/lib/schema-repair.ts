@@ -69,6 +69,10 @@ export async function ensurePunishmentSelectionSchema() {
   const sql = postgres(env.databaseUrl, { max: 1 });
   try {
     await sql`
+      ALTER TYPE public."assignmentStatus" ADD VALUE IF NOT EXISTS 'escaped'
+    `;
+
+    await sql`
       ALTER TABLE public."punishmentAssignments"
         ADD COLUMN IF NOT EXISTS "selectedAt" timestamp
     `;

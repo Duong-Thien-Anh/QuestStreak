@@ -919,7 +919,8 @@ export default function AdminRegistrationsPage() {
       status: inputValue("admin-punishment-assignment-status") as
         | "active"
         | "redeemed"
-        | "forgiven",
+        | "forgiven"
+        | "escaped",
       checklist: inputValue("admin-punishment-assignment-checklist").trim() || undefined,
     });
   }
@@ -3101,6 +3102,7 @@ export default function AdminRegistrationsPage() {
                         <option value="active">active</option>
                         <option value="redeemed">redeemed</option>
                         <option value="forgiven">forgiven</option>
+                        <option value="escaped">escaped</option>
                       </select>
                       <Input id="admin-punishment-assignment-checklist" placeholder="Checklist" className="border-white/10 bg-[#1D2230] text-white md:col-span-2" />
                       <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreatePunishmentAssignment}>
@@ -3193,7 +3195,8 @@ export default function AdminRegistrationsPage() {
                                   status: event.target.value as
                                     | "active"
                                     | "redeemed"
-                                    | "forgiven",
+                                    | "forgiven"
+                                    | "escaped",
                                 })
                               }
                               className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
@@ -3201,6 +3204,7 @@ export default function AdminRegistrationsPage() {
                               <option value="active">active</option>
                               <option value="redeemed">redeemed</option>
                               <option value="forgiven">forgiven</option>
+                              <option value="escaped">escaped</option>
                             </select>
                           </TableCell>
                           <TableCell className="text-right">

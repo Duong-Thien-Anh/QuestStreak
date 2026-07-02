@@ -111,6 +111,7 @@ export function PunishmentsPage() {
   const assignPunishmentMutation = trpc.punishment.assign.useMutation({
     onSuccess: async () => {
       await utils.punishment.allAssignments.invalidate();
+      await utils.punishment.myAssignments.invalidate();
     },
   });
   const createPunishmentMutation = trpc.punishment.create.useMutation({
@@ -118,19 +119,28 @@ export function PunishmentsPage() {
       await utils.punishment.list.invalidate();
     },
   });
-  const forgivePunishmentMutation = trpc.punishment.forgive.useMutation({
-    onSuccess: async () => {
-      await utils.punishment.allAssignments.invalidate();
-    },
-  });
-  const selectPunishmentMutation = trpc.punishment.selectAssignment.useMutation({
+  const choosePunishmentMutation = trpc.punishment.choose.useMutation({
     onSuccess: async () => {
       await utils.punishment.myAssignments.invalidate();
+      await utils.punishment.allAssignments.invalidate();
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const resolvePunishmentMutation = trpc.punishment.resolve.useMutation({
+    onSuccess: async () => {
+      await utils.punishment.allAssignments.invalidate();
+      await utils.punishment.myAssignments.invalidate();
+      await utils.wallet.get.invalidate();
     },
     onError: (error) => showToast(error.message, "error"),
   });
   const visibleWallet = walletQuery.data ?? wallet;
   const visiblePunishments = punishmentsQuery.data ?? punishments;
+  const memberLabel = (memberId: number) => {
+    const member = members.find((item) => item.id === memberId);
+    const userName = (member as { user?: { name?: string } } | undefined)?.user?.name;
+    return member?.nickname || userName || "Thành viên";
+  };
 
   const checklistFromText = (text: string): ChecklistItem[] =>
     text
@@ -227,33 +237,79 @@ export function PunishmentsPage() {
     );
   };
 
-  const handleSelectAssignment = (assignmentId: number) => {
+  const handleChoosePunishment = (punishmentId: number) => {
     if (houseQuery.data) {
-      selectPunishmentMutation.mutate({ assignmentId });
-      showToast("Đã chọn hình phạt đang chịu!", "success");
+      choosePunishmentMutation.mutate(
+        { punishmentId },
+        {
+          onSuccess: () => showToast("Đã chọn hình phạt đang chịu!", "success"),
+        }
+      );
       return;
     }
-    setAssignments((prev) =>
-      prev.map((assignment) => ({
-        ...assignment,
-        selectedAt: assignment.id === assignmentId ? new Date() : null,
-      }))
-    );
+    const punishment =
+      visiblePunishments.find((item) => item.id === punishmentId) ?? visiblePunishments[0];
+    if (!punishment) return;
+    setAssignments((prev) => [
+      ...prev,
+      {
+        id: Date.now(),
+        punishmentId,
+        memberId: subMember?.id ?? 2,
+        assignedBy: subMember?.id ?? 2,
+        status: "active",
+        assignedAt: new Date(),
+        selectedAt: new Date(),
+        checklist: [
+          { label: "Hoàn thành yêu cầu", completed: false },
+          { label: "Xác nhận hoàn thành hình phạt", completed: false },
+        ],
+        punishment,
+      },
+    ]);
     showToast("Đã chọn hình phạt đang chịu!", "success");
   };
 
-  const handleForgive = (assignmentId: number) => {
+  const handleResolvePunishment = (
+    assignment: Assignment,
+    status: "redeemed" | "forgiven" | "escaped",
+  ) => {
+    const statusMessage = {
+      redeemed: "Đã xác nhận chịu phạt!",
+      forgiven: "Đã tha thứ!",
+      escaped: "Đã ghi nhận trốn phạt!",
+    }[status];
+
     if (houseQuery.data) {
-      forgivePunishmentMutation.mutate({ assignmentId });
-      setActionSheet(null);
-      showToast("Đã tha thứ!", "success");
+      resolvePunishmentMutation.mutate(
+        { assignmentId: assignment.id, status },
+        {
+          onSuccess: () => {
+            setActionSheet(null);
+            showToast(statusMessage, "success");
+          },
+        }
+      );
       return;
     }
+
     setAssignments((prev) =>
-      prev.map((a) => (a.id === assignmentId ? { ...a, status: "forgiven" } : a))
+      prev.map((item) => (item.id === assignment.id ? { ...item, status } : item))
     );
+    if (status === "redeemed") {
+      setWallet((prev) => ({
+        ...prev,
+        chayBalance: Math.max(0, prev.chayBalance - assignment.punishment.chayCost),
+      }));
+    }
+    if (status === "escaped") {
+      setWallet((prev) => ({
+        ...prev,
+        chayBalance: prev.chayBalance + assignment.punishment.chayCost,
+      }));
+    }
     setActionSheet(null);
-    showToast("Đã tha thứ!", "success");
+    showToast(statusMessage, "success");
   };
 
   const handleAddDemerits = () => {
@@ -323,13 +379,9 @@ export function PunishmentsPage() {
   };
 
   const activeAssignments = visibleAssignments.filter((a) => a.status === "active");
-  const selectedAssignment =
-    activeAssignments.find((assignment) => assignment.selectedAt) ?? null;
   const displayedActiveAssignments = isAdmin
     ? activeAssignments
-    : selectedAssignment
-      ? [selectedAssignment]
-      : [];
+    : activeAssignments;
 
   return (
     <div className="px-4 pt-4 space-y-4">
@@ -406,14 +458,35 @@ export function PunishmentsPage() {
                     <p className="text-xs text-white/50 mt-1">
                       {assignment.punishment.description}
                     </p>
+                    <p className="text-[11px] text-white/40 mt-2">
+                      Người chịu phạt:{" "}
+                      <span className="text-white/70">{memberLabel(assignment.memberId)}</span>
+                    </p>
                   </div>
                   {isAdmin ? (
-                    <button
-                      onClick={() => handleForgive(assignment.id)}
-                      className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
-                    >
-                      Tha thứ
-                    </button>
+                    <div className="ml-2 flex flex-col gap-2 flex-shrink-0">
+                      <button
+                        onClick={() => handleResolvePunishment(assignment, "forgiven")}
+                        disabled={resolvePunishmentMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg bg-[#252532] text-white text-xs font-medium hover:bg-[#333344] disabled:opacity-50 transition-colors"
+                      >
+                        Tha thứ
+                      </button>
+                      <button
+                        onClick={() => handleResolvePunishment(assignment, "redeemed")}
+                        disabled={resolvePunishmentMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg bg-[#00F2FE] text-[#0D0D11] text-xs font-semibold hover:bg-[#00F2FE]/90 disabled:opacity-50 transition-colors"
+                      >
+                        Đã chịu phạt
+                      </button>
+                      <button
+                        onClick={() => handleResolvePunishment(assignment, "escaped")}
+                        disabled={resolvePunishmentMutation.isPending}
+                        className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 disabled:opacity-50 transition-colors"
+                      >
+                        Đã trốn
+                      </button>
+                    </div>
                   ) : (
                     <button
                       onClick={() =>
@@ -493,8 +566,16 @@ export function PunishmentsPage() {
         <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
           Danh sách hình phạt
         </h2>
-        {isAdmin ? (
-          visiblePunishments.map((p, i) => (
+        {visiblePunishments.length === 0 ? (
+          <div className="text-center py-8 text-white/30 text-sm">
+            Chưa có hình phạt nào
+          </div>
+        ) : (
+          visiblePunishments.map((p, i) => {
+            const activeCount = activeAssignments.filter(
+              (assignment) => assignment.punishmentId === p.id
+            ).length;
+            return (
             <motion.div
               key={p.id}
               initial={{ opacity: 0, y: 10 }}
@@ -511,67 +592,34 @@ export function PunishmentsPage() {
                     </span>
                   </div>
                   <p className="text-xs text-white/50 mt-1">{p.description}</p>
+                  {!isAdmin && activeCount > 0 ? (
+                    <span className="inline-flex mt-2 text-[10px] px-2 py-0.5 rounded-md bg-[#00F2FE]/10 text-[#00F2FE] font-medium">
+                      Đang chịu {activeCount}
+                    </span>
+                  ) : null}
                 </div>
                 <button
                   onClick={() => {
-                    setAssignSheet({ punishmentId: p.id, title: p.title });
-                    setSelectedAssignMemberId(subMember?.id ?? members[0]?.id ?? null);
-                    setAssignChecklist("");
+                    if (isAdmin) {
+                      setAssignSheet({ punishmentId: p.id, title: p.title });
+                      setSelectedAssignMemberId(subMember?.id ?? members[0]?.id ?? null);
+                      setAssignChecklist("");
+                      return;
+                    }
+                    handleChoosePunishment(p.id);
                   }}
-                  className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
+                  disabled={!isAdmin && choosePunishmentMutation.isPending}
+                  className={
+                    "px-3 py-1.5 rounded-lg text-xs font-medium transition-colors ml-2 flex-shrink-0 disabled:opacity-50 " +
+                    (isAdmin
+                      ? "bg-[#FF3B30] text-white hover:bg-[#FF3B30]/90"
+                      : "bg-[#00F2FE] text-[#0D0D11] hover:bg-[#00F2FE]/90")
+                  }
                 >
-                  Gán
+                  {isAdmin ? "Gán" : "Chọn hình phạt"}
                 </button>
               </div>
             </motion.div>
-          ))
-        ) : activeAssignments.length === 0 ? (
-          <div className="text-center py-8 text-white/30 text-sm">
-            Chưa nhận hình phạt nào
-          </div>
-        ) : (
-          activeAssignments.map((assignment, i) => {
-            const isSelected = selectedAssignment?.id === assignment.id;
-            return (
-              <motion.div
-                key={assignment.id}
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: i * 0.05 }}
-                className={
-                  "bg-[#1A1A22] rounded-xl border p-4 " +
-                  (isSelected ? "border-[#00F2FE]/40" : "border-white/5")
-                }
-              >
-                <div className="flex items-start justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <h3 className="font-semibold text-white text-sm">
-                        {assignment.punishment.title}
-                      </h3>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
-                        <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chày
-                      </span>
-                      {isSelected ? (
-                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#00F2FE]/10 text-[#00F2FE] font-medium">
-                          Đang chịu
-                        </span>
-                      ) : null}
-                    </div>
-                    <p className="text-xs text-white/50 mt-1">
-                      {assignment.punishment.description}
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => handleSelectAssignment(assignment.id)}
-                    disabled={selectPunishmentMutation.isPending || isSelected}
-                    className="px-3 py-1.5 rounded-lg bg-[#00F2FE] text-[#0D0D11] text-xs font-semibold hover:bg-[#00F2FE]/90 disabled:opacity-50 transition-colors flex-shrink-0"
-                  >
-                    {isSelected ? "Đã chọn" : "Chọn hình phạt"}
-                  </button>
-                </div>
-              </motion.div>
             );
           })
         )}

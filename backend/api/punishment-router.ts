@@ -10,6 +10,11 @@ import {
 } from "@db/schema";
 import { eq, and, inArray } from "drizzle-orm";
 
+const defaultChecklist = [
+  { label: "Hoàn thành yêu cầu", completed: false },
+  { label: "Xác nhận hoàn thành hình phạt", completed: false },
+];
+
 export const punishmentRouter = createRouter({
   list: authedQuery
     .input(z.object({ houseId: z.number() }))
@@ -106,16 +111,6 @@ export const punishmentRouter = createRouter({
         checklist: input.checklist ? JSON.stringify(input.checklist) : null,
       });
 
-      const wallet = await db.query.wallets.findFirst({
-        where: eq(wallets.memberId, input.memberId),
-      });
-      if (wallet && punishment.chayCost > 0) {
-        await db
-          .update(wallets)
-          .set({ chayBalance: wallet.chayBalance + punishment.chayCost })
-          .where(eq(wallets.memberId, input.memberId));
-      }
-
       await db.insert(logs).values({
         houseId: actor?.houseId || punishment.houseId,
         action: "PUNISHMENT_ASSIGNED",
@@ -123,11 +118,55 @@ export const punishmentRouter = createRouter({
         targetId: input.memberId,
         details: JSON.stringify({
           punishmentId: input.punishmentId,
-          chayAdded: punishment.chayCost,
+          chayCost: punishment.chayCost,
         }),
       });
 
       return { success: true };
+    }),
+
+  choose: authedQuery
+    .input(z.object({ punishmentId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const member = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, ctx.user.id),
+      });
+      if (!member) throw new Error("Member not found");
+
+      const punishment = await db.query.punishments.findFirst({
+        where: and(
+          eq(punishments.id, input.punishmentId),
+          eq(punishments.houseId, member.houseId),
+          eq(punishments.isActive, true)
+        ),
+      });
+      if (!punishment) throw new Error("Punishment not found");
+
+      const [assignment] = await db
+        .insert(punishmentAssignments)
+        .values({
+          punishmentId: input.punishmentId,
+          memberId: member.id,
+          assignedBy: member.id,
+          selectedAt: new Date(),
+          checklist: JSON.stringify(defaultChecklist),
+        })
+        .returning({ id: punishmentAssignments.id });
+
+      await db.insert(logs).values({
+        houseId: member.houseId,
+        action: "PUNISHMENT_SELECTED",
+        actorId: member.id,
+        targetId: member.id,
+        details: JSON.stringify({
+          assignmentId: assignment.id,
+          punishmentId: input.punishmentId,
+          chayCost: punishment.chayCost,
+        }),
+      });
+
+      return { success: true, assignmentId: assignment.id };
     }),
 
   myAssignments: authedQuery.query(async ({ ctx }) => {
@@ -222,6 +261,76 @@ export const punishmentRouter = createRouter({
     )
     .mutation(async () => {
       throw new Error("Task Receive không thể dùng Chym để xử lý hình phạt");
+    }),
+
+  resolve: domQuery
+    .input(
+      z.object({
+        assignmentId: z.number(),
+        status: z.enum(["redeemed", "forgiven", "escaped"]),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const assignment = await db.query.punishmentAssignments.findFirst({
+        where: and(
+          eq(punishmentAssignments.id, input.assignmentId),
+          eq(punishmentAssignments.status, "active")
+        ),
+      });
+      if (!assignment) throw new Error("Active punishment assignment not found");
+
+      const punishment = await db.query.punishments.findFirst({
+        where: eq(punishments.id, assignment.punishmentId),
+      });
+      if (!punishment) throw new Error("Punishment not found");
+
+      const actor = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, ctx.user.id),
+      });
+
+      const wallet = await db.query.wallets.findFirst({
+        where: eq(wallets.memberId, assignment.memberId),
+      });
+
+      if (wallet && punishment.chayCost > 0) {
+        const chayBalance =
+          input.status === "redeemed"
+            ? Math.max(0, wallet.chayBalance - punishment.chayCost)
+            : input.status === "escaped"
+              ? wallet.chayBalance + punishment.chayCost
+              : wallet.chayBalance;
+
+        if (chayBalance !== wallet.chayBalance) {
+          await db
+            .update(wallets)
+            .set({ chayBalance })
+            .where(eq(wallets.memberId, assignment.memberId));
+        }
+      }
+
+      await db
+        .update(punishmentAssignments)
+        .set({
+          status: input.status,
+          redeemedAt: input.status === "forgiven" ? null : new Date(),
+        })
+        .where(eq(punishmentAssignments.id, input.assignmentId));
+
+      await db.insert(logs).values({
+        houseId: actor?.houseId || punishment.houseId,
+        action: "PUNISHMENT_RESOLVED",
+        actorId: actor?.id || 0,
+        targetId: assignment.memberId,
+        details: JSON.stringify({
+          assignmentId: input.assignmentId,
+          punishmentId: punishment.id,
+          status: input.status,
+          chayCost: punishment.chayCost,
+        }),
+      });
+
+      return { success: true };
     }),
 
   forgive: domQuery

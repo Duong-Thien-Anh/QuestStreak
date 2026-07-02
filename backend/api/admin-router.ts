@@ -1684,7 +1684,7 @@ export const adminRouter = createRouter({
         punishmentId: z.number(),
         memberId: z.number(),
         assignedBy: z.number(),
-        status: z.enum(["active", "redeemed", "forgiven"]).default("active"),
+        status: z.enum(["active", "redeemed", "forgiven", "escaped"]).default("active"),
         checklist: z.string().optional(),
       }),
     )
@@ -1742,7 +1742,7 @@ export const adminRouter = createRouter({
     .input(
       z.object({
         assignmentId: z.number(),
-        status: z.enum(["active", "redeemed", "forgiven"]),
+        status: z.enum(["active", "redeemed", "forgiven", "escaped"]),
       }),
     )
     .mutation(async ({ input }) => {

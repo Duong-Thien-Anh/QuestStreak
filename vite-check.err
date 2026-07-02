@@ -1,0 +1,7 @@
+npm error Lifecycle script `dev` failed with error:
+npm error code 1073807364
+npm error path D:\Projects\Company\Lunis_house_mini_app\frontend
+npm error workspace lunis-house-frontend@0.0.0
+npm error location D:\Projects\Company\Lunis_house_mini_app\frontend
+npm error command failed
+npm error command C:\WINDOWS\system32\cmd.exe /d /s /c vite

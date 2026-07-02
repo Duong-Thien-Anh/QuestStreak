@@ -294,6 +294,19 @@ export const wallets = pgTable("wallets", {
 
 export type Wallet = typeof wallets.$inferSelect;
 
+// ─── App Settings ─────────────────────────────────────────────────
+
+export const appSettings = pgTable("appSettings", {
+  key: varchar("key", { length: 100 }).primaryKey(),
+  value: text("value").notNull(),
+  updatedAt: timestamp("updatedAt")
+    .defaultNow()
+    .notNull()
+    .$onUpdate(() => new Date()),
+});
+
+export type AppSetting = typeof appSettings.$inferSelect;
+
 // ─── Member Progress ──────────────────────────────────────────────
 
 export const memberProgress = pgTable("memberProgress", {

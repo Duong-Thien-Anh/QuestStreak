@@ -1,6 +1,7 @@
-import { and, eq } from "drizzle-orm";
+import { and, eq, sql } from "drizzle-orm";
 import { getDb } from "../queries/connection";
 import {
+  appSettings,
   achievements,
   memberAchievements,
   memberProgress,
@@ -13,6 +14,18 @@ type CompletionSource = "task";
 type Db = ReturnType<typeof getDb>;
 
 const XP_PER_LEVEL = 100;
+const DEFAULT_TASK_XP = 25;
+export const DEFAULT_TASK_XP_SETTING_KEY = "default_task_xp";
+
+async function ensureAppSettingsTable(db: Db) {
+  await db.execute(sql`
+    CREATE TABLE IF NOT EXISTS "appSettings" (
+      "key" varchar(100) PRIMARY KEY NOT NULL,
+      "value" text NOT NULL,
+      "updatedAt" timestamp DEFAULT now() NOT NULL
+    )
+  `);
+}
 
 const DEFAULT_ACHIEVEMENTS = [
   {
@@ -66,8 +79,33 @@ export function calculateLevel(xp: number) {
   return Math.max(1, Math.floor(xp / XP_PER_LEVEL) + 1);
 }
 
-export function getCompletionXp(chymReward: number) {
-  const baseXp = 25;
+export async function getDefaultTaskXp(db: Db = getDb()) {
+  try {
+    await ensureAppSettingsTable(db);
+    const setting = await db.query.appSettings.findFirst({
+      where: eq(appSettings.key, DEFAULT_TASK_XP_SETTING_KEY),
+    });
+    const value = Number(setting?.value);
+    return Number.isFinite(value) && value >= 0 ? Math.floor(value) : DEFAULT_TASK_XP;
+  } catch {
+    return DEFAULT_TASK_XP;
+  }
+}
+
+export async function setDefaultTaskXp(value: number, db: Db = getDb()) {
+  await ensureAppSettingsTable(db);
+  const normalized = String(Math.max(0, Math.floor(value)));
+  await db
+    .insert(appSettings)
+    .values({ key: DEFAULT_TASK_XP_SETTING_KEY, value: normalized })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: normalized },
+    });
+  return Number(normalized);
+}
+
+export function getCompletionXp(chymReward: number, baseXp = DEFAULT_TASK_XP) {
   return baseXp + Math.max(0, chymReward) * 2;
 }
 
@@ -182,9 +220,10 @@ export async function awardCompletionProgress(input: {
   }
 
   const progress = await ensureMemberProgress(db, input.memberId);
+  const defaultTaskXp = await getDefaultTaskXp(db);
   const completionXp = alreadyCompletedToday
     ? 0
-    : getCompletionXp(input.chymReward) + Math.max(0, input.bonusXp ?? 0);
+    : getCompletionXp(input.chymReward, defaultTaskXp) + Math.max(0, input.bonusXp ?? 0);
   let xp = progress.xp + completionXp;
   let level = calculateLevel(xp);
 

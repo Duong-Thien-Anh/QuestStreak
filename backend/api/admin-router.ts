@@ -38,6 +38,7 @@ import {
 } from "@db/schema";
 import { sendMail, buildApprovalEmail, buildRejectionEmail } from "./lib/mailer";
 import { avatarForGender, supportedGenders } from "./lib/gender";
+import { getDefaultTaskXp, setDefaultTaskXp } from "./lib/gamification";
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_HASH_PREFIX = "scrypt";
@@ -873,6 +874,7 @@ export const adminRouter = createRouter({
         level: progress?.level ?? 1,
       };
     });
+    const defaultTaskXp = await getDefaultTaskXp(db);
 
     return {
       summary: {
@@ -895,6 +897,9 @@ export const adminRouter = createRouter({
         agreements: agreementRows.length,
         notifications: notificationRows.length,
         logs: logRows.length,
+      },
+      settings: {
+        defaultTaskXp,
       },
       tasks: taskRows.map((task) => ({
         ...task,
@@ -1056,6 +1061,14 @@ export const adminRouter = createRouter({
       return { wallet, progress };
     }),
 
+  updateTaskXpConfig: adminQuery
+    .input(z.object({ defaultTaskXp: z.number().int().min(0) }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const defaultTaskXp = await setDefaultTaskXp(input.defaultTaskXp, db);
+      return { defaultTaskXp };
+    }),
+
   updateStreak: adminQuery
     .input(
       z.object({
@@ -1179,6 +1192,7 @@ export const adminRouter = createRouter({
           .default("daily"),
         chymReward: z.number().int().min(0).default(0),
         chayPenalty: z.number().int().min(0).default(0),
+        bonusXp: z.number().int().min(0).default(0),
         assignedTo: z.number().optional(),
         createdBy: z.number(),
         status: z
@@ -1197,6 +1211,7 @@ export const adminRouter = createRouter({
           category: input.category,
           chymReward: input.chymReward,
           chayPenalty: input.chayPenalty,
+          bonusXp: input.bonusXp,
           assignedTo: input.assignedTo ?? null,
           createdBy: input.createdBy,
           status: input.status,
@@ -1215,6 +1230,7 @@ export const adminRouter = createRouter({
         category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial"]),
         chymReward: z.number().int().min(0),
         chayPenalty: z.number().int().min(0),
+        bonusXp: z.number().int().min(0),
         assignedTo: z.number().optional(),
         status: z.enum(["pending", "active", "submitted", "completed", "failed"]),
       }),
@@ -1229,6 +1245,7 @@ export const adminRouter = createRouter({
           category: input.category,
           chymReward: input.chymReward,
           chayPenalty: input.chayPenalty,
+          bonusXp: input.bonusXp,
           assignedTo: input.assignedTo ?? null,
           status: input.status,
           completedAt: input.status === "completed" ? new Date() : null,

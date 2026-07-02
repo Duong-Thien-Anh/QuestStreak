@@ -352,6 +352,13 @@ export default function AdminRegistrationsPage() {
     },
     onError: (error) => showToast(error.message, "error"),
   });
+  const updateTaskXpConfigMutation = trpc.admin.updateTaskXpConfig.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật XP mặc định", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
   const updateStreakMutation = trpc.admin.updateStreak.useMutation({
     onSuccess: async () => {
       await invalidateOperationsData();
@@ -746,6 +753,7 @@ export default function AdminRegistrationsPage() {
         | "superSpecial",
       chymReward: inputNumber("admin-task-chym"),
       chayPenalty: inputNumber("admin-task-chay"),
+      bonusXp: inputNumber("admin-task-bonus-xp"),
       assignedTo: inputNumber("admin-task-assigned-to") || undefined,
       createdBy,
       status: inputValue("admin-task-status") as
@@ -1841,6 +1849,33 @@ export default function AdminRegistrationsPage() {
             {operations && activeOperationSection === "tasks" ? (
               <div className="grid gap-4">
                 <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                  <h3 className="font-semibold text-white">Cấu hình XP task</h3>
+                  <div className="mt-4 flex flex-col gap-3 md:flex-row md:items-end">
+                    <label className="grid gap-2 text-xs text-white/50 md:w-64">
+                      XP mặc định cho mỗi task
+                      <Input
+                        id="admin-default-task-xp"
+                        type="number"
+                        min={0}
+                        defaultValue={operations.settings.defaultTaskXp}
+                        className="border-white/10 bg-[#1D2230] text-white"
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                      disabled={updateTaskXpConfigMutation.isPending}
+                      onClick={() =>
+                        updateTaskXpConfigMutation.mutate({
+                          defaultTaskXp: inputNumber("admin-default-task-xp"),
+                        })
+                      }
+                    >
+                      Lưu XP mặc định
+                    </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
                   <h3 className="font-semibold text-white">Tạo task toàn hệ thống</h3>
                   <div className="mt-4 grid gap-3 lg:grid-cols-4">
                     <select id="admin-task-house" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
@@ -1859,6 +1894,7 @@ export default function AdminRegistrationsPage() {
                     </select>
                     <Input id="admin-task-chym" type="number" min={0} defaultValue={0} placeholder="Chym" className="border-white/10 bg-[#1D2230] text-white" />
                     <Input id="admin-task-chay" type="number" min={0} defaultValue={0} placeholder="Chay" className="border-white/10 bg-[#1D2230] text-white" />
+                    <Input id="admin-task-bonus-xp" type="number" min={0} defaultValue={0} placeholder="Bonus XP riêng task" className="border-white/10 bg-[#1D2230] text-white" />
                     <select id="admin-task-assigned-to" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
                       <option value="">Chưa assign</option>
                       {memberOptions.map((member) => (
@@ -1889,7 +1925,7 @@ export default function AdminRegistrationsPage() {
                         <TableHead className="text-white/60">Task</TableHead>
                         <TableHead className="text-white/60">Room</TableHead>
                         <TableHead className="text-white/60">Assigned</TableHead>
-                        <TableHead className="text-white/60">Reward/Penalty</TableHead>
+                        <TableHead className="text-white/60">Reward/Penalty/XP</TableHead>
                         <TableHead className="text-white/60">Status</TableHead>
                       </TableRow>
                     </TableHeader>
@@ -1913,6 +1949,7 @@ export default function AdminRegistrationsPage() {
                             <div className="flex gap-2">
                               <Input id={`task-${task.id}-chym`} type="number" min={0} defaultValue={task.chymReward} className="w-20 border-white/10 bg-[#1D2230] text-white" />
                               <Input id={`task-${task.id}-chay`} type="number" min={0} defaultValue={task.chayPenalty} className="w-20 border-white/10 bg-[#1D2230] text-white" />
+                              <Input id={`task-${task.id}-bonus-xp`} type="number" min={0} defaultValue={task.bonusXp} className="w-24 border-white/10 bg-[#1D2230] text-white" placeholder="XP" />
                             </div>
                           </TableCell>
                           <TableCell>
@@ -1951,6 +1988,7 @@ export default function AdminRegistrationsPage() {
                                     category: task.category,
                                     chymReward: inputNumber(`task-${task.id}-chym`),
                                     chayPenalty: inputNumber(`task-${task.id}-chay`),
+                                    bonusXp: inputNumber(`task-${task.id}-bonus-xp`),
                                     assignedTo: inputNumber(`task-${task.id}-assigned-to`) || undefined,
                                     status: inputValue(`task-${task.id}-status`) as
                                       | "pending"

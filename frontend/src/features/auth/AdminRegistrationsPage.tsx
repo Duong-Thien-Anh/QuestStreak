@@ -2517,6 +2517,15 @@ export default function AdminRegistrationsPage() {
 
                 <div className="rounded-lg border border-white/10 bg-[#11141D] p-4 xl:col-span-2">
                   <h3 className="font-semibold text-white">Achievements</h3>
+                  <div className="mt-4 hidden grid-cols-7 gap-3 px-1 text-xs font-semibold uppercase tracking-wide text-white/45 xl:grid">
+                    <span>Key</span>
+                    <span>Tên</span>
+                    <span>Mô tả</span>
+                    <span>Icon</span>
+                    <span>XP thưởng</span>
+                    <span>Điều kiện</span>
+                    <span>Giá trị</span>
+                  </div>
                   <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-7">
                     <Input
                       id="admin-achievement-key"
@@ -2575,6 +2584,16 @@ export default function AdminRegistrationsPage() {
                   </div>
 
                   <div className="mt-4 grid gap-3">
+                    <div className="hidden grid-cols-[1fr_1.2fr_1.5fr_0.8fr_0.7fr_1fr_0.7fr_auto] gap-3 px-3 text-xs font-semibold uppercase tracking-wide text-white/45 lg:grid">
+                      <span>Key</span>
+                      <span>Tên</span>
+                      <span>Mô tả</span>
+                      <span>Icon</span>
+                      <span>XP thưởng</span>
+                      <span>Điều kiện</span>
+                      <span>Giá trị</span>
+                      <span className="text-right">Thao tác</span>
+                    </div>
                     {operations.achievements.map((achievement) => (
                       <div
                         key={achievement.id}

@@ -247,9 +247,19 @@ export const adminRouter = createRouter({
         orderBy: [desc(privilegeAssignments.assignedAt)],
       }),
       db.query.punishments.findMany(),
-      db.query.punishmentAssignments.findMany({
-        orderBy: [desc(punishmentAssignments.assignedAt)],
-      }),
+      db
+        .select({
+          id: punishmentAssignments.id,
+          punishmentId: punishmentAssignments.punishmentId,
+          memberId: punishmentAssignments.memberId,
+          assignedBy: punishmentAssignments.assignedBy,
+          status: punishmentAssignments.status,
+          assignedAt: punishmentAssignments.assignedAt,
+          redeemedAt: punishmentAssignments.redeemedAt,
+          checklist: punishmentAssignments.checklist,
+        })
+        .from(punishmentAssignments)
+        .orderBy(desc(punishmentAssignments.assignedAt)),
       db.query.logs.findMany({ orderBy: [desc(logs.createdAt)] }),
     ]);
 

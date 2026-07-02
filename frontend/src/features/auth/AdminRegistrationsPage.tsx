@@ -1814,7 +1814,28 @@ export default function AdminRegistrationsPage() {
                     <Spinner className="size-8 text-[#F59E0B]" />
                   </div>
                 ) : null}
-                {!userProfilesQuery.isLoading && userProfiles.length === 0 ? (
+                {!userProfilesQuery.isLoading && userProfilesQuery.error ? (
+                  <div className="rounded-lg border border-[#FF3B30]/25 bg-[#FF3B30]/10 p-4 text-sm text-[#FFB4B4]">
+                    <p className="font-semibold text-[#FFD1D1]">
+                      Không tải được Users Profile
+                    </p>
+                    <p className="mt-2 whitespace-pre-wrap break-words">
+                      {userProfilesQuery.error.message}
+                    </p>
+                    <Button
+                      type="button"
+                      size="sm"
+                      variant="destructive"
+                      className="mt-3"
+                      onClick={() => userProfilesQuery.refetch()}
+                    >
+                      Tải lại Users Profile
+                    </Button>
+                  </div>
+                ) : null}
+                {!userProfilesQuery.isLoading &&
+                !userProfilesQuery.error &&
+                userProfiles.length === 0 ? (
                   <Empty className="rounded-lg border border-white/10 bg-[#11141D]">
                     <EmptyHeader>
                       <EmptyTitle>Chưa có user profile</EmptyTitle>

@@ -22,6 +22,14 @@ import { eq, and, desc } from "drizzle-orm";
 import { awardCompletionProgress, calculateLevel, ensureMemberProgress } from "./lib/gamification";
 import { createNotification } from "./lib/notifications";
 
+function isTaskLocked(task: { startDate: Date | null }) {
+  return Boolean(task.startDate && task.startDate.getTime() > Date.now());
+}
+
+function taskLockedMessage(task: { startDate: Date | null }) {
+  return `Task sẽ mở vào ${task.startDate?.toLocaleDateString("vi-VN") ?? "ngày đã chọn"}`;
+}
+
 export const taskRouter = createRouter({
   list: authedQuery
     .input(
@@ -220,26 +228,29 @@ export const taskRouter = createRouter({
       });
       if (!member) throw new Error("Member not found");
 
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, input.taskId),
+      });
+      if (!task) throw new Error("Task not found");
+      if (isTaskLocked(task)) {
+        throw new Error(taskLockedMessage(task));
+      }
+
       await db
         .update(tasks)
         .set({ assignedTo: member.id, status: "active" })
         .where(eq(tasks.id, input.taskId));
 
-      const task = await db.query.tasks.findFirst({
-        where: eq(tasks.id, input.taskId),
+      await createNotification({
+        houseId: task.houseId,
+        recipientId: task.createdBy,
+        actorId: member.id,
+        type: "task_assigned",
+        title: "Task đã được nhận",
+        message: task.title,
+        entityType: "task",
+        entityId: task.id,
       });
-      if (task) {
-        await createNotification({
-          houseId: task.houseId,
-          recipientId: task.createdBy,
-          actorId: member.id,
-          type: "task_assigned",
-          title: "Task đã được nhận",
-          message: task.title,
-          entityType: "task",
-          entityId: task.id,
-        });
-      }
 
       return { success: true };
     }),
@@ -265,6 +276,9 @@ export const taskRouter = createRouter({
       ]);
       if (!member) throw new Error("Member not found");
       if (!task) throw new Error("Task not found");
+      if (isTaskLocked(task)) {
+        throw new Error(taskLockedMessage(task));
+      }
       if (task.assignedTo && task.assignedTo !== member.id) {
         throw new Error("Task is assigned to another member");
       }
@@ -603,6 +617,98 @@ export const taskRouter = createRouter({
             .where(eq(taskSubmissions.id, latestSubmission.id));
         }
       }
+
+      return { success: true };
+    }),
+
+  fail: domQuery
+    .input(
+      z.object({
+        taskId: z.number(),
+        reason: z.string().max(2000).optional(),
+      })
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const task = await db.query.tasks.findFirst({
+        where: eq(tasks.id, input.taskId),
+      });
+      if (!task) throw new Error("Task not found");
+
+      await db
+        .update(tasks)
+        .set({ status: "failed", completedAt: null })
+        .where(eq(tasks.id, input.taskId));
+
+      const actor = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, ctx.user.id),
+      });
+
+      if (task.assignedTo && task.chayPenalty > 0) {
+        const wallet = await db.query.wallets.findFirst({
+          where: eq(wallets.memberId, task.assignedTo),
+        });
+        if (wallet) {
+          await db
+            .update(wallets)
+            .set({ chayBalance: wallet.chayBalance + task.chayPenalty })
+            .where(eq(wallets.memberId, task.assignedTo));
+        }
+      }
+
+      let punishmentAssignmentId: number | null = null;
+      if (task.assignedTo && task.linkedPunishmentId) {
+        const linkedPunishment = await db.query.punishments.findFirst({
+          where: and(
+            eq(punishments.id, task.linkedPunishmentId),
+            eq(punishments.houseId, task.houseId),
+            eq(punishments.isActive, true)
+          ),
+        });
+        if (linkedPunishment) {
+          const [assignment] = await db
+            .insert(punishmentAssignments)
+            .values({
+              punishmentId: linkedPunishment.id,
+              memberId: task.assignedTo,
+              assignedBy: actor?.id || task.createdBy,
+              checklist: null,
+            })
+            .returning({ id: punishmentAssignments.id });
+          punishmentAssignmentId = assignment.id;
+        }
+      }
+
+      await db.insert(logs).values({
+        houseId: task.houseId,
+        action: "TASK_FAILED",
+        actorId: actor?.id || task.createdBy,
+        targetId: task.assignedTo,
+        details: JSON.stringify({
+          taskId: task.id,
+          chayPenalty: task.chayPenalty,
+          linkedPunishmentId: task.linkedPunishmentId,
+          punishmentAssignmentId,
+          reason: input.reason,
+        }),
+      });
+
+      await createNotification({
+        houseId: task.houseId,
+        recipientId: task.assignedTo,
+        actorId: actor?.id ?? null,
+        type: "task_rejected",
+        title: "Task không hoàn thành",
+        message: task.title,
+        entityType: "task",
+        entityId: task.id,
+        metadata: {
+          reason: input.reason,
+          chayPenalty: task.chayPenalty,
+          linkedPunishmentId: task.linkedPunishmentId,
+          punishmentAssignmentId,
+        },
+      });
 
       return { success: true };
     }),

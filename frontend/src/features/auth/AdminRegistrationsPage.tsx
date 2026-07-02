@@ -359,6 +359,27 @@ export default function AdminRegistrationsPage() {
     },
     onError: (error) => showToast(error.message, "error"),
   });
+  const createAchievementMutation = trpc.admin.createAchievement.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã tạo achievement", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const updateAchievementMutation = trpc.admin.updateAchievement.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật achievement", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const deleteAchievementMutation = trpc.admin.deleteAchievement.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã xóa achievement", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
   const updateTaskStatusMutation = trpc.admin.updateTaskStatus.useMutation({
     onSuccess: async () => {
       await invalidateOperationsData();
@@ -733,6 +754,25 @@ export default function AdminRegistrationsPage() {
         | "submitted"
         | "completed"
         | "failed",
+    });
+  }
+
+  function submitCreateAchievement() {
+    const key = inputValue("admin-achievement-key").trim();
+    const title = inputValue("admin-achievement-title").trim();
+    if (!key || !title) return;
+    createAchievementMutation.mutate({
+      key,
+      title,
+      description: inputValue("admin-achievement-description").trim() || undefined,
+      icon: inputValue("admin-achievement-icon").trim() || "trophy",
+      xpReward: inputNumber("admin-achievement-xp"),
+      criteriaType: inputValue("admin-achievement-criteria-type") as
+        | "total_completions"
+        | "current_streak"
+        | "xp"
+        | "level",
+      criteriaValue: Math.max(1, inputNumber("admin-achievement-criteria-value", 1)),
     });
   }
 
@@ -2473,6 +2513,172 @@ export default function AdminRegistrationsPage() {
                       ))}
                     </TableBody>
                   </Table>
+                </div>
+
+                <div className="rounded-lg border border-white/10 bg-[#11141D] p-4 xl:col-span-2">
+                  <h3 className="font-semibold text-white">Achievements</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-3 xl:grid-cols-7">
+                    <Input
+                      id="admin-achievement-key"
+                      placeholder="Key"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <Input
+                      id="admin-achievement-title"
+                      placeholder="Tên achievement"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <Input
+                      id="admin-achievement-description"
+                      placeholder="Mô tả"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <Input
+                      id="admin-achievement-icon"
+                      defaultValue="trophy"
+                      placeholder="Icon"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <Input
+                      id="admin-achievement-xp"
+                      type="number"
+                      min={0}
+                      defaultValue={0}
+                      placeholder="XP"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <select
+                      id="admin-achievement-criteria-type"
+                      className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
+                    >
+                      <option value="total_completions">total_completions</option>
+                      <option value="current_streak">current_streak</option>
+                      <option value="xp">xp</option>
+                      <option value="level">level</option>
+                    </select>
+                    <Input
+                      id="admin-achievement-criteria-value"
+                      type="number"
+                      min={1}
+                      defaultValue={1}
+                      placeholder="Target"
+                      className="border-white/10 bg-[#1D2230] text-white"
+                    />
+                    <Button
+                      type="button"
+                      className="bg-[#F59E0B] text-black hover:bg-[#D97706] md:col-span-3 xl:col-span-7"
+                      disabled={createAchievementMutation.isPending}
+                      onClick={submitCreateAchievement}
+                    >
+                      Tạo achievement
+                    </Button>
+                  </div>
+
+                  <div className="mt-4 grid gap-3">
+                    {operations.achievements.map((achievement) => (
+                      <div
+                        key={achievement.id}
+                        className="rounded-lg border border-white/10 bg-[#0D111A] p-3"
+                      >
+                        <div className="grid gap-3 lg:grid-cols-[1fr_1.2fr_1.5fr_0.8fr_0.7fr_1fr_0.7fr_auto]">
+                          <Input
+                            id={`achievement-${achievement.id}-key`}
+                            defaultValue={achievement.key}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <Input
+                            id={`achievement-${achievement.id}-title`}
+                            defaultValue={achievement.title}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <Input
+                            id={`achievement-${achievement.id}-description`}
+                            defaultValue={achievement.description ?? ""}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <Input
+                            id={`achievement-${achievement.id}-icon`}
+                            defaultValue={achievement.icon}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <Input
+                            id={`achievement-${achievement.id}-xp`}
+                            type="number"
+                            min={0}
+                            defaultValue={achievement.xpReward}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <select
+                            id={`achievement-${achievement.id}-criteria-type`}
+                            defaultValue={achievement.criteriaType}
+                            className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
+                          >
+                            <option value="total_completions">total_completions</option>
+                            <option value="current_streak">current_streak</option>
+                            <option value="xp">xp</option>
+                            <option value="level">level</option>
+                          </select>
+                          <Input
+                            id={`achievement-${achievement.id}-criteria-value`}
+                            type="number"
+                            min={1}
+                            defaultValue={achievement.criteriaValue}
+                            className="border-white/10 bg-[#1D2230] text-white"
+                          />
+                          <div className="flex gap-2 lg:justify-end">
+                            <Button
+                              type="button"
+                              size="sm"
+                              className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                              disabled={updateAchievementMutation.isPending}
+                              onClick={() =>
+                                updateAchievementMutation.mutate({
+                                  achievementId: achievement.id,
+                                  key: inputValue(`achievement-${achievement.id}-key`).trim(),
+                                  title: inputValue(`achievement-${achievement.id}-title`).trim(),
+                                  description:
+                                    inputValue(`achievement-${achievement.id}-description`).trim() ||
+                                    undefined,
+                                  icon:
+                                    inputValue(`achievement-${achievement.id}-icon`).trim() ||
+                                    "trophy",
+                                  xpReward: inputNumber(`achievement-${achievement.id}-xp`),
+                                  criteriaType: inputValue(
+                                    `achievement-${achievement.id}-criteria-type`,
+                                  ) as
+                                    | "total_completions"
+                                    | "current_streak"
+                                    | "xp"
+                                    | "level",
+                                  criteriaValue: Math.max(
+                                    1,
+                                    inputNumber(`achievement-${achievement.id}-criteria-value`, 1),
+                                  ),
+                                })
+                              }
+                            >
+                              Lưu
+                            </Button>
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="destructive"
+                              disabled={deleteAchievementMutation.isPending}
+                              onClick={() => {
+                                if (window.confirm(`Xóa achievement ${achievement.title}?`)) {
+                                  deleteAchievementMutation.mutate({
+                                    achievementId: achievement.id,
+                                  });
+                                }
+                              }}
+                            >
+                              Xóa
+                            </Button>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
                 </div>
               </div>
             ) : null}

@@ -5,6 +5,7 @@ import { desc, eq, inArray, and } from "drizzle-orm";
 import { createRouter, adminQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import {
+  achievements,
   houses,
   houseAvatars,
   houseMembers,
@@ -1074,6 +1075,77 @@ export const adminRouter = createRouter({
         .where(eq(streaks.id, input.streakId))
         .returning();
       return streak;
+    }),
+
+  createAchievement: adminQuery
+    .input(
+      z.object({
+        key: z.string().min(1).max(100),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        icon: z.string().min(1).max(50).default("trophy"),
+        xpReward: z.number().int().min(0).default(0),
+        criteriaType: z.enum(["total_completions", "current_streak", "xp", "level"]),
+        criteriaValue: z.number().int().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [achievement] = await db
+        .insert(achievements)
+        .values({
+          key: input.key.trim(),
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          icon: input.icon.trim() || "trophy",
+          xpReward: input.xpReward,
+          criteriaType: input.criteriaType,
+          criteriaValue: input.criteriaValue,
+        })
+        .returning();
+      return achievement;
+    }),
+
+  updateAchievement: adminQuery
+    .input(
+      z.object({
+        achievementId: z.number(),
+        key: z.string().min(1).max(100),
+        title: z.string().min(1).max(255),
+        description: z.string().optional(),
+        icon: z.string().min(1).max(50),
+        xpReward: z.number().int().min(0),
+        criteriaType: z.enum(["total_completions", "current_streak", "xp", "level"]),
+        criteriaValue: z.number().int().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [achievement] = await db
+        .update(achievements)
+        .set({
+          key: input.key.trim(),
+          title: input.title.trim(),
+          description: input.description?.trim() || null,
+          icon: input.icon.trim() || "trophy",
+          xpReward: input.xpReward,
+          criteriaType: input.criteriaType,
+          criteriaValue: input.criteriaValue,
+        })
+        .where(eq(achievements.id, input.achievementId))
+        .returning();
+      return achievement;
+    }),
+
+  deleteAchievement: adminQuery
+    .input(z.object({ achievementId: z.number() }))
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      await db
+        .delete(memberAchievements)
+        .where(eq(memberAchievements.achievementId, input.achievementId));
+      await db.delete(achievements).where(eq(achievements.id, input.achievementId));
+      return { success: true };
     }),
 
   updateTaskStatus: adminQuery

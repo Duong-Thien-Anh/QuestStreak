@@ -129,9 +129,11 @@ export const taskRouter = createRouter({
         taskId: z.number(),
         title: z.string().min(1).max(255).optional(),
         description: z.string().optional(),
+        category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial"]).optional(),
         chymReward: z.number().min(0).optional(),
         chayPenalty: z.number().min(0).optional(),
         bonusXp: z.number().min(0).optional(),
+        assignedTo: z.number().nullable().optional(),
         linkedRewardId: z.number().nullable().optional(),
         linkedAchievementId: z.number().nullable().optional(),
         linkedPrivilegeId: z.number().nullable().optional(),
@@ -147,9 +149,14 @@ export const taskRouter = createRouter({
       const updateData: Record<string, unknown> = {};
       if (input.title !== undefined) updateData.title = input.title;
       if (input.description !== undefined) updateData.description = input.description;
+      if (input.category !== undefined) updateData.category = input.category;
       if (input.chymReward !== undefined) updateData.chymReward = input.chymReward;
       if (input.chayPenalty !== undefined) updateData.chayPenalty = input.chayPenalty;
       if (input.bonusXp !== undefined) updateData.bonusXp = input.bonusXp;
+      if (input.assignedTo !== undefined) {
+        updateData.assignedTo = input.assignedTo;
+        updateData.status = input.assignedTo ? "active" : "pending";
+      }
       if (input.linkedRewardId !== undefined) updateData.linkedRewardId = input.linkedRewardId;
       if (input.linkedAchievementId !== undefined) updateData.linkedAchievementId = input.linkedAchievementId;
       if (input.linkedPrivilegeId !== undefined) updateData.linkedPrivilegeId = input.linkedPrivilegeId;
@@ -224,6 +231,7 @@ export const taskRouter = createRouter({
       if (task) {
         await createNotification({
           houseId: task.houseId,
+          recipientId: task.createdBy,
           actorId: member.id,
           type: "task_assigned",
           title: "Task đã được nhận",
@@ -279,6 +287,7 @@ export const taskRouter = createRouter({
 
       await createNotification({
         houseId: task.houseId,
+        recipientId: task.createdBy,
         actorId: member.id,
         type: "task_submitted",
         title: "Task chờ duyệt",

@@ -206,6 +206,7 @@ export const taskCategories = [
   { key: "special", label: "Special", color: "#FFD700" },
   { key: "superSpecial", label: "Super Special", color: "#FF6B00" },
   { key: "completed", label: "Completed", color: "#52525B" },
+  { key: "failed", label: "Failed", color: "#FF3B30" },
 ];
 
 export const moodEmojis: Record<string, { emoji: string; label: string; color: string }> = {

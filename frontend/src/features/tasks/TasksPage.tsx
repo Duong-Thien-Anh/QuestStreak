@@ -530,6 +530,8 @@ export function TasksPage() {
         return "Siêu đặc biệt";
       case "completed":
         return "Đã hoàn thành";
+      case "failed":
+        return "Không hoàn thành";
       default:
         return key;
     }
@@ -561,7 +563,7 @@ export function TasksPage() {
         onSuccess: () => {
           setAssignTaskSheetId(null);
           setAssignTaskMemberId("");
-          showToast("Đã giao việc!", "success");
+          showToast(assignTaskTarget?.status === "failed" ? "Đã giao lại việc!" : "Đã giao việc!", "success");
         },
         onError: (err) => showToast(err.message, "error"),
       }
@@ -792,8 +794,10 @@ export function TasksPage() {
     const filtered =
       categoryKey === "completed"
         ? visibleTasks.filter((t) => t.status === "completed")
+        : categoryKey === "failed"
+          ? visibleTasks.filter((t) => t.status === "failed")
         : visibleTasks.filter(
-            (t) => t.category === categoryKey && t.status !== "completed"
+            (t) => t.category === categoryKey && t.status !== "completed" && t.status !== "failed"
           );
 
     return filtered.map((task, i) => (
@@ -934,10 +938,10 @@ export function TasksPage() {
               ) : (
                 <button
                   onClick={() => assignTask(task.id)}
-                  disabled={task.status === "completed" || task.status === "failed"}
+                  disabled={task.status === "completed"}
                   className="flex-1 py-2 rounded-lg bg-[#FF2A85]/10 text-[#FF2A85] text-xs font-medium hover:bg-[#FF2A85]/20 transition-colors"
                 >
-                  Giao việc
+                  {task.status === "failed" ? "Giao lại việc" : "Giao việc"}
                 </button>
               )}
             </>
@@ -1174,9 +1178,11 @@ export function TasksPage() {
                   {
                     (cat.key === "completed"
                       ? visibleTasks.filter((t) => t.status === "completed")
-                      : visibleTasks.filter(
-                          (t) => t.category === cat.key && t.status !== "completed"
-                        )
+                      : cat.key === "failed"
+                        ? visibleTasks.filter((t) => t.status === "failed")
+                        : visibleTasks.filter(
+                            (t) => t.category === cat.key && t.status !== "completed" && t.status !== "failed"
+                          )
                     ).length
                   }
                 </span>
@@ -1741,7 +1747,7 @@ export function TasksPage() {
           setAssignTaskSheetId(null);
           setAssignTaskMemberId("");
         }}
-        title="Giao nhiệm vụ"
+        title={assignTaskTarget?.status === "failed" ? "Giao lại nhiệm vụ" : "Giao nhiệm vụ"}
       >
         <div className="space-y-4">
           {assignTaskTarget && (
@@ -1774,7 +1780,11 @@ export function TasksPage() {
             disabled={assignTaskMutation.isPending || !assignTaskMemberId}
             className="w-full py-3 rounded-xl bg-[#FF2A85] text-white font-semibold text-sm hover:bg-[#FF2A85]/90 disabled:opacity-50 transition-colors"
           >
-            {assignTaskMutation.isPending ? "Đang giao..." : "Giao nhiệm vụ"}
+            {assignTaskMutation.isPending
+              ? "Đang giao..."
+              : assignTaskTarget?.status === "failed"
+                ? "Giao lại việc lần nữa"
+                : "Giao nhiệm vụ"}
           </button>
         </div>
       </BottomSheet>

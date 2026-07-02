@@ -35,7 +35,7 @@ export const taskRouter = createRouter({
     .input(
       z.object({
         houseId: z.number(),
-        category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial", "completed"]).optional(),
+        category: z.enum(["daily", "weekly", "monthly", "special", "superSpecial", "completed", "failed"]).optional(),
       })
     )
     .query(async ({ input }) => {
@@ -43,6 +43,12 @@ export const taskRouter = createRouter({
       if (input.category === "completed") {
         return db.query.tasks.findMany({
           where: and(eq(tasks.houseId, input.houseId), eq(tasks.status, "completed")),
+          orderBy: desc(tasks.updatedAt),
+        });
+      }
+      if (input.category === "failed") {
+        return db.query.tasks.findMany({
+          where: and(eq(tasks.houseId, input.houseId), eq(tasks.status, "failed")),
           orderBy: desc(tasks.updatedAt),
         });
       }

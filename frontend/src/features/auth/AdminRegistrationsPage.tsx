@@ -2030,6 +2030,26 @@ export default function AdminRegistrationsPage() {
               </div>
             ) : null}
 
+            {!operations && operationsQuery.error ? (
+              <div className="rounded-lg border border-[#FF3B30]/25 bg-[#FF3B30]/10 p-4 text-sm text-[#FFB4B4]">
+                <p className="font-semibold text-[#FFD1D1]">
+                  Không tải được dữ liệu Operations
+                </p>
+                <p className="mt-2 whitespace-pre-wrap break-words">
+                  {operationsQuery.error.message}
+                </p>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="destructive"
+                  className="mt-3"
+                  onClick={() => operationsQuery.refetch()}
+                >
+                  Tải lại Operations
+                </Button>
+              </div>
+            ) : null}
+
             {operations && activeOperationSection === "tasks" ? (
               <div className="grid gap-4">
                 <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">

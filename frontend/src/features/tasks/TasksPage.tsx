@@ -11,7 +11,6 @@ import {
   Trophy,
   Zap,
   Send,
-  CheckSquare,
   Trash2,
 } from "lucide-react";
 import { GamificationPanel } from "@/shared/components/GamificationPanel";
@@ -150,6 +149,11 @@ export function TasksPage() {
       await utils.task.list.invalidate();
     },
   });
+  const updateTaskMutation = trpc.task.update.useMutation({
+    onSuccess: async () => {
+      await utils.task.list.invalidate();
+    },
+  });
   const assignTaskMutation = trpc.task.assign.useMutation({
     onSuccess: async () => {
       await utils.task.list.invalidate();
@@ -204,12 +208,15 @@ export function TasksPage() {
   const visibleTasks = (tasksQuery.data ?? tasksState) as TaskItem[];
   const visibleWheels = wheelsQuery.data ?? [];
   const assignTaskTarget = visibleTasks.find((task) => task.id === assignTaskSheetId);
-  const availableRewards = rewardsQuery.data ?? [];
-  const availablePrivileges = privilegesQuery.data ?? [];
-  const availablePunishments = punishmentsQuery.data ?? [];
+  const availableRewards = useMemo(() => rewardsQuery.data ?? [], [rewardsQuery.data]);
+  const availablePrivileges = useMemo(() => privilegesQuery.data ?? [], [privilegesQuery.data]);
+  const availablePunishments = useMemo(() => punishmentsQuery.data ?? [], [punishmentsQuery.data]);
   const activeWheelRewards = availableRewards.filter((reward) => reward.isActive);
   const activeWheelPunishments = availablePunishments.filter((punishment) => punishment.isActive);
-  const availableAchievements = gamificationSummaryQuery.data?.achievements ?? [];
+  const availableAchievements = useMemo(
+    () => gamificationSummaryQuery.data?.achievements ?? [],
+    [gamificationSummaryQuery.data?.achievements]
+  );
   const memberById = useMemo(
     () => new Map(members.map((member) => [member.id, member])),
     [members]
@@ -260,9 +267,47 @@ export function TasksPage() {
 
   const handleCreateTask = () => {
     if (!title.trim()) return;
+    const category =
+      taskType === "regular" ? (scheduleMode === "custom" ? "special" : frequency) : taskType;
+    const nextDueDate =
+      scheduleMode === "custom" || taskType !== "regular" ? dueDate || undefined : undefined;
+    const nextStartDate =
+      scheduleMode === "custom" || taskType !== "regular" ? startDate || undefined : undefined;
+    const nextRecurringDays =
+      scheduleMode === "frequency" && recurringDays.length > 0 ? recurringDays : undefined;
+    const nextAssignedTo = selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : undefined;
+    const nextLinkedRewardId = linkedRewardId ? Number(linkedRewardId) : undefined;
+    const nextLinkedPrivilegeId = linkedPrivilegeId ? Number(linkedPrivilegeId) : undefined;
+    const nextLinkedPunishmentId = linkedPunishmentId ? Number(linkedPunishmentId) : undefined;
+
     if (editingTaskId) {
       if (houseQuery.data) {
-        showToast("Chỉnh sửa nhiệm vụ cần bổ sung API update ở backend", "info");
+        updateTaskMutation.mutate(
+          {
+            taskId: editingTaskId,
+            title,
+            description: description || undefined,
+            category,
+            dueDate: nextDueDate,
+            startDate: nextStartDate,
+            recurringDays: nextRecurringDays ?? null,
+            chymReward,
+            chayPenalty,
+            bonusXp,
+            assignedTo: nextAssignedTo ?? null,
+            linkedRewardId: nextLinkedRewardId ?? null,
+            linkedPrivilegeId: nextLinkedPrivilegeId ?? null,
+            linkedPunishmentId: nextLinkedPunishmentId ?? null,
+          },
+          {
+            onSuccess: () => {
+              setCreateSheet(false);
+              resetForm();
+              showToast("Đã cập nhật nhiệm vụ!", "success");
+            },
+            onError: (err) => showToast(err.message, "error"),
+          }
+        );
         return;
       }
       setTasksState((prev) =>
@@ -299,23 +344,17 @@ export function TasksPage() {
         houseId,
         title,
         description: description || undefined,
-        category: taskType === "regular" ? (scheduleMode === "custom" ? "special" : frequency) : taskType,
-        dueDate:
-          scheduleMode === "custom" || taskType !== "regular"
-            ? dueDate || undefined
-            : undefined,
-        startDate: (scheduleMode === "custom" || taskType !== "regular") ? (startDate || undefined) : undefined,
-        recurringDays:
-          scheduleMode === "frequency" && recurringDays.length > 0
-            ? recurringDays
-            : undefined,
+        category,
+        dueDate: nextDueDate,
+        startDate: nextStartDate,
+        recurringDays: nextRecurringDays,
         chymReward,
         chayPenalty,
         bonusXp,
-        assignedTo: selectedTaskAssigneeId ? Number(selectedTaskAssigneeId) : undefined,
-        linkedRewardId: linkedRewardId ? Number(linkedRewardId) : undefined,
-        linkedPrivilegeId: linkedPrivilegeId ? Number(linkedPrivilegeId) : undefined,
-        linkedPunishmentId: linkedPunishmentId ? Number(linkedPunishmentId) : undefined,
+        assignedTo: nextAssignedTo,
+        linkedRewardId: nextLinkedRewardId,
+        linkedPrivilegeId: nextLinkedPrivilegeId,
+        linkedPunishmentId: nextLinkedPunishmentId,
       });
       setCreateSheet(false);
       resetForm();
@@ -934,19 +973,7 @@ export function TasksPage() {
       )}
 
       {/* Manage button for admin */}
-      {isAdmin && (
-        <div className="flex justify-end gap-2">
-          <button
-            onClick={() => {
-              setCreateType("task");
-              setCreateSheet(true);
-            }}
-            className="px-3 py-1.5 rounded-lg bg-[#1A1A22] border border-white/5 text-xs text-white/60 flex items-center gap-1.5 hover:bg-white/5 transition-colors"
-          >
-            <CheckSquare className="w-3.5 h-3.5" /> Quản lý
-          </button>
-        </div>
-      )}
+
 
       {visibleWheels.length > 0 && (
         <motion.div

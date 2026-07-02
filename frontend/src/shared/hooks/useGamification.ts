@@ -20,6 +20,7 @@ export function useGamification(memberId: number | undefined) {
   const XP_PER_LEVEL = 100;
   const xp = data?.wallet.xp ?? 0;
   const level = data?.wallet.level ?? 1;
+  const levelTitle = data?.wallet.levelTitle ?? "Người mới";
   const xpInCurrentLevel = xp % XP_PER_LEVEL;
   const xpProgress = (xpInCurrentLevel / XP_PER_LEVEL) * 100;
 
@@ -43,6 +44,7 @@ export function useGamification(memberId: number | undefined) {
     // Raw
     xp,
     level,
+    levelTitle,
     streaks,
     achievements,
     // Computed

@@ -94,6 +94,8 @@ const registrationTabs: Array<{ value: RegistrationStatus; label: string }> = [
   { value: "all", label: "Tất cả" },
 ];
 
+const levelTitleLevelOptions = Array.from({ length: 100 }, (_, index) => index + 1);
+
 const memberRoleLabels: Record<MemberRole, string> = {
   dominant: "Creator",
   submissive: "Receiver",
@@ -359,6 +361,13 @@ export default function AdminRegistrationsPage() {
     },
     onError: (error) => showToast(error.message, "error"),
   });
+  const updateLevelTitlesConfigMutation = trpc.admin.updateLevelTitlesConfig.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật chức danh level", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
   const updateStreakMutation = trpc.admin.updateStreak.useMutation({
     onSuccess: async () => {
       await invalidateOperationsData();
@@ -433,10 +442,59 @@ export default function AdminRegistrationsPage() {
       },
       onError: (error) => showToast(error.message, "error"),
     });
-  const updateAgreementStatusMutation = trpc.admin.updateAgreementStatus.useMutation({
+  const createLimitMutation = trpc.admin.createLimit.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã tạo limit/mong muốn", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const updateLimitMutation = trpc.admin.updateLimit.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật limit/mong muốn", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const createAgreementMutation = trpc.admin.createAgreement.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã tạo agreement", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const updateAgreementMutation = trpc.admin.updateAgreement.useMutation({
     onSuccess: async () => {
       await invalidateOperationsData();
       showToast("Đã cập nhật agreement", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const createJournalMutation = trpc.admin.createJournal.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã tạo journal", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const updateJournalMutation = trpc.admin.updateJournal.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật journal", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const createJournalEntryMutation = trpc.admin.createJournalEntry.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã tạo journal entry", "success");
+    },
+    onError: (error) => showToast(error.message, "error"),
+  });
+  const updateJournalEntryMutation = trpc.admin.updateJournalEntry.useMutation({
+    onSuccess: async () => {
+      await invalidateOperationsData();
+      showToast("Đã cập nhật journal entry", "success");
     },
     onError: (error) => showToast(error.message, "error"),
   });
@@ -700,6 +758,10 @@ export default function AdminRegistrationsPage() {
       | "privilegeAssignment"
       | "punishmentAssignment"
       | "wheelSpin"
+      | "limit"
+      | "agreement"
+      | "journal"
+      | "journalEntry"
       | "note"
       | "notification"
       | "log",
@@ -873,6 +935,128 @@ export default function AdminRegistrationsPage() {
       title,
       content: inputValue("admin-note-content").trim() || undefined,
       visibility: inputValue("admin-note-visibility") as "public" | "private",
+    });
+  }
+
+  function saveLevelTitlesConfig(
+    levelTitles: Array<{ minLevel: number; title: string }>,
+  ) {
+    const normalized = levelTitles
+      .map((item) => ({
+        minLevel: Math.floor(item.minLevel),
+        title: item.title.trim(),
+      }))
+      .filter((item) => Number.isFinite(item.minLevel) && item.minLevel >= 1 && item.title)
+      .sort((a, b) => a.minLevel - b.minLevel);
+
+    if (normalized.length === 0) {
+      showToast("Cần có ít nhất một chức danh hợp lệ", "error");
+      return;
+    }
+
+    updateLevelTitlesConfigMutation.mutate({ levelTitles: normalized });
+  }
+
+  function submitAddLevelTitle() {
+    const minLevel = inputNumber("admin-level-title-level", 1);
+    const title = inputValue("admin-level-title-title").trim();
+
+    if (!Number.isFinite(minLevel) || minLevel < 1 || !title) {
+      showToast("Chọn level và nhập chức danh", "error");
+      return;
+    }
+
+    const currentTitles = operations?.settings.levelTitles ?? [];
+    saveLevelTitlesConfig([
+      ...currentTitles.filter((item) => item.minLevel !== minLevel),
+      { minLevel, title },
+    ]);
+  }
+
+  function submitUpdateLevelTitle(currentLevel: number) {
+    const minLevel = inputNumber(`level-title-${currentLevel}-level`, currentLevel);
+    const title = inputValue(`level-title-${currentLevel}-title`).trim();
+
+    if (!Number.isFinite(minLevel) || minLevel < 1 || !title) {
+      showToast("Level và chức danh không được để trống", "error");
+      return;
+    }
+
+    const currentTitles = operations?.settings.levelTitles ?? [];
+    saveLevelTitlesConfig([
+      ...currentTitles.filter(
+        (item) => item.minLevel !== currentLevel && item.minLevel !== minLevel,
+      ),
+      { minLevel, title },
+    ]);
+  }
+
+  function deleteLevelTitle(currentLevel: number) {
+    const currentTitles = operations?.settings.levelTitles ?? [];
+    if (currentTitles.length <= 1) {
+      showToast("Cần giữ ít nhất một chức danh", "error");
+      return;
+    }
+
+    if (!window.confirm(`Xóa chức danh level ${currentLevel}?`)) return;
+    saveLevelTitlesConfig(
+      currentTitles.filter((item) => item.minLevel !== currentLevel),
+    );
+  }
+
+  function submitCreateLimit() {
+    const houseId = inputNumber("admin-limit-house");
+    const content = inputValue("admin-limit-content").trim();
+    if (!houseId || !content) return;
+    createLimitMutation.mutate({
+      houseId,
+      content,
+      type: inputValue("admin-limit-type") as "limit" | "desire",
+    });
+  }
+
+  function submitCreateAgreement() {
+    const houseId = inputNumber("admin-agreement-house");
+    const title = inputValue("admin-agreement-title").trim();
+    if (!houseId || !title) return;
+    createAgreementMutation.mutate({
+      houseId,
+      title,
+      purpose: inputValue("admin-agreement-purpose").trim() || undefined,
+      rules: inputValue("admin-agreement-rules").trim() || undefined,
+      consequences: inputValue("admin-agreement-consequences").trim() || undefined,
+      status: inputValue("admin-agreement-status") as "pending" | "active" | "void",
+    });
+  }
+
+  function submitCreateJournal() {
+    const memberId = inputNumber("admin-journal-member");
+    const member = memberOptions.find((item) => item.id === memberId);
+    const name = inputValue("admin-journal-name").trim();
+    if (!member || !name) return;
+    createJournalMutation.mutate({
+      houseId: member.houseId,
+      memberId,
+      name,
+      prompt: inputValue("admin-journal-prompt").trim() || undefined,
+    });
+  }
+
+  function submitCreateJournalEntry() {
+    const journalId = inputNumber("admin-journal-entry-journal");
+    const journal = operations?.journals.find((item) => item.id === journalId);
+    const content = inputValue("admin-journal-entry-content").trim();
+    if (!journal || !content) return;
+    createJournalEntryMutation.mutate({
+      journalId,
+      memberId: journal.memberId,
+      mood: inputValue("admin-journal-entry-mood") as
+        | "sad"
+        | "neutral"
+        | "happy"
+        | "excited"
+        | "loved",
+      content,
     });
   }
 
@@ -1873,6 +2057,96 @@ export default function AdminRegistrationsPage() {
                     >
                       Lưu XP mặc định
                     </Button>
+                  </div>
+                </div>
+                <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                  <h3 className="font-semibold text-white">Cấu hình chức danh level</h3>
+                  <div className="mt-4 grid gap-3 md:grid-cols-[160px_1fr_auto] md:items-end">
+                    <label className="grid gap-2 text-xs text-white/50">
+                      Level
+                      <select
+                        id="admin-level-title-level"
+                        defaultValue={1}
+                        className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white outline-none focus:border-[#F59E0B]/60"
+                      >
+                        {levelTitleLevelOptions.map((level) => (
+                          <option key={level} value={level}>
+                            Level {level}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label className="grid gap-2 text-xs text-white/50">
+                      Chức danh
+                      <Input
+                        id="admin-level-title-title"
+                        placeholder="Ví dụ: Người mới"
+                        className="border-white/10 bg-[#1D2230] text-white"
+                      />
+                    </label>
+                    <Button
+                      type="button"
+                      className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                      disabled={updateLevelTitlesConfigMutation.isPending}
+                      onClick={submitAddLevelTitle}
+                    >
+                      Thêm chức danh
+                    </Button>
+                  </div>
+                  <div className="mt-4 overflow-x-auto rounded-lg border border-white/10">
+                    <Table className="min-w-[620px]">
+                      <TableHeader>
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead className="w-40 text-white/60">Level</TableHead>
+                          <TableHead className="text-white/60">Chức danh</TableHead>
+                          <TableHead className="text-right text-white/60">Thao tác</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {operations.settings.levelTitles.map((item) => (
+                          <TableRow key={item.minLevel} className="border-white/10">
+                            <TableCell>
+                              <Input
+                                id={`level-title-${item.minLevel}-level`}
+                                type="number"
+                                min={1}
+                                defaultValue={item.minLevel}
+                                className="border-white/10 bg-[#1D2230] text-white"
+                              />
+                            </TableCell>
+                            <TableCell>
+                              <Input
+                                id={`level-title-${item.minLevel}-title`}
+                                defaultValue={item.title}
+                                className="border-white/10 bg-[#1D2230] text-white"
+                              />
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                                  disabled={updateLevelTitlesConfigMutation.isPending}
+                                  onClick={() => submitUpdateLevelTitle(item.minLevel)}
+                                >
+                                  Lưu
+                                </Button>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="destructive"
+                                  disabled={updateLevelTitlesConfigMutation.isPending}
+                                  onClick={() => deleteLevelTitle(item.minLevel)}
+                                >
+                                  Xóa
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
                   </div>
                 </div>
                 <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
@@ -2933,6 +3207,86 @@ export default function AdminRegistrationsPage() {
                   </div>
                 </div>
                 <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                    <h3 className="font-semibold text-white">Tạo Limit / Mong muốn</h3>
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <select id="admin-limit-house" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        {rooms.map((room) => (
+                          <option key={room.id} value={room.id}>{room.name}</option>
+                        ))}
+                      </select>
+                      <select id="admin-limit-type" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        <option value="limit">Limit</option>
+                        <option value="desire">Mong muốn</option>
+                      </select>
+                      <Input id="admin-limit-content" placeholder="Nội dung" className="border-white/10 bg-[#1D2230] text-white md:col-span-2" />
+                      <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreateLimit}>
+                        Tạo mục
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                    <h3 className="font-semibold text-white">Tạo journal</h3>
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <select id="admin-journal-member" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        {memberOptions.map((member) => (
+                          <option key={member.id} value={member.id}>{member.label}</option>
+                        ))}
+                      </select>
+                      <Input id="admin-journal-name" placeholder="Tên journal" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Input id="admin-journal-prompt" placeholder="Prompt" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreateJournal}>
+                        Tạo journal
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
+                  <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                    <h3 className="font-semibold text-white">Tạo thỏa thuận</h3>
+                    <div className="mt-4 grid gap-3 md:grid-cols-3">
+                      <select id="admin-agreement-house" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        {rooms.map((room) => (
+                          <option key={room.id} value={room.id}>{room.name}</option>
+                        ))}
+                      </select>
+                      <Input id="admin-agreement-title" placeholder="Tiêu đề" className="border-white/10 bg-[#1D2230] text-white" />
+                      <select id="admin-agreement-status" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        <option value="pending">pending</option>
+                        <option value="active">active</option>
+                        <option value="void">void</option>
+                      </select>
+                      <Input id="admin-agreement-purpose" placeholder="Mục đích" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Input id="admin-agreement-rules" placeholder="Quy tắc" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Input id="admin-agreement-consequences" placeholder="Hậu quả" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreateAgreement}>
+                        Tạo thỏa thuận
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="rounded-lg border border-white/10 bg-[#11141D] p-4">
+                    <h3 className="font-semibold text-white">Tạo journal entry</h3>
+                    <div className="mt-4 grid gap-3 md:grid-cols-4">
+                      <select id="admin-journal-entry-journal" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        {operations.journals.map((journal) => (
+                          <option key={journal.id} value={journal.id}>{journal.name}</option>
+                        ))}
+                      </select>
+                      <select id="admin-journal-entry-mood" className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                        <option value="neutral">neutral</option>
+                        <option value="happy">happy</option>
+                        <option value="sad">sad</option>
+                        <option value="excited">excited</option>
+                        <option value="loved">loved</option>
+                      </select>
+                      <Input id="admin-journal-entry-content" placeholder="Nội dung" className="border-white/10 bg-[#1D2230] text-white" />
+                      <Button type="button" className="bg-[#F59E0B] text-black hover:bg-[#D97706]" onClick={submitCreateJournalEntry}>
+                        Tạo entry
+                      </Button>
+                    </div>
+                  </div>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-2">
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
                   <Table className="min-w-[900px]">
                     <TableHeader>
@@ -2995,35 +3349,31 @@ export default function AdminRegistrationsPage() {
                 </div>
 
                 <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
-                  <Table className="min-w-[700px]">
+                  <Table className="min-w-[1000px]">
                     <TableHeader>
                       <TableRow className="border-white/10 hover:bg-transparent">
                         <TableHead className="text-white/60">Agreement</TableHead>
                         <TableHead className="text-white/60">Room</TableHead>
                         <TableHead className="text-white/60">Status</TableHead>
+                        <TableHead className="text-right text-white/60">Actions</TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
                       {operations.agreements.map((agreement) => (
                         <TableRow key={agreement.id} className="border-white/10">
-                          <TableCell className="font-medium text-white">
-                            {agreement.title}
+                          <TableCell>
+                            <Input id={`agreement-${agreement.id}-title`} defaultValue={agreement.title} className="border-white/10 bg-[#1D2230] text-white" />
+                            <Input id={`agreement-${agreement.id}-purpose`} defaultValue={agreement.purpose ?? ""} placeholder="Mục đích" className="mt-2 border-white/10 bg-[#1D2230] text-white" />
+                            <Input id={`agreement-${agreement.id}-rules`} defaultValue={agreement.rules ?? ""} placeholder="Quy tắc" className="mt-2 border-white/10 bg-[#1D2230] text-white" />
+                            <Input id={`agreement-${agreement.id}-consequences`} defaultValue={agreement.consequences ?? ""} placeholder="Hậu quả" className="mt-2 border-white/10 bg-[#1D2230] text-white" />
                           </TableCell>
                           <TableCell className="text-white/65">
                             {agreement.roomName}
                           </TableCell>
                           <TableCell>
                             <select
-                              value={agreement.status}
-                              onChange={(event) =>
-                                updateAgreementStatusMutation.mutate({
-                                  agreementId: agreement.id,
-                                  status: event.target.value as
-                                    | "pending"
-                                    | "active"
-                                    | "void",
-                                })
-                              }
+                              id={`agreement-${agreement.id}-status`}
+                              defaultValue={agreement.status}
                               className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white"
                             >
                               <option value="pending">pending</option>
@@ -3031,11 +3381,196 @@ export default function AdminRegistrationsPage() {
                               <option value="void">void</option>
                             </select>
                           </TableCell>
+                          <TableCell className="text-right">
+                            <div className="flex justify-end gap-2">
+                              <Button
+                                type="button"
+                                size="sm"
+                                className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                                onClick={() =>
+                                  updateAgreementMutation.mutate({
+                                    agreementId: agreement.id,
+                                    title: inputValue(`agreement-${agreement.id}-title`),
+                                    purpose: inputValue(`agreement-${agreement.id}-purpose`) || undefined,
+                                    rules: inputValue(`agreement-${agreement.id}-rules`) || undefined,
+                                    consequences:
+                                      inputValue(`agreement-${agreement.id}-consequences`) ||
+                                      undefined,
+                                    status: inputValue(`agreement-${agreement.id}-status`) as
+                                      | "pending"
+                                      | "active"
+                                      | "void",
+                                  })
+                                }
+                              >
+                                Lưu
+                              </Button>
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="destructive"
+                                onClick={() => deleteOperationRecord("agreement", agreement.id)}
+                              >
+                                Xóa
+                              </Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
                   </Table>
                 </div>
+                </div>
+                <div className="grid gap-4 xl:grid-cols-3">
+                  <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                    <Table className="min-w-[620px]">
+                      <TableHeader>
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead className="text-white/60">Limit / Mong muốn</TableHead>
+                          <TableHead className="text-white/60">Type</TableHead>
+                          <TableHead className="text-right text-white/60">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {operations.limits.map((limit) => (
+                          <TableRow key={limit.id} className="border-white/10">
+                            <TableCell>
+                              <Input id={`limit-${limit.id}-content`} defaultValue={limit.content} className="border-white/10 bg-[#1D2230] text-white" />
+                              <p className="mt-2 text-xs text-white/45">{limit.roomName}</p>
+                            </TableCell>
+                            <TableCell>
+                              <select id={`limit-${limit.id}-type`} defaultValue={limit.type} className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                                <option value="limit">limit</option>
+                                <option value="desire">desire</option>
+                              </select>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                                  onClick={() =>
+                                    updateLimitMutation.mutate({
+                                      limitId: limit.id,
+                                      content: inputValue(`limit-${limit.id}-content`),
+                                      type: inputValue(`limit-${limit.id}-type`) as
+                                        | "limit"
+                                        | "desire",
+                                    })
+                                  }
+                                >
+                                  Lưu
+                                </Button>
+                                <Button type="button" size="sm" variant="destructive" onClick={() => deleteOperationRecord("limit", limit.id)}>
+                                  Xóa
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                    <Table className="min-w-[620px]">
+                      <TableHeader>
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead className="text-white/60">Journal</TableHead>
+                          <TableHead className="text-white/60">Member</TableHead>
+                          <TableHead className="text-right text-white/60">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {operations.journals.map((journal) => (
+                          <TableRow key={journal.id} className="border-white/10">
+                            <TableCell>
+                              <Input id={`journal-${journal.id}-name`} defaultValue={journal.name} className="border-white/10 bg-[#1D2230] text-white" />
+                              <Input id={`journal-${journal.id}-prompt`} defaultValue={journal.prompt ?? ""} placeholder="Prompt" className="mt-2 border-white/10 bg-[#1D2230] text-white" />
+                            </TableCell>
+                            <TableCell className="text-white/65">{journal.memberName}</TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                                  onClick={() =>
+                                    updateJournalMutation.mutate({
+                                      journalId: journal.id,
+                                      name: inputValue(`journal-${journal.id}-name`),
+                                      prompt: inputValue(`journal-${journal.id}-prompt`) || undefined,
+                                    })
+                                  }
+                                >
+                                  Lưu
+                                </Button>
+                                <Button type="button" size="sm" variant="destructive" onClick={() => deleteOperationRecord("journal", journal.id)}>
+                                  Xóa
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                  <div className="overflow-x-auto rounded-lg border border-white/10 bg-[#11141D]">
+                    <Table className="min-w-[620px]">
+                      <TableHeader>
+                        <TableRow className="border-white/10 hover:bg-transparent">
+                          <TableHead className="text-white/60">Journal Entry</TableHead>
+                          <TableHead className="text-white/60">Mood</TableHead>
+                          <TableHead className="text-right text-white/60">Actions</TableHead>
+                        </TableRow>
+                      </TableHeader>
+                      <TableBody>
+                        {operations.journalEntries.map((entry) => (
+                          <TableRow key={entry.id} className="border-white/10">
+                            <TableCell>
+                              <Input id={`journal-entry-${entry.id}-content`} defaultValue={entry.content} className="border-white/10 bg-[#1D2230] text-white" />
+                              <p className="mt-2 text-xs text-white/45">{entry.memberName}</p>
+                            </TableCell>
+                            <TableCell>
+                              <select id={`journal-entry-${entry.id}-mood`} defaultValue={entry.mood} className="rounded-md border border-white/10 bg-[#1D2230] px-3 py-2 text-sm text-white">
+                                <option value="neutral">neutral</option>
+                                <option value="happy">happy</option>
+                                <option value="sad">sad</option>
+                                <option value="excited">excited</option>
+                                <option value="loved">loved</option>
+                              </select>
+                            </TableCell>
+                            <TableCell className="text-right">
+                              <div className="flex justify-end gap-2">
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  className="bg-[#F59E0B] text-black hover:bg-[#D97706]"
+                                  onClick={() =>
+                                    updateJournalEntryMutation.mutate({
+                                      entryId: entry.id,
+                                      content: inputValue(`journal-entry-${entry.id}-content`),
+                                      mood: inputValue(`journal-entry-${entry.id}-mood`) as
+                                        | "sad"
+                                        | "neutral"
+                                        | "happy"
+                                        | "excited"
+                                        | "loved",
+                                    })
+                                  }
+                                >
+                                  Lưu
+                                </Button>
+                                <Button type="button" size="sm" variant="destructive" onClick={() => deleteOperationRecord("journalEntry", entry.id)}>
+                                  Xóa
+                                </Button>
+                              </div>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
                 </div>
               </div>
             ) : null}

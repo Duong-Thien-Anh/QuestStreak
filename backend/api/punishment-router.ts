@@ -153,6 +153,42 @@ export const punishmentRouter = createRouter({
     );
   }),
 
+  selectAssignment: authedQuery
+    .input(z.object({ assignmentId: z.number() }))
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const member = await db.query.houseMembers.findFirst({
+        where: eq(houseMembers.userId, ctx.user.id),
+      });
+      if (!member) throw new Error("Member not found");
+
+      const assignment = await db.query.punishmentAssignments.findFirst({
+        where: and(
+          eq(punishmentAssignments.id, input.assignmentId),
+          eq(punishmentAssignments.memberId, member.id),
+          eq(punishmentAssignments.status, "active")
+        ),
+      });
+      if (!assignment) throw new Error("Punishment assignment not found");
+
+      await db
+        .update(punishmentAssignments)
+        .set({ selectedAt: null })
+        .where(
+          and(
+            eq(punishmentAssignments.memberId, member.id),
+            eq(punishmentAssignments.status, "active")
+          )
+        );
+
+      await db
+        .update(punishmentAssignments)
+        .set({ selectedAt: new Date() })
+        .where(eq(punishmentAssignments.id, input.assignmentId));
+
+      return { success: true };
+    }),
+
   allAssignments: authedQuery
     .input(z.object({ houseId: z.number() }))
     .query(async ({ input }) => {
@@ -184,67 +220,8 @@ export const punishmentRouter = createRouter({
         checklist: z.array(z.object({ label: z.string(), completed: z.boolean() })),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      const assignment = await db.query.punishmentAssignments.findFirst({
-        where: eq(punishmentAssignments.id, input.assignmentId),
-      });
-      if (!assignment) throw new Error("Assignment not found");
-      if (assignment.status !== "active") throw new Error("Not active");
-
-      const punishment = await db.query.punishments.findFirst({
-        where: eq(punishments.id, assignment.punishmentId),
-      });
-      if (!punishment) throw new Error("Punishment not found");
-
-      // Check if all items are completed
-      const allCompleted = input.checklist.every((item) => item.completed);
-      if (!allCompleted) throw new Error("Not all items completed");
-
-      // Redeeming a violation costs Chym and clears the corresponding Chay.
-      const wallet = await db.query.wallets.findFirst({
-        where: eq(wallets.memberId, assignment.memberId),
-      });
-      if (!wallet) throw new Error("Wallet not found");
-      if (punishment.chayCost > 0) {
-        if (wallet.chymBalance < punishment.chayCost) {
-          throw new Error("Không đủ Chym để chuộc lỗi");
-        }
-        await db
-          .update(wallets)
-          .set({
-            chymBalance: wallet.chymBalance - punishment.chayCost,
-            chayBalance: Math.max(0, wallet.chayBalance - punishment.chayCost),
-          })
-          .where(eq(wallets.memberId, assignment.memberId));
-      }
-
-      await db
-        .update(punishmentAssignments)
-        .set({
-          status: "redeemed",
-          redeemedAt: new Date(),
-          checklist: JSON.stringify(input.checklist),
-        })
-        .where(eq(punishmentAssignments.id, input.assignmentId));
-
-      const actor = await db.query.houseMembers.findFirst({
-        where: eq(houseMembers.userId, ctx.user.id),
-      });
-
-      await db.insert(logs).values({
-        houseId: actor?.houseId || 0,
-        action: "PUNISHMENT_REDEEMED",
-        actorId: actor?.id || 0,
-        targetId: assignment.memberId,
-        details: JSON.stringify({
-          assignmentId: assignment.id,
-          chymCost: punishment.chayCost,
-          chayCleared: punishment.chayCost,
-        }),
-      });
-
-      return { success: true };
+    .mutation(async () => {
+      throw new Error("Task Receive không thể dùng Chym để xử lý hình phạt");
     }),
 
   forgive: domQuery

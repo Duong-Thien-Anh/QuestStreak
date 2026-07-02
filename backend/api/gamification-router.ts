@@ -3,7 +3,7 @@ import { and, eq } from "drizzle-orm";
 import { createRouter, authedQuery } from "./middleware";
 import { getDb } from "./queries/connection";
 import { memberAchievements, memberProgress, streaks, wallets } from "@db/schema";
-import { ensureDefaultAchievements } from "./lib/gamification";
+import { ensureDefaultAchievements, getLevelTitles, resolveLevelTitle } from "./lib/gamification";
 
 export const gamificationRouter = createRouter({
   summary: authedQuery
@@ -12,7 +12,7 @@ export const gamificationRouter = createRouter({
       const db = getDb();
       await ensureDefaultAchievements(db);
 
-      const [wallet, progress, memberStreaks, allAchievements, unlockedRows] = await Promise.all([
+      const [wallet, progress, memberStreaks, allAchievements, unlockedRows, levelTitles] = await Promise.all([
         db.query.wallets.findFirst({
           where: eq(wallets.memberId, input.memberId),
         }),
@@ -26,6 +26,7 @@ export const gamificationRouter = createRouter({
         db.query.memberAchievements.findMany({
           where: eq(memberAchievements.memberId, input.memberId),
         }),
+        getLevelTitles(db),
       ]);
 
       const unlockedByAchievementId = new Map(
@@ -37,7 +38,9 @@ export const gamificationRouter = createRouter({
           ...(wallet || { chymBalance: 0, chayBalance: 0 }),
           xp: progress?.xp ?? 0,
           level: progress?.level ?? 1,
+          levelTitle: resolveLevelTitle(progress?.level ?? 1, levelTitles),
         },
+        levelTitles,
         streaks: memberStreaks,
         achievements: allAchievements.map((achievement) => ({
           ...achievement,

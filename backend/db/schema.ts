@@ -542,6 +542,7 @@ export const punishmentAssignments = pgTable("punishmentAssignments", {
   assignedBy: bigint("assignedBy", { mode: "number" }).notNull(),
   status: assignmentStatusEnum("status").default("active").notNull(),
   assignedAt: timestamp("assignedAt").defaultNow().notNull(),
+  selectedAt: timestamp("selectedAt"),
   redeemedAt: timestamp("redeemedAt"),
   checklist: text("checklist"),
 });

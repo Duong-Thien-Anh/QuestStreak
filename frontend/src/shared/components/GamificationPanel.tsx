@@ -27,18 +27,6 @@ const iconMap: Record<string, React.ReactNode> = {
   zap: <Zap className="w-4 h-4" />,
 };
 
-// ─── Utility: level name ──────────────────────────────────────────────────
-
-function getLevelTitle(level: number): string {
-  if (level <= 2) return "Người mới";
-  if (level <= 5) return "Học việc";
-  if (level <= 10) return "Quen việc";
-  if (level <= 20) return "Thành thục";
-  if (level <= 35) return "Chuyên gia";
-  if (level <= 50) return "Bậc thầy";
-  return "Huyền thoại";
-}
-
 // ─── Streak Heatmap (last 7 slots) ────────────────────────────────────────
 
 function StreakDots({ current, max }: { current: number; max: number }) {
@@ -168,9 +156,8 @@ export function GamificationPanel({ memberId, memberName }: GamificationPanelPro
     achievements,
     unlockedCount,
     totalCount,
+    levelTitle,
   } = useGamification(memberId);
-
-  const levelTitle = getLevelTitle(level);
 
   if (isLoading) {
     return (

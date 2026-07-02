@@ -27,6 +27,7 @@ interface Assignment {
   assignedBy: number;
   status: string;
   assignedAt: Date;
+  selectedAt?: Date | string | null;
   checklist: ChecklistItem[];
   punishment: {
     id: number;
@@ -51,6 +52,7 @@ export function PunishmentsPage() {
       assignedBy: 1,
       status: "active",
       assignedAt: new Date(),
+      selectedAt: new Date(),
       checklist: [
         { label: "Viết 100 dòng đầu tiên", completed: false },
         { label: "Viết 100 dòng tiếp theo", completed: false },
@@ -106,11 +108,6 @@ export function PunishmentsPage() {
       await utils.wallet.get.invalidate();
     },
   });
-  const redeemChayMutation = trpc.wallet.redeemChay.useMutation({
-    onSuccess: async () => {
-      await utils.wallet.get.invalidate();
-    },
-  });
   const assignPunishmentMutation = trpc.punishment.assign.useMutation({
     onSuccess: async () => {
       await utils.punishment.allAssignments.invalidate();
@@ -126,12 +123,11 @@ export function PunishmentsPage() {
       await utils.punishment.allAssignments.invalidate();
     },
   });
-  const redeemPunishmentMutation = trpc.punishment.redeem.useMutation({
+  const selectPunishmentMutation = trpc.punishment.selectAssignment.useMutation({
     onSuccess: async () => {
       await utils.punishment.myAssignments.invalidate();
-      await utils.punishment.allAssignments.invalidate();
-      await utils.wallet.get.invalidate();
     },
+    onError: (error) => showToast(error.message, "error"),
   });
   const visibleWallet = walletQuery.data ?? wallet;
   const visiblePunishments = punishmentsQuery.data ?? punishments;
@@ -150,7 +146,7 @@ export function PunishmentsPage() {
         ? checklistFromText(assignChecklist)
         : [
             { label: "Hoàn thành yêu cầu", completed: false },
-            { label: "Xác nhận chuộc lỗi", completed: false },
+            { label: "Xác nhận hoàn thành hình phạt", completed: false },
           ];
     if (houseQuery.data) {
       assignPunishmentMutation.mutate(
@@ -231,35 +227,19 @@ export function PunishmentsPage() {
     );
   };
 
-  const handleRedeem = (assignment: Assignment) => {
-    const allCompleted = assignment.checklist.every((item) => item.completed);
-    if (!allCompleted) {
-      showToast("Vui lòng hoàn thành tất cả các mục!", "error");
-      return;
-    }
-    if (visibleWallet.chymBalance < assignment.punishment.chayCost) {
-      showToast("Không đủ Chym để chuộc lỗi!", "error");
-      return;
-    }
+  const handleSelectAssignment = (assignmentId: number) => {
     if (houseQuery.data) {
-      redeemPunishmentMutation.mutate({
-        assignmentId: assignment.id,
-        checklist: assignment.checklist,
-      });
-      setExpandedId(null);
-      showToast("Đã chuộc lỗi thành công!", "success");
+      selectPunishmentMutation.mutate({ assignmentId });
+      showToast("Đã chọn hình phạt đang chịu!", "success");
       return;
     }
-    setWallet((prev) => ({
-      ...prev,
-      chymBalance: Math.max(0, prev.chymBalance - assignment.punishment.chayCost),
-      chayBalance: Math.max(0, prev.chayBalance - assignment.punishment.chayCost),
-    }));
     setAssignments((prev) =>
-      prev.map((a) => (a.id === assignment.id ? { ...a, status: "redeemed" } : a))
+      prev.map((assignment) => ({
+        ...assignment,
+        selectedAt: assignment.id === assignmentId ? new Date() : null,
+      }))
     );
-    setExpandedId(null);
-    showToast("Đã chuộc lỗi thành công!", "success");
+    showToast("Đã chọn hình phạt đang chịu!", "success");
   };
 
   const handleForgive = (assignmentId: number) => {
@@ -307,33 +287,7 @@ export function PunishmentsPage() {
       showToast("Đã xóa " + amount + " Chày!", "success");
       return;
     }
-    if (houseQuery.data) {
-      redeemChayMutation.mutate(
-        {
-          amount,
-          reason: reasonInput || undefined,
-        },
-        {
-          onSuccess: () => {
-            setActionSheet(null);
-            showToast("Đã dùng " + amount + " Chym để chuộc " + amount + " Chày!", "success");
-          },
-          onError: (err) => showToast(err.message, "error"),
-        }
-      );
-      return;
-    }
-    if (wallet.chymBalance < amount) {
-      showToast("Không đủ Chym để chuộc lỗi!", "error");
-      return;
-    }
-    setWallet((prev) => ({
-      ...prev,
-      chymBalance: Math.max(0, prev.chymBalance - amount),
-      chayBalance: Math.max(0, prev.chayBalance - amount),
-    }));
-    setActionSheet(null);
-    showToast("Đã dùng " + amount + " Chym để chuộc " + amount + " Chày!", "success");
+    showToast("Task Receive không thể dùng Chym để xử lý hình phạt.", "error");
   };
 
   const handleCreatePunishment = () => {
@@ -369,6 +323,13 @@ export function PunishmentsPage() {
   };
 
   const activeAssignments = visibleAssignments.filter((a) => a.status === "active");
+  const selectedAssignment =
+    activeAssignments.find((assignment) => assignment.selectedAt) ?? null;
+  const displayedActiveAssignments = isAdmin
+    ? activeAssignments
+    : selectedAssignment
+      ? [selectedAssignment]
+      : [];
 
   return (
     <div className="px-4 pt-4 space-y-4">
@@ -399,16 +360,16 @@ export function PunishmentsPage() {
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">{visibleWallet.chymBalance}</p>
-              <p className="text-xs text-white/50">Chym chuộc lỗi</p>
+              <p className="text-xs text-white/50">Chym hiện có</p>
             </div>
             <Crown className="w-6 h-6 text-[#FFD700]" />
           </div>
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
               <p className="text-2xl font-bold text-white">
-                {visibleAssignments.filter((a) => a.status === "redeemed").length}
+                {activeAssignments.length}
               </p>
-              <p className="text-xs text-white/50">Đã chuộc lỗi</p>
+              <p className="text-xs text-white/50">Đã nhận</p>
             </div>
             <Crown className="w-6 h-6 text-[#FFD700]" />
           </div>
@@ -421,12 +382,14 @@ export function PunishmentsPage() {
           Hình phạt đang chịu
         </h2>
 
-        {activeAssignments.length === 0 ? (
+        {displayedActiveAssignments.length === 0 ? (
           <div className="text-center py-8 text-white/30 text-sm">
-            Không có hình phạt đang chịu
+            {activeAssignments.length === 0
+              ? "Không có hình phạt đang chịu"
+              : "Chọn một hình phạt trong danh sách bên dưới"}
           </div>
         ) : (
-          activeAssignments.map((assignment) => (
+          displayedActiveAssignments.map((assignment) => (
             <motion.div
               key={assignment.id}
               initial={{ opacity: 0, y: 10 }}
@@ -448,9 +411,6 @@ export function PunishmentsPage() {
                       <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
                         <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chày
                       </span>
-                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FFD700]/10 text-[#FFD700] font-medium flex items-center gap-1">
-                        <Crown className="w-3 h-3" /> Chuộc {assignment.punishment.chayCost} Chym
-                      </span>
                     </div>
                     <p className="text-xs text-white/50 mt-1">
                       {assignment.punishment.description}
@@ -470,9 +430,9 @@ export function PunishmentsPage() {
                           expandedId === assignment.id ? null : assignment.id
                         )
                       }
-                      className="px-3 py-1.5 rounded-lg bg-[#FF3B30] text-white text-xs font-medium hover:bg-[#FF3B30]/90 transition-colors ml-2 flex-shrink-0"
+                      className="px-3 py-1.5 rounded-lg bg-[#252532] text-white text-xs font-medium hover:bg-[#333344] transition-colors ml-2 flex-shrink-0"
                     >
-                      {expandedId === assignment.id ? "Đóng" : "Chuộc lỗi"}
+                      {expandedId === assignment.id ? "Đóng" : "Checklist"}
                     </button>
                   )}
                 </div>
@@ -528,12 +488,6 @@ export function PunishmentsPage() {
                           </span>
                         </motion.button>
                       ))}
-                      <button
-                        onClick={() => handleRedeem(assignment)}
-                        className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors mt-2"
-                      >
-                        Chuộc lỗi ({assignment.punishment.chayCost} Chym)
-                      </button>
                     </div>
                   </motion.div>
                 )}
@@ -548,28 +502,25 @@ export function PunishmentsPage() {
         <h2 className="text-xs font-semibold text-white/40 uppercase tracking-wider">
           Danh sách hình phạt
         </h2>
-        {visiblePunishments.map((p, i) => (
-          <motion.div
-            key={p.id}
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: i * 0.05 }}
-            className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
-          >
-            <div className="flex items-start justify-between">
-              <div className="flex-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <h3 className="font-semibold text-white text-sm">{p.title}</h3>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
-                    <Link2 className="w-3 h-3" /> {p.chayCost} Chày
-                  </span>
-                  <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FFD700]/10 text-[#FFD700] font-medium flex items-center gap-1">
-                    <Crown className="w-3 h-3" /> {p.chayCost} Chym chuộc
-                  </span>
+        {isAdmin ? (
+          visiblePunishments.map((p, i) => (
+            <motion.div
+              key={p.id}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: i * 0.05 }}
+              className="bg-[#1A1A22] rounded-xl border border-white/5 p-4"
+            >
+              <div className="flex items-start justify-between">
+                <div className="flex-1">
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="font-semibold text-white text-sm">{p.title}</h3>
+                    <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
+                      <Link2 className="w-3 h-3" /> {p.chayCost} Chày
+                    </span>
+                  </div>
+                  <p className="text-xs text-white/50 mt-1">{p.description}</p>
                 </div>
-                <p className="text-xs text-white/50 mt-1">{p.description}</p>
-              </div>
-              {isAdmin && (
                 <button
                   onClick={() => {
                     setAssignSheet({ punishmentId: p.id, title: p.title });
@@ -580,10 +531,59 @@ export function PunishmentsPage() {
                 >
                   Gán
                 </button>
-              )}
-            </div>
-          </motion.div>
-        ))}
+              </div>
+            </motion.div>
+          ))
+        ) : activeAssignments.length === 0 ? (
+          <div className="text-center py-8 text-white/30 text-sm">
+            Chưa nhận hình phạt nào
+          </div>
+        ) : (
+          activeAssignments.map((assignment, i) => {
+            const isSelected = selectedAssignment?.id === assignment.id;
+            return (
+              <motion.div
+                key={assignment.id}
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: i * 0.05 }}
+                className={
+                  "bg-[#1A1A22] rounded-xl border p-4 " +
+                  (isSelected ? "border-[#00F2FE]/40" : "border-white/5")
+                }
+              >
+                <div className="flex items-start justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h3 className="font-semibold text-white text-sm">
+                        {assignment.punishment.title}
+                      </h3>
+                      <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#FF3B30]/10 text-[#FF3B30] font-medium flex items-center gap-1">
+                        <Link2 className="w-3 h-3" /> {assignment.punishment.chayCost} Chày
+                      </span>
+                      {isSelected ? (
+                        <span className="text-[10px] px-2 py-0.5 rounded-md bg-[#00F2FE]/10 text-[#00F2FE] font-medium">
+                          Đang chịu
+                        </span>
+                      ) : null}
+                    </div>
+                    <p className="text-xs text-white/50 mt-1">
+                      {assignment.punishment.description}
+                    </p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleSelectAssignment(assignment.id)}
+                    disabled={selectPunishmentMutation.isPending || isSelected}
+                    className="px-3 py-1.5 rounded-lg bg-[#00F2FE] text-[#0D0D11] text-xs font-semibold hover:bg-[#00F2FE]/90 disabled:opacity-50 transition-colors flex-shrink-0"
+                  >
+                    {isSelected ? "Đã chọn" : "Chọn hình phạt"}
+                  </button>
+                </div>
+              </motion.div>
+            );
+          })
+        )}
       </div>
 
       {/* FAB */}
@@ -595,12 +595,16 @@ export function PunishmentsPage() {
             onClick: () => setActionSheet("new"),
             color: "#FF3B30",
           },
-          {
-            label: isAdmin ? "Tha Chày" : "Chuộc Chày",
-            icon: <Heart className="w-5 h-5 text-white" />,
-            onClick: () => setActionSheet("forgive"),
-            color: "#00F2FE",
-          },
+          ...(isAdmin
+            ? [
+                {
+                  label: "Tha Chày",
+                  icon: <Heart className="w-5 h-5 text-white" />,
+                  onClick: () => setActionSheet("forgive"),
+                  color: "#00F2FE",
+                },
+              ]
+            : []),
           {
             label: "Thêm Chày",
             icon: <AlertOctagon className="w-5 h-5 text-white" />,
@@ -648,7 +652,7 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
-            <label className="text-xs text-white/50 mb-2 block">Mức Chày vi phạm / Chym cần chuộc</label>
+            <label className="text-xs text-white/50 mb-2 block">Mức Chày vi phạm</label>
             <input
               type="number"
               min={0}
@@ -709,12 +713,12 @@ export function PunishmentsPage() {
       <BottomSheet
         isOpen={actionSheet === "forgive"}
         onClose={() => setActionSheet(null)}
-        title={isAdmin ? "Tha Chày" : "Chuộc Chày bằng Chym"}
+        title="Tha Chày"
       >
         <div className="space-y-4">
           <div>
             <label className="text-xs text-white/50 mb-2 block">
-              {isAdmin ? "Số Chày muốn tha" : "Số Chày muốn chuộc"}
+              Số Chày muốn tha
             </label>
             <input
               type="number"
@@ -725,13 +729,13 @@ export function PunishmentsPage() {
           </div>
           <div>
             <label className="text-xs text-white/50 mb-2 block">
-              {isAdmin ? "Lời tha thứ" : "Lý do chuộc lỗi"}
+              Lời tha thứ
             </label>
             <input
               type="text"
               value={reasonInput}
               onChange={(e) => setReasonInput(e.target.value)}
-              placeholder={isAdmin ? "Viết lời nhắn dịu dàng..." : "Ghi chú chuộc lỗi..."}
+              placeholder="Viết lời nhắn dịu dàng..."
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#00F2FE]/50 focus:outline-none"
             />
           </div>
@@ -740,7 +744,7 @@ export function PunishmentsPage() {
             className="w-full py-3 rounded-xl bg-[#00F2FE] text-[#0D0D11] font-semibold text-sm hover:bg-[#00F2FE]/90 transition-colors"
           >
             <Heart className="w-4 h-4 inline mr-2" />
-            {isAdmin ? "Tha thứ" : "Chuộc lỗi bằng Chym"}
+            Tha thứ
           </button>
         </div>
       </BottomSheet>
@@ -778,7 +782,7 @@ export function PunishmentsPage() {
             <textarea
               value={assignChecklist}
               onChange={(e) => setAssignChecklist(e.target.value)}
-              placeholder={"Hoàn thành yêu cầu\nXác nhận chuộc lỗi"}
+              placeholder={"Hoàn thành yêu cầu\nXác nhận hoàn thành hình phạt"}
               rows={4}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm placeholder:text-white/20 focus:border-[#FF3B30]/50 focus:outline-none resize-none"
             />

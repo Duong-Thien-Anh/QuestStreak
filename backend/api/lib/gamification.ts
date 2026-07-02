@@ -16,6 +16,22 @@ type Db = ReturnType<typeof getDb>;
 const XP_PER_LEVEL = 100;
 const DEFAULT_TASK_XP = 25;
 export const DEFAULT_TASK_XP_SETTING_KEY = "default_task_xp";
+export const LEVEL_TITLES_SETTING_KEY = "level_titles";
+
+export type LevelTitleConfig = {
+  minLevel: number;
+  title: string;
+};
+
+export const DEFAULT_LEVEL_TITLES: LevelTitleConfig[] = [
+  { minLevel: 1, title: "Người mới" },
+  { minLevel: 3, title: "Học việc" },
+  { minLevel: 6, title: "Quen việc" },
+  { minLevel: 11, title: "Thành thục" },
+  { minLevel: 21, title: "Chuyên gia" },
+  { minLevel: 36, title: "Bậc thầy" },
+  { minLevel: 51, title: "Huyền thoại" },
+];
 
 async function ensureAppSettingsTable(db: Db) {
   await db.execute(sql`
@@ -103,6 +119,58 @@ export async function setDefaultTaskXp(value: number, db: Db = getDb()) {
       set: { value: normalized },
     });
   return Number(normalized);
+}
+
+function normalizeLevelTitles(value: unknown): LevelTitleConfig[] {
+  if (!Array.isArray(value)) return DEFAULT_LEVEL_TITLES;
+  const normalized = value
+    .map((item) => {
+      if (!item || typeof item !== "object") return null;
+      const raw = item as { minLevel?: unknown; title?: unknown };
+      const minLevel = Number(raw.minLevel);
+      const title = typeof raw.title === "string" ? raw.title.trim() : "";
+      if (!Number.isFinite(minLevel) || minLevel < 1 || !title) return null;
+      return { minLevel: Math.floor(minLevel), title };
+    })
+    .filter((item): item is LevelTitleConfig => item !== null)
+    .sort((a, b) => a.minLevel - b.minLevel);
+
+  return normalized.length > 0 ? normalized : DEFAULT_LEVEL_TITLES;
+}
+
+export async function getLevelTitles(db: Db = getDb()) {
+  try {
+    await ensureAppSettingsTable(db);
+    const setting = await db.query.appSettings.findFirst({
+      where: eq(appSettings.key, LEVEL_TITLES_SETTING_KEY),
+    });
+    if (!setting) return DEFAULT_LEVEL_TITLES;
+    return normalizeLevelTitles(JSON.parse(setting.value));
+  } catch {
+    return DEFAULT_LEVEL_TITLES;
+  }
+}
+
+export async function setLevelTitles(value: LevelTitleConfig[], db: Db = getDb()) {
+  await ensureAppSettingsTable(db);
+  const normalized = normalizeLevelTitles(value);
+  await db
+    .insert(appSettings)
+    .values({ key: LEVEL_TITLES_SETTING_KEY, value: JSON.stringify(normalized) })
+    .onConflictDoUpdate({
+      target: appSettings.key,
+      set: { value: JSON.stringify(normalized) },
+    });
+  return normalized;
+}
+
+export function resolveLevelTitle(level: number, titles: LevelTitleConfig[] = DEFAULT_LEVEL_TITLES) {
+  const normalizedLevel = Math.max(1, Math.floor(level));
+  const sorted = normalizeLevelTitles(titles);
+  return sorted.reduce(
+    (current, item) => (normalizedLevel >= item.minLevel ? item.title : current),
+    sorted[0]?.title ?? "Người mới",
+  );
 }
 
 export function getCompletionXp(chymReward: number, baseXp = DEFAULT_TASK_XP) {

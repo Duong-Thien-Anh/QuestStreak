@@ -11,6 +11,7 @@ import { createDevLoginHandler } from "./dev-auth";
 import { createDemoAuthHandler } from "./demo-auth";
 import {
   ensureGenderAvatarSchema,
+  ensurePunishmentSelectionSchema,
   ensureTaskRewardSchema,
   ensureUserCredentialsSchema,
 } from "./lib/schema-repair";
@@ -85,6 +86,7 @@ if (env.isProduction) {
 
   await ensureUserCredentialsSchema();
   await ensureTaskRewardSchema();
+  await ensurePunishmentSelectionSchema();
   await ensureGenderAvatarSchema();
 
   const port = parseInt(process.env.PORT || "3000");

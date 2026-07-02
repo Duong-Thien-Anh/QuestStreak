@@ -61,6 +61,27 @@ export async function ensureTaskRewardSchema() {
   }
 }
 
+export async function ensurePunishmentSelectionSchema() {
+  if (!env.databaseUrl) {
+    return;
+  }
+
+  const sql = postgres(env.databaseUrl, { max: 1 });
+  try {
+    await sql`
+      ALTER TABLE public."punishmentAssignments"
+        ADD COLUMN IF NOT EXISTS "selectedAt" timestamp
+    `;
+  } catch (error) {
+    if ((error as { code?: string }).code === "42501") {
+      return;
+    }
+    throw error;
+  } finally {
+    await sql.end();
+  }
+}
+
 export async function ensureGenderAvatarSchema() {
   if (!env.databaseUrl) {
     return;

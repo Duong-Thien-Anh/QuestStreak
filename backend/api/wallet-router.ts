@@ -174,44 +174,7 @@ export const walletRouter = createRouter({
         reason: z.string().optional(),
       })
     )
-    .mutation(async ({ ctx, input }) => {
-      const db = getDb();
-      const member = await db.query.houseMembers.findFirst({
-        where: eq(houseMembers.userId, ctx.user.id),
-      });
-      if (!member) throw new Error("Member not found");
-
-      const wallet = await db.query.wallets.findFirst({
-        where: eq(wallets.memberId, member.id),
-      });
-      if (!wallet) throw new Error("Wallet not found");
-      if (wallet.chayBalance < input.amount) {
-        throw new Error("Số Chày muốn chuộc vượt quá Chày hiện có");
-      }
-      if (wallet.chymBalance < input.amount) {
-        throw new Error("Không đủ Chym để chuộc lỗi");
-      }
-
-      const chymBalance = wallet.chymBalance - input.amount;
-      const chayBalance = wallet.chayBalance - input.amount;
-      await db
-        .update(wallets)
-        .set({ chymBalance, chayBalance })
-        .where(eq(wallets.memberId, member.id));
-
-      await db.insert(logs).values({
-        houseId: member.houseId,
-        action: "REDEEM_CHAY",
-        actorId: member.id,
-        targetId: member.id,
-        details: JSON.stringify({
-          amount: input.amount,
-          reason: input.reason,
-          chymCost: input.amount,
-          chayCleared: input.amount,
-        }),
-      });
-
-      return { chymBalance, chayBalance };
+    .mutation(async () => {
+      throw new Error("Task Receive không thể dùng Chym để xử lý Chày");
     }),
 });

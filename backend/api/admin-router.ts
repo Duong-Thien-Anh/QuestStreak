@@ -38,7 +38,7 @@ import {
 } from "@db/schema";
 import { sendMail, buildApprovalEmail, buildRejectionEmail } from "./lib/mailer";
 import { avatarForGender, supportedGenders } from "./lib/gender";
-import { getDefaultTaskXp, setDefaultTaskXp } from "./lib/gamification";
+import { getDefaultTaskXp, getLevelTitles, setDefaultTaskXp, setLevelTitles } from "./lib/gamification";
 
 const scrypt = promisify(scryptCallback);
 const PASSWORD_HASH_PREFIX = "scrypt";
@@ -819,9 +819,19 @@ export const adminRouter = createRouter({
         orderBy: [desc(privilegeAssignments.assignedAt)],
       }),
       db.query.punishments.findMany({ orderBy: [desc(punishments.createdAt)] }),
-      db.query.punishmentAssignments.findMany({
-        orderBy: [desc(punishmentAssignments.assignedAt)],
-      }),
+      db
+        .select({
+          id: punishmentAssignments.id,
+          punishmentId: punishmentAssignments.punishmentId,
+          memberId: punishmentAssignments.memberId,
+          assignedBy: punishmentAssignments.assignedBy,
+          status: punishmentAssignments.status,
+          assignedAt: punishmentAssignments.assignedAt,
+          redeemedAt: punishmentAssignments.redeemedAt,
+          checklist: punishmentAssignments.checklist,
+        })
+        .from(punishmentAssignments)
+        .orderBy(desc(punishmentAssignments.assignedAt)),
       db.query.limits.findMany({ orderBy: [desc(limits.createdAt)] }),
       db.query.agreements.findMany({ orderBy: [desc(agreements.createdAt)] }),
       db.query.journals.findMany({ orderBy: [desc(journals.createdAt)] }),
@@ -874,7 +884,10 @@ export const adminRouter = createRouter({
         level: progress?.level ?? 1,
       };
     });
-    const defaultTaskXp = await getDefaultTaskXp(db);
+    const [defaultTaskXp, levelTitles] = await Promise.all([
+      getDefaultTaskXp(db),
+      getLevelTitles(db),
+    ]);
 
     return {
       summary: {
@@ -900,6 +913,7 @@ export const adminRouter = createRouter({
       },
       settings: {
         defaultTaskXp,
+        levelTitles,
       },
       tasks: taskRows.map((task) => ({
         ...task,
@@ -1067,6 +1081,25 @@ export const adminRouter = createRouter({
       const db = getDb();
       const defaultTaskXp = await setDefaultTaskXp(input.defaultTaskXp, db);
       return { defaultTaskXp };
+    }),
+
+  updateLevelTitlesConfig: adminQuery
+    .input(
+      z.object({
+        levelTitles: z
+          .array(
+            z.object({
+              minLevel: z.number().int().min(1),
+              title: z.string().min(1).max(100),
+            }),
+          )
+          .min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const levelTitles = await setLevelTitles(input.levelTitles, db);
+      return { levelTitles };
     }),
 
   updateStreak: adminQuery
@@ -1732,6 +1765,194 @@ export const adminRouter = createRouter({
       return agreement;
     }),
 
+  createLimit: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        content: z.string().min(1),
+        type: z.enum(["limit", "desire"]),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
+      const [limit] = await db
+        .insert(limits)
+        .values({
+          houseId: input.houseId,
+          content: input.content.trim(),
+          type: input.type,
+          createdBy: actor?.id ?? 0,
+        })
+        .returning();
+      return limit;
+    }),
+
+  updateLimit: adminQuery
+    .input(
+      z.object({
+        limitId: z.number(),
+        content: z.string().min(1),
+        type: z.enum(["limit", "desire"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [limit] = await db
+        .update(limits)
+        .set({
+          content: input.content.trim(),
+          type: input.type,
+        })
+        .where(eq(limits.id, input.limitId))
+        .returning();
+      return limit;
+    }),
+
+  createAgreement: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        title: z.string().min(1).max(255),
+        purpose: z.string().optional(),
+        rules: z.string().optional(),
+        consequences: z.string().optional(),
+        status: z.enum(["pending", "active", "void"]).default("pending"),
+      }),
+    )
+    .mutation(async ({ ctx, input }) => {
+      const db = getDb();
+      const actor = await getAdminMember(ctx.user.id);
+      const [agreement] = await db
+        .insert(agreements)
+        .values({
+          houseId: input.houseId,
+          title: input.title.trim(),
+          purpose: input.purpose?.trim() || null,
+          rules: input.rules?.trim() || null,
+          consequences: input.consequences?.trim() || null,
+          status: input.status,
+          createdBy: actor?.id ?? 0,
+        })
+        .returning();
+      return agreement;
+    }),
+
+  updateAgreement: adminQuery
+    .input(
+      z.object({
+        agreementId: z.number(),
+        title: z.string().min(1).max(255),
+        purpose: z.string().optional(),
+        rules: z.string().optional(),
+        consequences: z.string().optional(),
+        status: z.enum(["pending", "active", "void"]),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [agreement] = await db
+        .update(agreements)
+        .set({
+          title: input.title.trim(),
+          purpose: input.purpose?.trim() || null,
+          rules: input.rules?.trim() || null,
+          consequences: input.consequences?.trim() || null,
+          status: input.status,
+        })
+        .where(eq(agreements.id, input.agreementId))
+        .returning();
+      return agreement;
+    }),
+
+  createJournal: adminQuery
+    .input(
+      z.object({
+        houseId: z.number(),
+        memberId: z.number(),
+        name: z.string().min(1).max(255),
+        prompt: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [journal] = await db
+        .insert(journals)
+        .values({
+          houseId: input.houseId,
+          memberId: input.memberId,
+          name: input.name.trim(),
+          prompt: input.prompt?.trim() || null,
+        })
+        .returning();
+      return journal;
+    }),
+
+  updateJournal: adminQuery
+    .input(
+      z.object({
+        journalId: z.number(),
+        name: z.string().min(1).max(255),
+        prompt: z.string().optional(),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [journal] = await db
+        .update(journals)
+        .set({
+          name: input.name.trim(),
+          prompt: input.prompt?.trim() || null,
+        })
+        .where(eq(journals.id, input.journalId))
+        .returning();
+      return journal;
+    }),
+
+  createJournalEntry: adminQuery
+    .input(
+      z.object({
+        journalId: z.number(),
+        memberId: z.number(),
+        mood: z.enum(["happy", "neutral", "sad", "excited", "loved"]),
+        content: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [entry] = await db
+        .insert(journalEntries)
+        .values({
+          journalId: input.journalId,
+          memberId: input.memberId,
+          mood: input.mood,
+          content: input.content.trim(),
+        })
+        .returning();
+      return entry;
+    }),
+
+  updateJournalEntry: adminQuery
+    .input(
+      z.object({
+        entryId: z.number(),
+        mood: z.enum(["happy", "neutral", "sad", "excited", "loved"]),
+        content: z.string().min(1),
+      }),
+    )
+    .mutation(async ({ input }) => {
+      const db = getDb();
+      const [entry] = await db
+        .update(journalEntries)
+        .set({
+          mood: input.mood,
+          content: input.content.trim(),
+        })
+        .where(eq(journalEntries.id, input.entryId))
+        .returning();
+      return entry;
+    }),
+
   createNote: adminQuery
     .input(
       z.object({
@@ -1789,6 +2010,10 @@ export const adminRouter = createRouter({
           "privilegeAssignment",
           "punishmentAssignment",
           "wheelSpin",
+          "limit",
+          "agreement",
+          "journal",
+          "journalEntry",
           "note",
           "notification",
           "log",
@@ -1822,6 +2047,21 @@ export const adminRouter = createRouter({
           break;
         case "wheelSpin":
           await db.delete(wheelSpins).where(eq(wheelSpins.id, input.id));
+          break;
+        case "limit":
+          await db.delete(limits).where(eq(limits.id, input.id));
+          break;
+        case "agreement":
+          await db.delete(agreements).where(eq(agreements.id, input.id));
+          break;
+        case "journal":
+          await db
+            .delete(journalEntries)
+            .where(eq(journalEntries.journalId, input.id));
+          await db.delete(journals).where(eq(journals.id, input.id));
+          break;
+        case "journalEntry":
+          await db.delete(journalEntries).where(eq(journalEntries.id, input.id));
           break;
         case "note":
           await db.delete(notes).where(eq(notes.id, input.id));

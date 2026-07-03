@@ -4,7 +4,6 @@ import { motion, AnimatePresence } from "framer-motion";
 import {
   Star,
   Gift,
-  Heart,
   Plus,
   Minus,
   Zap,
@@ -59,6 +58,7 @@ export function ShopPage() {
   const [actionSheet, setActionSheet] = useState<string | null>(null);
   const [selectedPrivilegeId, setSelectedPrivilegeId] = useState<number | null>(null);
   const [selectedPrivilegeMemberId, setSelectedPrivilegeMemberId] = useState<number | null>(null);
+  const [selectedPointMemberId, setSelectedPointMemberId] = useState<number | null>(null);
   const [pointsInput, setPointsInput] = useState("10");
   const [reasonInput, setReasonInput] = useState("");
   const [editingRewardId, setEditingRewardId] = useState<number | null>(null);
@@ -159,6 +159,10 @@ export function ShopPage() {
   const purchasedCount = purchasesQuery.data?.length ?? 0;
   const selectedGiftMember = members.find((member) => member.id === selectedGiftMemberId);
   const selectedPrivilegeMember = members.find((member) => member.id === selectedPrivilegeMemberId);
+  const selectedPointMember = members.find(
+    (member) => member.id === (selectedPointMemberId ?? subMember?.id)
+  );
+  const pointTargetMemberId = selectedPointMemberId ?? subMember?.id ?? null;
   const purchaseCountByRewardId = new Map<number, number>();
   for (const purchase of purchasesQuery.data ?? []) {
     purchaseCountByRewardId.set(
@@ -270,14 +274,14 @@ export function ShopPage() {
   const handleAddPoints = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
-    if (houseQuery.data && subMember?.id) {
+    if (houseQuery.data && pointTargetMemberId) {
       addChymMutation.mutate({
-        memberId: subMember.id,
+        memberId: pointTargetMemberId,
         amount,
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast(`Đã thêm ${amount} Chym!`, "success");
+      showToast(`Đã thêm ${amount} Chym cho ${selectedPointMember?.nickname ?? "thành viên"}!`, "success");
       return;
     }
     setWallet((prev) => ({ ...prev, chymBalance: prev.chymBalance + amount }));
@@ -288,14 +292,14 @@ export function ShopPage() {
   const handleRemovePoints = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
-    if (houseQuery.data && subMember?.id) {
+    if (houseQuery.data && pointTargetMemberId) {
       removeChymMutation.mutate({
-        memberId: subMember.id,
+        memberId: pointTargetMemberId,
         amount,
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast(`Đã trừ ${amount} Chym!`, "success");
+      showToast(`Đã trừ ${amount} Chym của ${selectedPointMember?.nickname ?? "thành viên"}!`, "success");
       return;
     }
     setWallet((prev) => ({
@@ -552,9 +556,6 @@ export function ShopPage() {
             alt="Avatar"
             className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF2A85] flex items-center justify-center">
-            <Heart className="w-3 h-3 text-white" />
-          </div>
         </div>
         <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
@@ -778,13 +779,19 @@ export function ShopPage() {
           {
             label: "Trừ Chym",
             icon: <Minus className="w-5 h-5 text-white" />,
-            onClick: () => setActionSheet("remove"),
+            onClick: () => {
+              setSelectedPointMemberId(subMember?.id ?? members[0]?.id ?? null);
+              setActionSheet("remove");
+            },
             color: "#FF3B30",
           },
           {
             label: "Thêm Chym",
             icon: <Plus className="w-5 h-5 text-white" />,
-            onClick: () => setActionSheet("add"),
+            onClick: () => {
+              setSelectedPointMemberId(subMember?.id ?? members[0]?.id ?? null);
+              setActionSheet("add");
+            },
             color: "#00F2FE",
           },
         ]}
@@ -972,6 +979,20 @@ export function ShopPage() {
             />
           </div>
           <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận việc</label>
+            <select
+              value={pointTargetMemberId ?? ""}
+              onChange={(event) => setSelectedPointMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="text-xs text-white/50 mb-2 block">Lý do</label>
             <input
               type="text"
@@ -1004,6 +1025,20 @@ export function ShopPage() {
               onChange={(e) => setPointsInput(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
             />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận việc</label>
+            <select
+              value={pointTargetMemberId ?? ""}
+              onChange={(event) => setSelectedPointMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-white/50 mb-2 block">Lý do</label>

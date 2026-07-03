@@ -177,10 +177,7 @@ export const punishmentRouter = createRouter({
     if (!member) return [];
 
     const assignments = await db.query.punishmentAssignments.findMany({
-      where: and(
-        eq(punishmentAssignments.memberId, member.id),
-        eq(punishmentAssignments.status, "active")
-      ),
+      where: eq(punishmentAssignments.memberId, member.id),
     });
     return Promise.all(
       assignments.map(async (assignment) => ({

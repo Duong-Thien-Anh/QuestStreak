@@ -7,7 +7,6 @@ import {
   Heart,
   Plus,
   Check,
-  Crown,
 } from "lucide-react";
 import { FAB } from "@/shared/components/FAB";
 import { BottomSheet } from "@/shared/components/BottomSheet";
@@ -75,6 +74,7 @@ export function PunishmentsPage() {
   });
   const [assignSheet, setAssignSheet] = useState<{ punishmentId: number; title: string } | null>(null);
   const [selectedAssignMemberId, setSelectedAssignMemberId] = useState<number | null>(null);
+  const [selectedPointMemberId, setSelectedPointMemberId] = useState<number | null>(null);
   const [assignChecklist, setAssignChecklist] = useState("");
   const [punishments, setPunishments] = useState(mockPunishments);
   const utils = trpc.useUtils();
@@ -136,6 +136,10 @@ export function PunishmentsPage() {
   });
   const visibleWallet = walletQuery.data ?? wallet;
   const visiblePunishments = punishmentsQuery.data ?? punishments;
+  const selectedPointMember = members.find(
+    (member) => member.id === (selectedPointMemberId ?? subMember?.id)
+  );
+  const pointTargetMemberId = selectedPointMemberId ?? subMember?.id ?? null;
   const memberLabel = (memberId: number) => {
     const member = members.find((item) => item.id === memberId);
     const userName = (member as { user?: { name?: string } } | undefined)?.user?.name;
@@ -315,14 +319,14 @@ export function PunishmentsPage() {
   const handleAddDemerits = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
-    if (houseQuery.data && subMember?.id) {
+    if (houseQuery.data && pointTargetMemberId) {
       addChayMutation.mutate({
-        memberId: subMember.id,
+        memberId: pointTargetMemberId,
         amount,
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast("Đã thêm " + amount + " Chày!", "success");
+      showToast("Đã thêm " + amount + " Chày cho " + (selectedPointMember?.nickname ?? "thành viên") + "!", "success");
       return;
     }
     setWallet((prev) => ({ ...prev, chayBalance: prev.chayBalance + amount }));
@@ -333,14 +337,14 @@ export function PunishmentsPage() {
   const handleForgiveDemerits = () => {
     const amount = parseInt(pointsInput) || 0;
     if (amount <= 0) return;
-    if (isAdmin && houseQuery.data && subMember?.id) {
+    if (isAdmin && houseQuery.data && pointTargetMemberId) {
       forgiveChayMutation.mutate({
-        memberId: subMember.id,
+        memberId: pointTargetMemberId,
         amount,
         reason: reasonInput || undefined,
       });
       setActionSheet(null);
-      showToast("Đã xóa " + amount + " Chày!", "success");
+      showToast("Đã xóa " + amount + " Chày cho " + (selectedPointMember?.nickname ?? "thành viên") + "!", "success");
       return;
     }
     showToast("Task Receive không thể dùng Chym để xử lý hình phạt.", "error");
@@ -379,6 +383,11 @@ export function PunishmentsPage() {
   };
 
   const activeAssignments = visibleAssignments.filter((a) => a.status === "active");
+  const completedPunishmentsCount = visibleAssignments.filter(
+    (assignment) =>
+      assignment.status === "redeemed" &&
+      (!subMember?.id || assignment.memberId === subMember.id)
+  ).length;
   const displayedActiveAssignments = isAdmin
     ? activeAssignments
     : activeAssignments;
@@ -397,9 +406,6 @@ export function PunishmentsPage() {
             alt="Avatar"
             className="w-44 h-44 rounded-xl object-cover border-2 border-[#FF2A85]/30"
           />
-          <div className="absolute -bottom-1 -right-1 w-6 h-6 rounded-full bg-[#FF2A85] flex items-center justify-center">
-            <Heart className="w-3 h-3 text-white" />
-          </div>
         </div>
         <div className="flex-1 grid grid-rows-2 gap-2">
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
@@ -411,10 +417,10 @@ export function PunishmentsPage() {
           </div>
           <div className="bg-[#1A1A22] rounded-xl p-3 flex items-center justify-between border border-white/5">
             <div>
-              <p className="text-2xl font-bold text-white">{visibleWallet.chymBalance}</p>
-              <p className="text-xs text-white/50">Chym hiện có</p>
+              <p className="text-2xl font-bold text-white">{completedPunishmentsCount}</p>
+              <p className="text-xs text-white/50">Đã chịu phạt</p>
             </div>
-            <Crown className="w-6 h-6 text-[#FFD700]" />
+            <Check className="w-6 h-6 text-[#00F2FE]" />
           </div>
         </div>
       </motion.div>
@@ -639,7 +645,10 @@ export function PunishmentsPage() {
                 {
                   label: "Tha Chày",
                   icon: <Heart className="w-5 h-5 text-white" />,
-                  onClick: () => setActionSheet("forgive"),
+                  onClick: () => {
+                    setSelectedPointMemberId(subMember?.id ?? members[0]?.id ?? null);
+                    setActionSheet("forgive");
+                  },
                   color: "#00F2FE",
                 },
               ]
@@ -647,7 +656,10 @@ export function PunishmentsPage() {
           {
             label: "Thêm Chày",
             icon: <AlertOctagon className="w-5 h-5 text-white" />,
-            onClick: () => setActionSheet("add"),
+            onClick: () => {
+              setSelectedPointMemberId(subMember?.id ?? members[0]?.id ?? null);
+              setActionSheet("add");
+            },
             color: "#FF3B30",
           },
         ]}
@@ -731,6 +743,20 @@ export function PunishmentsPage() {
             />
           </div>
           <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận việc</label>
+            <select
+              value={pointTargetMemberId ?? ""}
+              onChange={(event) => setSelectedPointMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#FF3B30]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
+          </div>
+          <div>
             <label className="text-xs text-white/50 mb-2 block">Lý do</label>
             <input
               type="text"
@@ -765,6 +791,20 @@ export function PunishmentsPage() {
               onChange={(e) => setPointsInput(e.target.value)}
               className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
             />
+          </div>
+          <div>
+            <label className="text-xs text-white/50 mb-2 block">Người nhận việc</label>
+            <select
+              value={pointTargetMemberId ?? ""}
+              onChange={(event) => setSelectedPointMemberId(Number(event.target.value))}
+              className="w-full px-4 py-3 rounded-xl bg-[#252532] border border-white/10 text-white text-sm focus:border-[#00F2FE]/50 focus:outline-none"
+            >
+              {members.map((member) => (
+                <option key={member.id} value={member.id}>
+                  {member.nickname || "Thành viên"} - {member.lifestyleRole}
+                </option>
+              ))}
+            </select>
           </div>
           <div>
             <label className="text-xs text-white/50 mb-2 block">

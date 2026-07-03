@@ -41,6 +41,13 @@ type LocalPrivilege = {
   isActive: boolean;
 };
 
+const privilegeImageByRarity: Record<Rarity, string> = {
+  common: "/privileges/movie_ticket.jpg",
+  rare: "/privileges/vip_pass.jpg",
+  epic: "/shop/reward_star.jpg",
+  legendary: "/shop/reward_gift.jpg",
+};
+
 export function ShopPage() {
   const { shopSubTab, setShopSubTab, showToast } = useAppStore();
   const { isAdmin } = useCurrentUser();
@@ -466,7 +473,7 @@ export function ShopPage() {
             houseId: 1,
             title: privilegeForm.title,
             description: privilegeForm.description,
-            image: "/privileges/vip_pass.jpg",
+            image: privilegeImageByRarity[privilegeForm.rarity],
             rarity: privilegeForm.rarity,
             isActive: true,
           },
@@ -491,7 +498,7 @@ export function ShopPage() {
         houseId,
         title: privilegeForm.title,
         description: privilegeForm.description || undefined,
-        image: "/privileges/vip_pass.jpg",
+        image: privilegeImageByRarity[privilegeForm.rarity],
         rarity: privilegeForm.rarity,
       });
       showToast("Đã tạo privilege!", "success");
@@ -528,6 +535,8 @@ export function ShopPage() {
     epic: "Sử thi",
     legendary: "Huyền thoại",
   };
+
+  const privilegeImage = (rarity: Rarity) => privilegeImageByRarity[rarity];
 
   return (
     <div className="px-4 pt-4 space-y-4">
@@ -705,7 +714,7 @@ export function ShopPage() {
                 className="bg-[#1A1A22] rounded-xl border border-white/5 p-4 flex flex-col"
               >
                 <img
-                  src={priv.image || "/privileges/vip_pass.jpg"}
+                  src={privilegeImage(priv.rarity)}
                   alt={priv.title}
                   className="w-full aspect-square rounded-lg object-cover mb-3"
                 />
@@ -1026,7 +1035,7 @@ export function ShopPage() {
         {selectedPrivilege ? (
           <div className="space-y-4">
             <img
-              src={selectedPrivilege.image || "/privileges/vip_pass.jpg"}
+              src={privilegeImage(selectedPrivilege.rarity)}
               alt={selectedPrivilege.title}
               className="w-full aspect-video rounded-xl object-cover"
             />
@@ -1062,7 +1071,7 @@ export function ShopPage() {
           <div className="space-y-4">
             <div className="flex items-center gap-3 rounded-xl border border-[#00F2FE]/20 bg-[#00F2FE]/5 p-3">
               <img
-                src={selectedPrivilege.image || "/privileges/vip_pass.jpg"}
+                src={privilegeImage(selectedPrivilege.rarity)}
                 alt={selectedPrivilege.title}
                 className="h-12 w-12 flex-shrink-0 rounded-lg object-cover"
               />
